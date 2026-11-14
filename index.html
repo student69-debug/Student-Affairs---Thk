@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Student Affairs – Thk</title>
+<link rel="stylesheet" href="css/styles.css">
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+<div id="gate" class="gate" hidden></div>
+<div class="shell" hidden>
+  <aside class="sidebar" aria-label="เมนูหลัก">
+    <a class="brand" href="#/">
+      <div class="brand-mark" aria-hidden="true">S</div>
+      <div class="brand-text"><b>STUDENT AFFAIRS</b><span>กลุ่มบริหารกิจการนักเรียน<br>ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม</span></div>
+    </a>
+    <nav class="nav" id="nav"></nav>
+    <div class="sidebar-foot">เชื่อมต่อฐานข้อมูลกลาง</div>
+  </aside>
+  <div class="nav-scrim" data-action="toggle-nav"></div>
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" data-action="toggle-nav" aria-label="เปิดเมนู"><i data-lucide="menu"></i></button>
+      <h1 id="page-title">หน้าแรก</h1>
+      <div class="quick-search"><i data-lucide="search" class="i16"></i><input id="quick-search" placeholder="พิมพ์รหัส / ชื่อนักเรียน" autocomplete="off" aria-label="ค้นหานักเรียน" aria-controls="quick-results"><div class="qs-box" id="quick-results" role="listbox" hidden></div></div>
+      <div class="user-chip"><div class="avatar" id="user-avatar"></div><div class="uname" id="user-name"></div><button class="icon-btn" data-action="logout" title="ออกจากระบบ" aria-label="ออกจากระบบ"><i data-lucide="log-out"></i></button></div>
+    </header>
+    <main class="content" id="content"></main>
+  </div>
+</div>
+<div id="dialog-root"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/store.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/apps.js"></script>
+<script src="js/pages.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

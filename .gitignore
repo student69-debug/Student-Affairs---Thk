@@ -1,0 +1,10 @@
+# Netlify CLI local state
+.netlify/
+node_modules/
+
+# never commit student data exports or source spreadsheets
+*.xlsx
+*.xls
+*.csv
+.env
+.env.*
