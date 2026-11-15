@@ -416,7 +416,7 @@
 
   function settings(q) {
     const tab = q.tab || 'users';
-    const tabs = `<div class="tabs">${[['users', 'ผู้ใช้และสิทธิ์'], ['term', 'ปีการศึกษา / ภาคเรียน'], ['apps', 'จัดการแอป'], ['parents', 'ผู้ปกครอง'], ['data', 'ข้อมูลระบบ']].map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/settings?tab=${k}">${l}</button>`).join('')}</div>`;
+    const tabs = `<div class="tabs">${[['users', 'ผู้ใช้และสิทธิ์'], ['term', 'ปีการศึกษา / ภาคเรียน'], ['apps', 'จัดการแอป'], ['parents', 'ผู้ปกครอง']].concat(Store.isAdmin() ? [['api', 'การเชื่อมต่อ API']] : [], [['data', 'ข้อมูลระบบ']]).map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/settings?tab=${k}">${l}</button>`).join('')}</div>`;
     const admin = Store.isAdmin();
     const lock = admin ? '' : `<div class="notice warn">${icon('lock', 'i16')}<span>เฉพาะผู้ดูแลระบบที่แก้ไขการตั้งค่าได้ </span></div>`;
     let body = '';
@@ -434,6 +434,8 @@
         <div class="field"><label>ภาคเรียน</label><select class="select" name="term" ${admin ? '' : 'disabled'}><option value="1" ${Store.s.term === 1 ? 'selected' : ''}>1</option><option value="2" ${Store.s.term === 2 ? 'selected' : ''}>2</option></select></div>
         <div class="full notice">${icon('info', 'i16')}<span>คะแนนพฤติกรรมนับแยกตามภาคเรียน เมื่อเปลี่ยนภาคเรียน คะแนนทุกคนเริ่มจากคะแนนตั้งต้นใหม่ (บันทึกเดิมยังเก็บไว้)</span></div></div></div>
         ${admin ? '<div class="dialog-foot"><button class="btn primary" type="submit">บันทึก</button></div>' : ''}</form>`;
+    } else if (tab === 'api' && admin) {
+      return { title: 'ตั้งค่า', html: tabs + ApiKeys.html(), after: ApiKeys.after };
     } else if (tab === 'parents') {
       const pv = Store.s.parentView || {};
       const dis = admin ? '' : 'disabled';

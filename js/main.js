@@ -91,6 +91,8 @@
       await Store.importSample(); await Store.load(); UI.toast('นำเข้าข้อมูลตัวอย่างแล้ว'); render();
     }),
     'room-edit': (el) => Pages.roomDialog(el.dataset.id),
+    'api-issue': () => ApiKeys.issueDialog(),
+    'api-revoke': (el) => ApiKeys.revoke(el.dataset.id, el.dataset.name),
     'grade-edit': (el) => Pages.gradeDialog(el.dataset.id),
     'room-auto': async (el) => {
       el.disabled = true;

@@ -89,6 +89,12 @@
     },
     async parentView() { return check(await sb.rpc('parent_view')); },
 
+    /* ---- API keys for other school systems (admin only, enforced in the database) ---- */
+    async apiKeys() { return check(await sb.rpc('admin_list_app_keys')); },
+    async issueKey(name, scopes) { const rows = check(await sb.rpc('admin_issue_app_key', { p_name: name, p_scopes: scopes })); return rows[0]; },
+    async revokeKey(id) { check(await sb.rpc('admin_revoke_app_key', { p_client_id: id })); },
+    async apiLog(clientId) { return check(await sb.rpc('admin_api_log', { p_client_id: clientId, p_limit: 100 })); },
+
     /* ---- photos (private Storage bucket, short-lived signed links) ---- */
     _photoUrls: new Map(),
     async photoUrls(paths) {
