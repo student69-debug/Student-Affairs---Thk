@@ -2,7 +2,7 @@
 
 ระบบงานกลุ่มบริหารกิจการนักเรียน โรงเรียนธรรมศาสตร์คลองหลวงวิทยาคม
 
-- เว็บ: https://student-affairs-thk.netlify.app
+- เว็บ: https://student69-debug.github.io/Student-Affairs---Thk/ (GitHub Pages)
 - ฐานข้อมูล: Supabase (โปรเจกต์ `student-affairs-thk`) — สิทธิ์การเข้าถึงคุมด้วย Row Level Security
 - หน้าเว็บ: HTML/CSS/JavaScript ล้วน ไม่ต้อง build
 
@@ -40,6 +40,4 @@
 
 ## เผยแพร่
 
-```bash
-npx netlify-cli@17.38.1 deploy --prod --dir . --site 597f3226-828e-491e-9d63-31fcf86ace4b
-```
+เว็บอยู่บน GitHub Pages (branch `main`, โฟลเดอร์ราก) — แค่ `git push` ขึ้น `main` เว็บจะอัปเดตเองภายในประมาณ 1 นาที
