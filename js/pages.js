@@ -37,14 +37,16 @@
       return { s, sc: sc ?? 999, reasons };
     }).filter((x) => x.reasons.length).sort((a, b) => a.sc - b.sc);
     const month = new Date(); month.setDate(1); month.setHours(0, 0, 0, 0);
-    const cMonth = on('counsel') ? D().counsel.filter((c) => new Date(c.at) >= month).length : 0;
-    const in7 = Date.now() + 7 * 864e5;
-    const fu = on('counsel') ? D().counsel.filter((c) => c.nextAt && new Date(c.nextAt) >= Date.now() - 864e5 && new Date(c.nextAt) <= in7).length : 0;
+    // counselling progress (counsellors see every case; others only students in their own scope)
+    const prog = on('counsel') ? (D().progress || []) : [];
+    const monthIso = month.toISOString().slice(0, 10), todayIso = new Date().toISOString().slice(0, 10), in7Iso = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+    const cMonth = prog.reduce((a, p) => a + p.sessionDates.filter((d) => d >= monthIso).length, 0);
+    const fu = prog.filter((p) => !p.closed && p.nextAppt && p.nextAppt >= todayIso && p.nextAppt <= in7Iso).length;
 
     return { title: 'หน้าแรก', html: `
       <div class="page-head"><div><h2>ภาพรวมวันนี้</h2><p>${fmtDate(new Date().toISOString())} · ภาคเรียนที่ ${Store.s.term}/${Store.s.year}${Store.seesAll() ? ' · นักเรียนทั้งโรงเรียน' : Store.myScopeText() ? ' · ' + Store.myScopeText() + ' (' + act.length.toLocaleString() + ' คน)' : ''}</p></div>
         <div class="actions">${on('behavior') ? `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}
-        ${on('counsel') ? `<button class="btn secondary" data-action="counsel-record">${icon('message-square-plus')}บันทึกให้คำปรึกษา</button>` : ''}</div></div>
+        ${on('counsel') && Store.seesAll() ? `<button class="btn secondary" data-action="counsel-record">${icon('message-square-plus')}บันทึกให้คำปรึกษา</button>` : ''}</div></div>
       ${!Store.seesAll() && !Store.myScopeText() ? `<div class="notice warn">${icon('info', 'i16')}<span>บัญชีของคุณยังไม่ได้กำหนด${Store.user().role === 'grade_head' ? 'ระดับชั้นที่ดูแล' : 'ห้องที่ปรึกษา'} — ค้นหาและบันทึกพฤติกรรมได้ แต่จะยังไม่เห็นรายละเอียดนักเรียน กรุณาแจ้งผู้ดูแลระบบ</span></div>` : ''}
       <div class="grid g4">
         ${stat('file-plus', 'บันทึกใหม่วันนี้', today.length, 'รายการ', '', 'จากทุกแอป')}
@@ -88,14 +90,16 @@
   /* ---------------- หน้านักเรียนรายคน ---------------- */
   // A student outside the teacher's own rooms: directory info + record behaviour, no personal details
   function limitedStudent(s) {
-    const mine = Apps.get('behavior').records(s.id); // only records this teacher made (database rule)
+    const B_ = Apps.get('behavior');
+    const mine = B_.records(s.id); // records this teacher made, or every record when they teach this student (database rule)
     return { title: fullName(s), html: `
       <div class="card rule profile">${avatar(s, true)}
         <div class="who"><h2>${esc(fullName(s))} ${statusBadge(s.status)}</h2>
           <div class="kv"><span><b>รหัส</b><span class="mono">${s.id}</span></span><span><b>ชั้น</b>${klass(s)} เลขที่ ${s.no}</span><span><b>ครูที่ปรึกษา</b>${esc(s.advisor) || '—'}</span></div></div>
         <div class="actions no-print">${on('behavior') ? `<button class="btn accent" data-action="behavior-record" data-student="${s.id}">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}</div></div>
       <div class="notice">${icon('lock', 'i16')}<span>นักเรียนคนนี้ไม่ได้อยู่ใน${Store.user().role === 'grade_head' ? 'ระดับชั้น' : 'ห้องที่ปรึกษา'}ของคุณ — บันทึกพฤติกรรมได้ แต่รายละเอียด (คะแนนรวม ผลคัดกรอง การให้คำปรึกษา ข้อมูลผู้ปกครอง) เห็นเฉพาะครูที่ปรึกษาของห้องนี้ หัวหน้าระดับ ครูแนะแนว และผู้ดูแลระบบ</span></div>
-      ${on('behavior') ? `<div class="card"><div class="card-head"><h3>พฤติกรรมที่คุณบันทึกให้นักเรียนคนนี้</h3><span class="muted small">${mine.length} รายการ</span></div>
+      ${s.taught && on('behavior') ? `<div class="card"><div class="card-body" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><div class="muted small">คะแนนพฤติกรรม · นักเรียนในรายวิชาที่คุณสอน</div>${UI.meter(B_.score(s.id))}</div></div></div>` : ''}
+      ${on('behavior') ? `<div class="card"><div class="card-head"><h3>${s.taught ? 'รายการพฤติกรรมในภาคเรียนนี้' : 'พฤติกรรมที่คุณบันทึกให้นักเรียนคนนี้'}</h3><span class="muted small">${mine.length} รายการ</span></div>
         ${mine.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>วันที่</th><th>รายการ</th><th class="num">คะแนน</th><th>หมายเหตุ</th></tr></thead><tbody>
         ${mine.map((r) => `<tr><td>${fmtDate(r.at, true)}</td><td>${esc(r.title)}</td><td class="num ${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${UI.signed(r.points)}</td><td class="muted">${esc(r.note) || '—'}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีรายการที่คุณบันทึก', 'clipboard-pen')}</div>` : ''}` };
   }
@@ -126,7 +130,7 @@
           <div class="kv"><span><b>ผู้ปกครอง</b>${esc(s.guardian)} · <span class="mono">${esc(s.guardianPhone)}</span></span></div></div>
         <div class="actions no-print">
           ${on('behavior') ? `<button class="btn accent" data-action="behavior-record" data-student="${s.id}">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}
-          ${on('counsel') ? `<button class="btn secondary" data-action="counsel-record" data-student="${s.id}">${icon('message-square-plus')}บันทึกให้คำปรึกษา</button>` : ''}
+          ${on('counsel') && Store.seesAll() ? `<button class="btn secondary" data-action="counsel-record" data-student="${s.id}">${icon('message-square-plus')}บันทึกให้คำปรึกษา</button>` : ''}
           <button class="btn ghost" data-action="print">${icon('printer')}พิมพ์รายงาน</button></div></div>
 
       <div class="grid g-auto">${apps.map((a) => { const m = a.summary(s.id); return `<a class="card app-card ${a.rule}" href="#/apps/${a.id}" title="เปิดแอป${esc(a.name)}">
@@ -305,7 +309,7 @@
       const scr = list.map((s) => care.latestScreen(s.id)).filter(Boolean);
       return { k, list, n: list.length, avg: sc.length ? Math.round(sc.reduce((a, b) => a + b, 0) / sc.length) : 0,
         watch: sc.filter((x) => scoreLevel(x).key === 'watch').length, high: sc.filter((x) => scoreLevel(x).key === 'high').length,
-        risk: scr.filter((x) => x.result !== 'normal').length, counsel: D().counsel.filter((c) => list.some((s) => s.id === c.studentId)).length,
+        risk: scr.filter((x) => x.result !== 'normal').length, counsel: (D().progress || []).filter((p) => list.some((s) => s.id === p.studentId)).reduce((a, p) => a + p.sessions, 0),
         visit: list.filter((s) => care.latestVisit(s.id)).length };
     });
     const cols = [on('behavior') && ['avg', 'คะแนนเฉลี่ย'], on('behavior') && ['watch', 'เฝ้าระวัง'], on('behavior') && ['high', 'เสี่ยงสูง'], on('care') && ['risk', 'คัดกรองเสี่ยง/มีปัญหา'], on('care') && ['visit', 'เยี่ยมบ้านแล้ว'], on('counsel') && ['counsel', 'ให้คำปรึกษา (ครั้ง)']].filter(Boolean);
@@ -414,9 +418,64 @@
     return { done, missed, total: targets.length };
   }
 
+  /* ---- ครูประจำวิชา: ครูที่สอนห้องไหนเห็นพฤติกรรมของนักเรียนห้องนั้น (จับคู่ด้วยอีเมลบัญชี) ---- */
+  function subjectsHtml() {
+    const list = (D().subjects || []).filter((x) => x.year === Store.s.year && x.term === Store.s.term);
+    const byT = {};
+    list.forEach((x) => { const k = x.email.toLowerCase(); (byT[k] = byT[k] || { name: x.staffName, email: x.email, rows: [] }).rows.push(x); });
+    const accounts = new Set(D().users.map((u) => (u.email || '').toLowerCase()));
+    const teachers = Object.values(byT).sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email, 'th'));
+    return `<div class="grid g-main">
+      <div class="card"><div class="card-head"><h3>ครูประจำวิชา ภาคเรียน ${Store.s.term}/${Store.s.year}</h3><span class="muted small">${teachers.length} คน · ${list.length} รายการ</span></div>
+        ${teachers.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ครู</th><th>บัญชีในระบบ</th><th>รายวิชา / ห้อง</th></tr></thead><tbody>
+        ${teachers.map((x) => `<tr><td><b>${esc(x.name || '—')}</b><div class="muted small">${esc(x.email)}</div></td><td>${accounts.has(x.email.toLowerCase()) ? '<span class="badge b-success">มีบัญชี</span>' : '<span class="badge b-neutral">ยังไม่สมัคร</span>'}</td>
+          <td class="small">${[...new Set(x.rows.map((r) => r.code + (r.subject ? ' ' + r.subject : '')))].map(esc).join(', ')}<div class="muted">${[...new Set(x.rows.map((r) => 'ม.' + r.grade + '/' + r.room))].join(', ')}</div></td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีข้อมูลครูประจำวิชาในภาคเรียนนี้', 'book-open')}</div>
+      <div class="card"><div class="card-head"><h3>นำเข้าครูประจำวิชา</h3></div><div class="card-body" style="display:flex;flex-direction:column;gap:12px;font-size:14px">
+        <p style="margin:0">ไฟล์ Excel หรือ CSV แถวแรกเป็นหัวคอลัมน์: <b>อีเมล</b>, <b>ชื่อครู</b>, <b>ชั้น</b> (ม.1 หรือ 1), <b>ห้อง</b>, <b>รหัสวิชา</b>, <b>ชื่อวิชา</b> — 1 แถวต่อ 1 ห้องที่สอน</p>
+        <button class="btn ghost sm" id="sj-template" style="align-self:flex-start">${icon('download', 'i16')}ดาวน์โหลดแม่แบบ</button>
+        <div class="field"><label>ไฟล์</label><input class="input" type="file" id="sj-file" accept=".xlsx,.xls,.csv" style="padding-top:6px"></div>
+        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="sj-replace"> แทนที่ข้อมูลของภาคเรียนนี้ทั้งหมด</label>
+        <button class="btn primary" id="sj-run" style="align-self:flex-start">${icon('upload', 'i16')}นำเข้า</button>
+        <div id="sj-result"></div>
+        <div class="notice">${icon('info', 'i16')}<span>ครูประจำวิชาเห็น<b>พฤติกรรม</b>ของนักเรียนห้องที่สอน (ไม่เห็นข้อมูลติดต่อ สุขภาพ หรือการให้คำปรึกษา) โดยจับคู่จากอีเมลที่ครูใช้สมัครบัญชี — ใช้ได้กับภาคเรียนปัจจุบันเท่านั้น</span></div>
+        ${list.length ? `<button class="btn danger sm" id="sj-clear" style="align-self:flex-start">${icon('trash-2', 'i16')}ล้างข้อมูลภาคเรียนนี้</button>` : ''}
+      </div></div></div>`;
+  }
+  function bindSubjects() {
+    const $ = (id) => document.getElementById(id);
+    $('sj-template').addEventListener('click', () => UI.download('แม่แบบครูประจำวิชา.csv', ['อีเมล,ชื่อครู,ชั้น,ห้อง,รหัสวิชา,ชื่อวิชา', 'somsri@thk.ac.th,นางสาวสมศรี ตัวอย่าง,ม.1,2,ค21101,คณิตศาสตร์ 1'].join('\n')));
+    if ($('sj-clear')) $('sj-clear').addEventListener('click', () => UI.confirmDialog('ล้างครูประจำวิชา', 'ลบข้อมูลครูประจำวิชาของภาคเรียนนี้ทั้งหมด — ครูประจำวิชาจะไม่เห็นพฤติกรรมของห้องที่สอนจนกว่าจะนำเข้าใหม่', 'ล้างข้อมูล', async () => {
+      await Store.clearSubjects(); UI.toast('ล้างข้อมูลครูประจำวิชาแล้ว'); App.render();
+    }, true));
+    $('sj-run').addEventListener('click', async () => {
+      const f = $('sj-file').files[0];
+      if (!f) { UI.toast('เลือกไฟล์ก่อน'); return; }
+      const out = $('sj-result');
+      try {
+        const rows = await UI.readSheet(f);
+        const head = (rows.shift() || []).map((h) => String(h).trim());
+        const col = (re) => head.findIndex((h) => re.test(h));
+        const ci = { email: col(/อีเมล|email/i), name: col(/ชื่อครู|ชื่อ-สกุล|ชื่อ - สกุล|ครู|name/i), grade: col(/ชั้น|grade/i), room: col(/ห้อง|room/i), code: col(/รหัสวิชา|subject_code|code/i), subject: col(/ชื่อวิชา|รายวิชา|subject_name|subject/i) };
+        if (ci.email < 0 || ci.grade < 0 || ci.room < 0 || ci.code < 0) { out.innerHTML = '<div class="notice danger"><span>ต้องมีคอลัมน์ อีเมล ชั้น ห้อง และรหัสวิชา</span></div>'; return; }
+        const good = [], bad = [];
+        rows.forEach((r, i) => {
+          const email = String(r[ci.email] || '').trim().toLowerCase(), grade = Number(String(r[ci.grade] || '').replace(/[^0-9]/g, '')), room = Number(String(r[ci.room] || '').replace(/[^0-9]/g, '')), code = String(r[ci.code] || '').trim();
+          if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !(grade >= 1 && grade <= 6) || !(room >= 1 && room <= 40) || !code) { if (r.some((x) => String(x).trim())) bad.push(i + 2); return; }
+          good.push({ email, staffName: ci.name >= 0 ? String(r[ci.name] || '').trim() : '', grade, room, code, subject: ci.subject >= 0 ? String(r[ci.subject] || '').trim() : '' });
+        });
+        if (!good.length) { out.innerHTML = '<div class="notice danger"><span>ไม่พบแถวที่ถูกต้อง</span></div>'; return; }
+        await Store.importSubjects(good, $('sj-replace').checked);
+        await Store.log('', 'นำเข้าข้อมูล', `นำเข้าครูประจำวิชา ${good.length} แถว ภาคเรียน ${Store.s.term}/${Store.s.year}`);
+        UI.toast(`นำเข้าครูประจำวิชา ${good.length} แถว` + (bad.length ? ` · ข้าม ${bad.length} แถว` : ''));
+        App.render();
+        if (bad.length) setTimeout(() => { const o = document.getElementById('sj-result'); if (o) o.innerHTML = `<div class="notice warn"><span>ข้ามแถวที่ข้อมูลไม่ครบ: ${bad.slice(0, 30).join(', ')}${bad.length > 30 ? ' …' : ''}</span></div>`; }, 0);
+      } catch (err) { out.innerHTML = `<div class="notice danger"><span>นำเข้าไม่สำเร็จ: ${esc(err.message)}</span></div>`; }
+    });
+  }
+
   function settings(q) {
     const tab = q.tab || 'users';
-    const tabs = `<div class="tabs">${[['users', 'ผู้ใช้และสิทธิ์'], ['term', 'ปีการศึกษา / ภาคเรียน'], ['apps', 'จัดการแอป'], ['parents', 'ผู้ปกครอง']].concat(Store.isAdmin() ? [['api', 'การเชื่อมต่อ API']] : [], [['data', 'ข้อมูลระบบ']]).map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/settings?tab=${k}">${l}</button>`).join('')}</div>`;
+    const tabs = `<div class="tabs">${[['users', 'ผู้ใช้และสิทธิ์'], ['term', 'ปีการศึกษา / ภาคเรียน'], ['apps', 'จัดการแอป'], ['parents', 'ผู้ปกครอง']].concat(Store.isAdmin() ? [['subjects', 'ครูประจำวิชา'], ['api', 'การเชื่อมต่อ API']] : [], [['data', 'ข้อมูลระบบ']]).map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/settings?tab=${k}">${l}</button>`).join('')}</div>`;
     const admin = Store.isAdmin();
     const lock = admin ? '' : `<div class="notice warn">${icon('lock', 'i16')}<span>เฉพาะผู้ดูแลระบบที่แก้ไขการตั้งค่าได้ </span></div>`;
     let body = '';
@@ -434,6 +493,8 @@
         <div class="field"><label>ภาคเรียน</label><select class="select" name="term" ${admin ? '' : 'disabled'}><option value="1" ${Store.s.term === 1 ? 'selected' : ''}>1</option><option value="2" ${Store.s.term === 2 ? 'selected' : ''}>2</option></select></div>
         <div class="full notice">${icon('info', 'i16')}<span>คะแนนพฤติกรรมนับแยกตามภาคเรียน เมื่อเปลี่ยนภาคเรียน คะแนนทุกคนเริ่มจากคะแนนตั้งต้นใหม่ (บันทึกเดิมยังเก็บไว้)</span></div></div></div>
         ${admin ? '<div class="dialog-foot"><button class="btn primary" type="submit">บันทึก</button></div>' : ''}</form>`;
+    } else if (tab === 'subjects' && admin) {
+      return { title: 'ตั้งค่า', html: tabs + subjectsHtml(), after: bindSubjects };
     } else if (tab === 'api' && admin) {
       return { title: 'ตั้งค่า', html: tabs + ApiKeys.html(), after: ApiKeys.after };
     } else if (tab === 'parents') {
@@ -448,7 +509,8 @@
         ${chk('behavior', 'คะแนนพฤติกรรม และรายการตัด/เพิ่มคะแนนทั้งหมดในภาคเรียน')}
         <div class="field"><label>ผลคัดกรอง</label>${sel('screening', [['hidden', 'ไม่แสดง'], ['summary', 'แสดงแค่ ปกติ / ครูจะติดต่อผู้ปกครอง'], ['full', 'แสดงผลจริง (ปกติ / เสี่ยง / มีปัญหา)']])}</div>
         <div class="field"><label>การเยี่ยมบ้าน</label>${sel('visits', [['hidden', 'ไม่แสดง'], ['dates', 'แสดงเฉพาะวันที่เยี่ยม'], ['full', 'แสดงวันที่และบันทึก']])}</div>
-        <div class="field"><label>การให้คำปรึกษา</label>${sel('counsel', [['hidden', 'ไม่แสดง'], ['count', 'แสดงจำนวนครั้งและวันที่ (ไม่แสดงเนื้อหา)']])}<span class="help">การให้คำปรึกษาระดับ "ลับ" การส่งต่อ และข้อมูลสุขภาพ ไม่แสดงต่อผู้ปกครองในทุกกรณี</span></div>
+        <div class="field"><label>การให้คำปรึกษา</label>${sel('counsel', [['hidden', 'ไม่แสดง (แนะนำ)'], ['count', 'แสดงเฉพาะวันที่พบครูแนะแนว (ไม่แสดงเนื้อหา)']])}<span class="help">ประเภทปัญหา ความรุนแรง และบันทึกการพูดคุย ไม่แสดงต่อผู้ปกครองในทุกกรณี — บางเคส (เช่น ครอบครัว ความรุนแรง) แม้แต่วันที่ก็อาจทำให้เด็กเดือดร้อน</span></div>
+        <div class="field"><label>บันทึกสุขภาพ</label>${sel('health', [['hidden', 'ไม่แสดง'], ['symptoms', 'แสดงวันที่ อาการ และการส่งต่อ']])}</div>
         </div>${admin ? '<div class="dialog-foot"><button class="btn primary" type="submit">บันทึก</button></div>' : ''}</form>
         <div class="card"><div class="card-head"><h3>การเข้าใช้งานของผู้ปกครอง</h3></div><div class="card-body" style="display:flex;flex-direction:column;gap:10px;font-size:14px">
           <div class="stat" style="padding:0"><div class="val">${(D().parentCount || 0).toLocaleString()}<small> บัญชี</small></div><div class="hint">ผู้ปกครองที่เปิดใช้งานแล้ว</div></div>
@@ -466,7 +528,7 @@
     } else {
       body = `<div class="card" style="max-width:640px"><div class="card-head"><h3>ข้อมูลระบบ</h3></div><div class="card-body" style="display:flex;flex-direction:column;gap:12px">
         <p style="margin:0">${icon('database', 'i16')} เชื่อมต่อฐานข้อมูล Supabase · สิทธิ์การเข้าถึงคุมด้วย Row Level Security ที่ฝั่งฐานข้อมูล</p>
-        <div class="kv"><span><b>นักเรียน</b>${D().students.length} คน</span><span><b>บันทึกพฤติกรรม</b>${D().behavior.records.length}</span><span><b>ให้คำปรึกษา</b>${D().counsel.length}</span><span><b>คัดกรอง</b>${D().care.screenings.length}</span></div>
+        <div class="kv"><span><b>นักเรียน</b>${D().students.length} คน</span><span><b>บันทึกพฤติกรรม</b>${D().behavior.records.length}</span><span><b>เคสให้คำปรึกษา</b>${(D().progress || []).length}</span><span><b>คัดกรอง</b>${D().care.screenings.length}</span></div>
         ${admin && !D().students.length ? `<div class="notice warn">${icon('info', 'i16')}<span>ฐานข้อมูลยังว่าง — นำเข้าข้อมูลตัวอย่าง (ชื่อสมมติ 37 คน) เพื่อทดลองใช้ได้ แล้วค่อยเปลี่ยนสถานะ/แทนที่ด้วยข้อมูลจริงภายหลัง</span></div><button class="btn secondary" style="align-self:flex-start" data-action="import-sample">${icon('database')}นำเข้าข้อมูลตัวอย่าง</button>` : ''}</div></div>`;
     }
     return { title: 'ตั้งค่า', html: lock + tabs + body };

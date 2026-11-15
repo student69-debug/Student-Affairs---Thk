@@ -46,7 +46,10 @@
       extra.push(`<div class="list-row">${icon('house')}<div class="grow"><div class="t">การเยี่ยมบ้าน</div><div class="s">${c.visits.length ? c.visits.map((v) => fmtDate(v.at) + (v.note ? ' · ' + esc(v.note) : '')).join('<br>') : 'ยังไม่มีการเยี่ยมบ้าน'}</div></div></div>`);
     }
     if ('counsel' in c) {
-      extra.push(`<div class="list-row">${icon('messages-square')}<div class="grow"><div class="t">การพบครูเพื่อให้คำปรึกษา</div><div class="s">${c.counsel.length ? c.counsel.length + ' ครั้ง · ล่าสุด ' + fmtDate(c.counsel[0].at) : 'ยังไม่มี'}</div></div></div>`);
+      extra.push(`<div class="list-row">${icon('messages-square')}<div class="grow"><div class="t">การพบครูแนะแนว</div><div class="s">${c.counsel.length ? c.counsel.length + ' ครั้ง · ล่าสุด ' + fmtDate(c.counsel[0].at) : 'ยังไม่มี'}</div></div></div>`);
+    }
+    if ('health' in c) {
+      extra.push(`<div class="list-row">${icon('thermometer')}<div class="grow"><div class="t">บันทึกสุขภาพที่โรงเรียน</div><div class="s">${c.health.length ? c.health.slice(0, 10).map((h) => fmtDate(h.at) + ' · ' + esc(h.symptom) + (h.referred ? ' (ส่งต่อ)' : '')).join('<br>') : 'ไม่มี'}</div></div></div>`);
     }
     if (extra.length) parts.push(`<div class="card"><div class="card-head"><h3>การดูแลช่วยเหลือ</h3></div><div class="list">${extra.join('')}</div></div>`);
     return parts.join('');

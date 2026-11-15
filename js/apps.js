@@ -122,71 +122,10 @@
     },
   };
 
-  /* ================= ให้คำปรึกษา ================= */
-  const TOPICS = ['การเรียน', 'ครอบครัว', 'เพื่อน', 'สุขภาพจิต', 'การวางแผนอนาคต', 'พฤติกรรม', 'อื่น ๆ'];
-  const counsel = {
-    id: 'counsel', name: 'ให้คำปรึกษา', short: 'ให้คำปรึกษา', icon: 'messages-square', rule: 'rule',
-    list(sid) { return (sid ? of(D().counsel, sid) : D().counsel).slice().sort(byDate); },
-    next(sid) { const now = Date.now(); return this.list(sid).filter((c) => c.nextAt && new Date(c.nextAt) >= now - 864e5).sort((a, b) => new Date(a.nextAt) - new Date(b.nextAt))[0]; },
-    hidden(c) { return c.level === 'confidential' && !Store.canSeeConfidential(); },
-    summary(sid) {
-      const l = this.list(sid), n = this.next(sid);
-      return { big: `${l.length}<small> ครั้ง</small>`, label: 'จำนวนครั้งที่ให้คำปรึกษา', badge: '',
-        rows: [['ครั้งล่าสุด', l[0] ? fmtDate(l[0].at) : '—'], ['นัดถัดไป', n ? fmtDate(n.nextAt) : '—']] };
-    },
-    events(sid) {
-      // ไม่ส่งเนื้อหาลับลงหน้ารวม — ส่งเฉพาะหัวข้อ/วันที่
-      return this.list(sid).map((c) => ({ app: 'counsel', at: c.at, studentId: c.studentId, by: c.counselor, dot: 'counsel', ic: 'message-circle',
-        title: c.level === 'confidential' ? 'ให้คำปรึกษา <span class="badge b-neutral">' + icon('lock', 'i16') + 'ลับ</span>' : `ให้คำปรึกษา · ${esc(c.topic)}`, note: '' }));
-    },
-    row(c, showStudent) {
-      const hide = this.hidden(c);
-      return `<tr>${showStudent ? `<td>${sLink(c.studentId)}</td>` : ''}<td>${fmtDate(c.at, true)}</td><td>${hide ? '<span class="muted">—</span>' : esc(c.topic)}</td>
-        <td>${hide ? `<span class="muted">${icon('lock', 'i16')} เนื้อหาลับ — เห็นเฉพาะผู้มีสิทธิ์</span>` : `${esc(c.detail)}${c.plan ? `<div class="muted small">แนวทาง: ${esc(c.plan)}</div>` : ''}`}</td>
-        <td>${esc(c.counselor)}</td><td>${c.nextAt ? fmtDate(c.nextAt) : '—'}</td><td>${c.level === 'confidential' ? '<span class="badge b-neutral">ลับ</span>' : '<span class="badge b-info">ทั่วไป</span>'}</td></tr>`;
-    },
-    table(rows, showStudent) {
-      return rows.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${showStudent ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>ประเด็น</th><th>รายละเอียด</th><th>ผู้ให้คำปรึกษา</th><th>นัดถัดไป</th><th>ระดับ</th></tr></thead><tbody>
-        ${rows.slice(0, LIMIT).map((c) => this.row(c, showStudent)).join('')}</tbody></table></div>${more(rows.length, 'ครั้ง')}` : empty('ยังไม่มีบันทึกการให้คำปรึกษา', 'messages-square');
-    },
-    studentTab(sid) {
-      return `<div class="card-body no-print" style="border-bottom:1px solid var(--ink-200);display:flex;justify-content:flex-end"><button class="btn primary sm" data-action="counsel-record" data-student="${sid}">${icon('message-square-plus', 'i16')}บันทึกให้คำปรึกษา</button></div>${this.table(this.list(sid), false)}`;
-    },
-    openRecord(sid) {
-      dialog({ title: 'บันทึกการให้คำปรึกษา', submitLabel: 'บันทึก',
-        body: `<div class="form-grid">${studentField('student', sid, true)}
-          <div class="field"><label>วันที่ / เวลา</label><input class="input" type="datetime-local" name="at" value="${localInput()}"></div>
-          <div class="field"><label>ผู้ให้คำปรึกษา</label><input class="input" name="counselor" value="${esc(Store.user().name)}"></div>
-          <div class="field full"><label>ประเด็น <span class="req">*</span></label><select class="select" name="topic" required>${TOPICS.map((t) => `<option>${t}</option>`).join('')}</select></div>
-          <div class="field full"><label>รายละเอียด <span class="req">*</span></label><textarea class="textarea" name="detail" required></textarea></div>
-          <div class="field full"><label>แนวทางช่วยเหลือ</label><textarea class="textarea" name="plan" style="min-height:64px"></textarea></div>
-          <div class="field"><label>นัดติดตามครั้งถัดไป</label><input class="input" type="date" name="nextAt"></div>
-          <div class="field"><label>ระดับความลับ</label><div class="radio-row" style="height:40px">
-            <label><input type="radio" name="level" value="normal" checked> ทั่วไป</label><label><input type="radio" name="level" value="confidential"> ลับ</label></div></div></div>
-          <div class="notice">${icon('shield', 'i16')}<span>ระดับ "ลับ" — เนื้อหาเห็นเฉพาะครูแนะแนวและผู้ดูแลระบบ หน้ารวมแสดงเพียงวันที่และจำนวนครั้ง</span></div>`,
-        onSubmit: async (v) => {
-          const id = parseMyStudent(v.student);
-          if (!id) { toast('ไม่พบรหัสนักเรียน หรือไม่ได้อยู่ในห้อง/ระดับชั้นที่คุณดูแล'); return false; }
-          await Store.add('counsel', { studentId: id, at: new Date(v.at || Date.now()).toISOString(), counselor: v.counselor.trim(), topic: v.topic, detail: v.detail.trim(), plan: v.plan.trim(), nextAt: v.nextAt ? new Date(v.nextAt + 'T09:00').toISOString() : '', level: v.level });
-          toast('บันทึกการให้คำปรึกษาเรียบร้อยแล้ว · ' + fullName(Store.student(id))); App.render();
-        } });
-    },
-    page(q) {
-      const tab = q.tab || 'sessions';
-      let body;
-      if (tab === 'sessions') body = `<div class="card"><div class="card-head"><h3>บันทึกการให้คำปรึกษาทั้งหมด</h3><span class="muted small">${this.list().length} ครั้ง</span></div>${this.table(this.list(), true)}</div>`;
-      else {
-        const now = Date.now() - 864e5;
-        const up = D().counsel.filter((c) => c.nextAt && new Date(c.nextAt) >= now).sort((a, b) => new Date(a.nextAt) - new Date(b.nextAt));
-        body = `<div class="card"><div class="card-head"><h3>นัดติดตามที่กำลังจะถึง</h3></div>${up.length ? `<div class="list">${up.map((c) => { const s = Store.student(c.studentId); return `<a class="list-row" href="#/student/${c.studentId}"><div class="avatar">${UI.initials(s)}</div><div class="grow"><div class="t">${esc(fullName(s))} <span class="muted small">${klass(s)}</span></div><div class="s">${this.hidden(c) ? 'นัดติดตาม' : esc(c.topic)} · ${esc(c.counselor)}</div></div><span class="badge b-info">${fmtDate(c.nextAt)}</span></a>`; }).join('')}</div>` : empty('ไม่มีนัดติดตาม', 'calendar')}</div>`;
-      }
-      return { title: this.name, actions: `<button class="btn primary" data-action="counsel-record">${icon('message-square-plus')}บันทึกให้คำปรึกษา</button>`,
-        html: (Store.canSeeConfidential() ? '' : `<div class="notice warn">${icon('lock', 'i16')}<span>สิทธิ์ของคุณดูเนื้อหาระดับ "ลับ" ไม่ได้ (เห็นเฉพาะครูแนะแนวและผู้ดูแลระบบ)</span></div>`) +
-          tabsBar([['sessions', 'บันทึกทั้งหมด'], ['followups', 'นัดติดตาม']], tab, '#/apps/counsel') + body };
-    },
-  };
+  /* ให้คำปรึกษา: ระบบเคสอยู่ใน counsel.js (window.CounselApp) */
 
   /* ================= ดูแลช่วยเหลือนักเรียน ================= */
+  const HSYMS = ['ปวดศีรษะ', 'ไข้', 'ปวดท้อง', 'ปวดประจำเดือน', 'เป็นลม/หน้ามืด', 'บาดแผล/อุบัติเหตุ', 'ผื่นแพ้', 'หอบหืด', 'คลื่นไส้/อาเจียน'];
   const care = {
     id: 'care', name: 'ดูแลช่วยเหลือนักเรียน', short: 'ดูแลช่วยเหลือ', icon: 'hand-heart', rule: 'rule',
     c: () => D().care,
@@ -203,13 +142,17 @@
       this.c().screenings.filter(f).forEach((x) => ev.push({ app: 'care', at: x.at, studentId: x.studentId, by: x.by, dot: 'care', ic: 'clipboard-check', title: `คัดกรอง ${esc(x.tool)} · ${screenBadge(x.result)}`, note: x.note }));
       this.c().visits.filter(f).forEach((x) => ev.push({ app: 'care', at: x.at, studentId: x.studentId, by: x.by, dot: 'care', ic: 'house', title: 'เยี่ยมบ้าน', note: x.note }));
       this.c().referrals.filter(f).forEach((x) => ev.push({ app: 'care', at: x.at, studentId: x.studentId, by: '', dot: 'care', ic: 'share-2', title: `ส่งต่อ${x.type === 'internal' ? 'ภายใน' : 'ภายนอก'} → ${esc(x.to)}`, note: x.note }));
+      (this.c().health || []).filter(f).forEach((x) => ev.push({ app: 'care', at: x.date + 'T10:00:00', studentId: x.studentId, by: x.by, dot: 'care', ic: 'thermometer', title: `บันทึกสุขภาพ · ${esc(x.symptom)}${x.referred ? ' <span class="badge b-warning">ส่งต่อ</span>' : ''}`, note: [x.detail, x.action && 'การดูแล: ' + x.action].filter(Boolean).join(' · ') }));
       return ev;
     },
     tables(sid) {
       const f = (x) => !sid || x.studentId === sid;
       const st = !sid;
       const sc = this.c().screenings.filter(f).sort(byDate), vi = this.c().visits.filter(f).sort(byDate), ne = this.c().needs.filter(f), rf = this.c().referrals.filter(f).sort(byDate);
+      const hl = (this.c().health || []).filter(f).sort((p, q) => (p.date < q.date ? 1 : p.date > q.date ? -1 : 0));
+      const canDel = (x) => Store.isAdmin() || x.byUser === Store.user().id;
       return {
+        health: hl.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>อาการ</th><th>รายละเอียด</th><th>การดูแล</th><th>ส่งต่อ</th><th>ผู้บันทึก</th><th></th></tr></thead><tbody>${hl.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.date)}</td><td>${esc(x.symptom)}</td><td class="muted">${esc(x.detail) || '—'}</td><td>${esc(x.action) || '—'}</td><td>${x.referred ? '<span class="badge b-warning">ส่งต่อ</span>' : '—'}</td><td>${esc(x.by)}</td><td>${canDel(x) ? `<button class="icon-btn" title="ลบ" data-action="care-health-del" data-id="${x.id}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>${more(hl.length, 'รายการ')}` : empty('ยังไม่มีบันทึกสุขภาพ', 'thermometer'),
         screen: sc.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>เครื่องมือ</th><th>ผล</th><th>ผู้ประเมิน</th><th>หมายเหตุ</th></tr></thead><tbody>${sc.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${esc(x.tool)}</td><td>${screenBadge(x.result)}</td><td>${esc(x.by)}</td><td class="muted">${esc(x.note) || '—'}</td></tr>`).join('')}</tbody></table></div>${more(sc.length, 'รายการ')}` : empty('ยังไม่มีผลคัดกรอง', 'clipboard-check'),
         visit: vi.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>ผู้เยี่ยม</th><th>บันทึก</th><th>รูป</th></tr></thead><tbody>${vi.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${esc(x.by)}</td><td>${esc(x.note)}</td><td>${x.photo ? `<img src="${x.photo}" alt="รูปเยี่ยมบ้าน" style="width:56px;height:42px;object-fit:cover;border-radius:4px">` : '<span class="muted">—</span>'}</td></tr>`).join('')}</tbody></table></div>${more(vi.length, 'รายการ')}` : empty('ยังไม่มีบันทึกเยี่ยมบ้าน', 'house'),
         needs: ne.length ? `<div class="list">${ne.map((x) => `<div class="list-row"><span class="badge ${x.kind === 'สุขภาพ' ? 'b-info' : 'b-warning'}">${esc(x.kind)}</span><div class="grow">${st ? `<div class="t">${sLink(x.studentId)}</div>` : ''}<div>${esc(x.text)}</div></div></div>`).join('')}</div>` : empty('ไม่มีข้อมูลความต้องการพิเศษ / สุขภาพ', 'heart-pulse'),
@@ -219,9 +162,10 @@
     studentTab(sid) {
       const t = this.tables(sid);
       const btn = (a, l) => `<button class="btn secondary sm" data-action="${a}" data-student="${sid}">${icon('plus', 'i16')}${l}</button>`;
-      return `<div class="card-body no-print" style="border-bottom:1px solid var(--ink-200)"><div class="actions">${btn('care-screen', 'คัดกรอง')}${btn('care-visit', 'เยี่ยมบ้าน')}${btn('care-need', 'ความต้องการพิเศษ')}${btn('care-referral', 'ส่งต่อ')}</div></div>
+      return `<div class="card-body no-print" style="border-bottom:1px solid var(--ink-200)"><div class="actions">${btn('care-screen', 'คัดกรอง')}${btn('care-visit', 'เยี่ยมบ้าน')}${btn('care-health', 'บันทึกสุขภาพ')}${btn('care-need', 'ความต้องการพิเศษ')}${btn('care-referral', 'ส่งต่อ')}</div></div>
         <div class="card-body"><h4 style="font-size:15px;margin-bottom:6px">ผลคัดกรอง</h4></div>${t.screen}
         <div class="card-body"><h4 style="font-size:15px">เยี่ยมบ้าน</h4></div>${t.visit}
+        <div class="card-body"><h4 style="font-size:15px">บันทึกสุขภาพ</h4></div>${t.health}
         <div class="card-body"><h4 style="font-size:15px">ความต้องการพิเศษ / สุขภาพ</h4></div>${t.needs}
         <div class="card-body"><h4 style="font-size:15px">การส่งต่อ</h4></div>${t.referral}`;
     },
@@ -256,6 +200,15 @@
           return false;
         } });
     },
+    openHealth(sid) {
+      dialog({ title: 'บันทึกสุขภาพ', body: `<div class="form-grid">${studentField('student', sid, true)}
+        <div class="field"><label>วันที่</label><input class="input" type="date" name="date" value="${localInput().slice(0, 10)}"></div>
+        <div class="field"><label>อาการ <span class="req">*</span></label><input class="input" name="symptom" list="dl-hsym" required placeholder="เลือกหรือพิมพ์อาการ"><datalist id="dl-hsym">${HSYMS.map((s) => `<option value="${s}"></option>`).join('')}</datalist></div>
+        <div class="field full"><label>รายละเอียด</label><textarea class="textarea" name="detail" placeholder="อาการ เวลา สิ่งที่สังเกต"></textarea></div>
+        <div class="field full"><label>การดูแลที่ให้</label><textarea class="textarea" name="action" style="min-height:64px" placeholder="เช่น ให้ยา พักห้องพยาบาล โทรแจ้งผู้ปกครอง"></textarea></div>
+        <label class="full" style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" name="referred"> ส่งต่อโรงพยาบาล / ผู้ปกครองรับกลับ</label></div>`,
+        onSubmit: (v) => this.save('health', v.student, { date: v.date || localInput().slice(0, 10), symptom: v.symptom.trim(), referred: !!v.referred, detail: v.detail.trim(), action: v.action.trim() }, 'บันทึกสุขภาพแล้ว') });
+    },
     openNeed(sid) {
       dialog({ title: 'ข้อมูลความต้องการพิเศษ / สุขภาพ', body: `<div class="form-grid">${studentField('student', sid, true)}
         <div class="field full"><label>ประเภท</label><select class="select" name="kind"><option>สุขภาพ</option><option>ความต้องการพิเศษ</option></select></div>
@@ -273,13 +226,13 @@
     page(q) {
       const tab = q.tab || 'screen';
       const t = this.tables();
-      const add = { screen: ['care-screen', 'บันทึกผลคัดกรอง'], visit: ['care-visit', 'บันทึกเยี่ยมบ้าน'], needs: ['care-need', 'เพิ่มข้อมูล'], referral: ['care-referral', 'บันทึกการส่งต่อ'] }[tab];
+      const add = { screen: ['care-screen', 'บันทึกผลคัดกรอง'], visit: ['care-visit', 'บันทึกเยี่ยมบ้าน'], health: ['care-health', 'บันทึกสุขภาพ'], needs: ['care-need', 'เพิ่มข้อมูล'], referral: ['care-referral', 'บันทึกการส่งต่อ'] }[tab];
       const latest = Store.myStudents().map((s) => this.latestScreen(s.id)).filter(Boolean);
       const cnt = (r) => latest.filter((x) => x.result === r).length;
-      const titles = { screen: 'ผลคัดกรองทั้งหมด', visit: 'บันทึกเยี่ยมบ้าน', needs: 'ความต้องการพิเศษ / สุขภาพ', referral: 'การส่งต่อ' };
+      const titles = { screen: 'ผลคัดกรองทั้งหมด', visit: 'บันทึกเยี่ยมบ้าน', health: 'บันทึกสุขภาพ', needs: 'ความต้องการพิเศษ / สุขภาพ', referral: 'การส่งต่อ' };
       return { title: this.name, actions: `<button class="btn primary" data-action="${add[0]}">${icon('plus')}${add[1]}</button>`,
         html: `<div class="grid g3">${stat('smile', 'ปกติ', cnt('normal'), 'คน', 'green', 'ผลคัดกรองล่าสุด')}${stat('triangle-alert', 'เสี่ยง', cnt('risk'), 'คน', 'amber', 'ผลคัดกรองล่าสุด')}${stat('siren', 'มีปัญหา', cnt('problem'), 'คน', 'red', 'ผลคัดกรองล่าสุด')}</div>` +
-          tabsBar([['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ']], tab, '#/apps/care') +
+          tabsBar([['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ']], tab, '#/apps/care') +
           `<div class="card"><div class="card-head"><h3>${titles[tab]}</h3></div>${t[tab]}</div>` };
     },
   };
@@ -288,7 +241,7 @@
     return `<div class="card stat"><div class="lbl"><span class="ic ${tone}">${icon(ic)}</span>${esc(label)}</div><div class="val">${val}<small> ${unit}</small></div>${hint ? `<div class="hint">${esc(hint)}</div>` : ''}</div>`;
   }
 
-  const ALL = [care, counsel, behavior];
+  const ALL = [care, window.CounselApp, behavior];
   window.Apps = {
     all: ALL,
     get: (id) => ALL.find((a) => a.id === id),

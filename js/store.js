@@ -6,14 +6,15 @@
 
   // [ชื่อในแอป, ชื่อคอลัมน์ในฐานข้อมูล]
   const MAPS = {
-    students: { table: 'students', order: 'id', cols: [['id', 'id'], ['cid', 'cid'], ['prefix', 'prefix'], ['first', 'first_name'], ['last', 'last_name'], ['nick', 'nick'], ['grade', 'grade'], ['room', 'room'], ['no', 'no'], ['advisor', 'advisor'], ['guardian', 'guardian'], ['guardianPhone', 'guardian_phone'], ['address', 'address'], ['status', 'status'], ['photoPath', 'photo_path'], ['mine', 'mine']] },
+    students: { table: 'students', order: 'id', cols: [['id', 'id'], ['cid', 'cid'], ['prefix', 'prefix'], ['first', 'first_name'], ['last', 'last_name'], ['nick', 'nick'], ['grade', 'grade'], ['room', 'room'], ['no', 'no'], ['advisor', 'advisor'], ['guardian', 'guardian'], ['guardianPhone', 'guardian_phone'], ['address', 'address'], ['status', 'status'], ['photoPath', 'photo_path'], ['mine', 'mine'], ['taught', 'taught']] },
     teacherRooms: { table: 'teacher_rooms', order: 'user_id', cols: [['userId', 'user_id'], ['grade', 'grade'], ['room', 'room']] },
     teacherGrades: { table: 'teacher_grades', order: 'user_id', cols: [['userId', 'user_id'], ['grade', 'grade']] },
     gradeStaff: { table: 'grade_staff', order: 'grade', cols: [['grade', 'grade'], ['title', 'title'], ['name', 'name']] },
     history: { table: 'registry_history', order: 'at', desc: true, cols: [['id', 'id'], ['at', 'at'], ['by', 'by_name'], ['studentId', 'student_id'], ['action', 'action'], ['detail', 'detail']] },
     rules: { table: 'behavior_rules', order: 'sort', cols: [['id', 'id'], ['name', 'name'], ['points', 'points'], ['restore', 'restore'], ['sort', 'sort']] },
     records: { table: 'behavior_records', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['ruleId', 'rule_id'], ['title', 'title'], ['points', 'points'], ['note', 'note'], ['by', 'by_name'], ['byUser', 'by_user'], ['at', 'at'], ['term', 'term']] },
-    counsel: { table: 'counsel_sessions', cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['counselor', 'counselor'], ['topic', 'topic'], ['detail', 'detail'], ['plan', 'plan'], ['nextAt', 'next_at'], ['level', 'level']] },
+    health: { table: 'health_logs', order: 'log_date', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['date', 'log_date'], ['symptom', 'symptom'], ['referred', 'referred'], ['detail', 'detail'], ['action', 'action_taken'], ['by', 'by_name'], ['byUser', 'by_user'], ['at', 'at']] },
+    subjects: { table: 'teacher_subjects', order: 'id', cols: [['id', 'id'], ['year', 'year'], ['term', 'term'], ['grade', 'grade'], ['room', 'room'], ['code', 'subject_code'], ['subject', 'subject_name'], ['email', 'staff_email'], ['staffName', 'staff_name']] },
     screenings: { table: 'care_screenings', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['tool', 'tool'], ['result', 'result'], ['by', 'by_name'], ['note', 'note']] },
     visits: { table: 'care_visits', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['by', 'by_name'], ['note', 'note'], ['photo', 'photo']] },
     needs: { table: 'care_needs', order: 'id', cols: [['id', 'id'], ['studentId', 'student_id'], ['kind', 'kind'], ['text', 'text']] },
@@ -21,41 +22,64 @@
     users: { table: 'profiles', order: 'created_at', cols: [['id', 'id'], ['name', 'name'], ['email', 'email'], ['role', 'role']] },
   };
   const fromRow = (kind, r) => { const o = {}; MAPS[kind].cols.forEach(([a, b]) => { o[a] = r[b] ?? (b === 'next_at' || b === 'student_id' ? '' : r[b]); }); return o; };
-  const toRow = (kind, o) => { const r = {}; MAPS[kind].cols.forEach(([a, b]) => { if (a in o && a !== 'byUser' && a !== 'mine' && !(a === 'by' && (kind === 'records' || kind === 'history'))) r[b] = o[a] === '' && (b === 'next_at' || b === 'student_id') ? null : o[a]; }); return r; };
+  const toRow = (kind, o) => { const r = {}; MAPS[kind].cols.forEach(([a, b]) => { if (a in o && a !== 'byUser' && a !== 'mine' && a !== 'taught' && !(a === 'by' && (kind === 'records' || kind === 'history' || kind === 'health'))) r[b] = o[a] === '' && (b === 'next_at' || b === 'student_id') ? null : o[a]; }); return r; };
 
   function check({ data, error }) {
     if (error) throw new Error(error.message);
     return data;
   }
 
-  async function fetchAll(kind) {
-    const m = MAPS[kind];
-    if (kind === 'counsel') return check(await sb.rpc('counsel_list')).map((r) => fromRow(kind, r));
-    const PAGE = 1000, PARALLEL = 4;
-    const page = (from) => {
-      // students come through students_list(): everyone sees the directory, personal fields only for own rooms
-      let q = kind === 'students' ? sb.rpc('students_list').range(from, from + PAGE - 1) : sb.from(m.table).select(m.cols.map((c) => c[1]).join(',')).range(from, from + PAGE - 1);
-      if (m.order && kind !== 'students') q = q.order(m.order, { ascending: !m.desc });
-      if (kind === 'users') q = q.neq('role', 'parent'); // parent accounts are counted separately, not listed
-      return q.then(check);
-    };
-    // fetch pages a few at a time in parallel; stop at the first short page
+  // fetch every page of a query, a few pages at a time in parallel; stop at the first short page
+  const PAGE = 1000, PARALLEL = 4;
+  async function paged(makeQuery) {
     const out = [];
     for (let start = 0; ; start += PAGE * PARALLEL) {
-      const pages = await Promise.all(Array.from({ length: PARALLEL }, (_, i) => page(start + i * PAGE)));
-      let done = false;
+      const pages = await Promise.all(Array.from({ length: PARALLEL }, (_, i) => makeQuery(start + i * PAGE, start + i * PAGE + PAGE - 1).then(check)));
       for (const rows of pages) {
-        if (done) break;
-        out.push(...rows.map((r) => fromRow(kind, r)));
-        if (rows.length < PAGE) done = true;
+        out.push(...rows);
+        if (rows.length < PAGE) return out;
       }
-      if (done) return out;
     }
+  }
+
+  /* ---- counselling cases: full content for counsellors/admins, progress for homeroom teachers / grade heads ---- */
+  const CASE_COLS = 'id,student_id,open_date,problem_types,severity,plan,next_appt,owner_email,consent,updated_at,sessions:counsel_case_sessions(session_no,session_date,note_a,note_b,note_c,note_d,checklist)';
+  const caseFrom = (r) => ({
+    id: r.id, studentId: r.student_id, openDate: r.open_date, types: r.problem_types || [], severity: r.severity, plan: r.plan,
+    nextAppt: r.next_appt || '', owner: r.owner_email || '', consent: r.consent || [], updatedAt: r.updated_at,
+    sessions: (r.sessions || []).sort((a, b) => a.session_no - b.session_no)
+      .map((s) => ({ no: s.session_no, date: s.session_date || '', notes: [s.note_a, s.note_b, s.note_c, s.note_d], check: s.checklist || [] })),
+  });
+  const progressFrom = (r) => ({
+    caseId: r.case_id, studentId: r.student_id, openDate: r.open_date, plan: r.plan, nextAppt: r.next_appt || '', owner: r.owner_email || '',
+    ownerName: r.owner_name || '', sessions: r.sessions, lastSession: r.last_session || '', sessionDates: r.session_dates || [], closed: r.closed,
+  });
+  const CUSTOM = {
+    async cases() {
+      if (!Store.seesAll()) return [];
+      return (await paged((a, b) => sb.from('counsel_cases').select(CASE_COLS).order('open_date', { ascending: false }).range(a, b))).map(caseFrom);
+    },
+    async progress() { return (await paged((a, b) => sb.rpc('case_progress').range(a, b))).map(progressFrom); },
+    async counsellors() { return check(await sb.rpc('counsellor_list')); },
+  };
+
+  async function fetchAll(kind) {
+    if (CUSTOM[kind]) return CUSTOM[kind]();
+    const m = MAPS[kind];
+    // students come through students_list(): everyone sees the directory, personal fields only for own scope
+    const rows = await paged((a, b) => {
+      let q = kind === 'students' ? sb.rpc('students_list').range(a, b) : sb.from(m.table).select(m.cols.map((c) => c[1]).join(',')).range(a, b);
+      if (m.order && kind !== 'students') q = q.order(m.order, { ascending: !m.desc });
+      if (kind === 'users') q = q.neq('role', 'parent'); // parent accounts are counted separately, not listed
+      return q;
+    });
+    return rows.map((r) => fromRow(kind, r));
   }
 
   // ตำแหน่งของแต่ละชนิดข้อมูลใน Store.data
   const SLOT = {
-    students: ['students'], history: ['history'], users: ['users'], counsel: ['counsel'],
+    students: ['students'], history: ['history'], users: ['users'], cases: ['cases'], progress: ['progress'], counsellors: ['counsellors'], subjects: ['subjects'],
+    health: ['care', 'health'],
     teacherRooms: ['teacherRooms'], teacherGrades: ['teacherGrades'], gradeStaff: ['gradeStaff'], rules: ['behavior', 'rules'], records: ['behavior', 'records'],
     screenings: ['care', 'screenings'], visits: ['care', 'visits'], needs: ['care', 'needs'], referrals: ['care', 'referrals'],
   };
@@ -125,9 +149,10 @@
       this.data = { settings: { year: s.year, term: s.term, baseScore: s.base_score, warnBelow: s.warn_below, alertBelow: s.alert_below, apps: s.apps || {}, parentView: s.parent_view || {} },
         behavior: {}, care: {}, history: [] };
       this.data.gradeStaff = [];
-      const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'counsel', 'screenings', 'visits', 'needs', 'referrals'];
+      this.data.subjects = [];
+      const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'cases', 'progress', 'counsellors', 'screenings', 'visits', 'needs', 'referrals', 'health'];
       if (this.isAdmin()) {
-        kinds.push('history', 'gradeStaff');
+        kinds.push('history', 'gradeStaff', 'subjects');
         const { count } = await sb.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'parent');
         this.data.parentCount = count || 0;
       }
@@ -157,15 +182,67 @@
       if (!res.length) throw new Error('ไม่มีสิทธิ์ลบรายการนี้');
       await this.refresh(kind);
     },
+    /* ---- counselling cases ---- */
+    async saveCase(c) {
+      const row = { student_id: c.studentId, open_date: c.openDate || null, problem_types: c.types || [], severity: c.severity, plan: c.plan,
+        next_appt: c.nextAppt || null, owner_email: c.owner || null, consent: Array.from({ length: 8 }, (_, i) => !!(c.consent && c.consent[i])) };
+      if (c.legacyId) row.legacy_id = c.legacyId;
+      let id = c.id;
+      if (id) check(await sb.from('counsel_cases').update(row).eq('id', id));
+      else id = check(await sb.from('counsel_cases').insert(row).select('id').single()).id;
+      const sessions = (c.sessions || []).slice(0, 6);
+      if (sessions.length) {
+        check(await sb.from('counsel_case_sessions').upsert(sessions.map((s, i) => ({
+          case_id: id, session_no: i + 1, session_date: s.date || null,
+          note_a: s.notes[0] || '', note_b: s.notes[1] || '', note_c: s.notes[2] || '', note_d: s.notes[3] || '',
+          checklist: Array.from({ length: 6 }, (_, j) => !!(s.check && s.check[j])),
+        })), { onConflict: 'case_id,session_no' }));
+      }
+      check(await sb.from('counsel_case_sessions').delete().eq('case_id', id).gt('session_no', sessions.length));
+      return id;
+    },
+    // old app case id -> our case id (so importing the same export twice updates instead of duplicating)
+    async legacyCaseIds() {
+      const rows = await paged((a, b) => sb.from('counsel_cases').select('id,legacy_id').not('legacy_id', 'is', null).range(a, b));
+      return new Map(rows.map((r) => [r.legacy_id, r.id]));
+    },
+    async importHealth(list) {
+      const rows = list.map((h) => ({ legacy_id: h.legacyId || null, student_id: h.studentId, log_date: h.date, symptom: h.symptom, referred: !!h.referred,
+        detail: h.detail || '', action_taken: h.action || '', by_name: h.by || '' }));
+      const withId = rows.filter((r) => r.legacy_id), without = rows.filter((r) => !r.legacy_id);
+      for (let i = 0; i < withId.length; i += 500) check(await sb.from('health_logs').upsert(withId.slice(i, i + 500), { onConflict: 'legacy_id', ignoreDuplicates: true }));
+      for (let i = 0; i < without.length; i += 500) check(await sb.from('health_logs').insert(without.slice(i, i + 500)));
+      return rows.length;
+    },
+    async deleteCase(id) {
+      const res = check(await sb.from('counsel_cases').delete().eq('id', id).select('id'));
+      if (!res.length) throw new Error('ลบเคสได้เฉพาะผู้ดูแลระบบ');
+      await this.refresh('cases', 'progress');
+    },
+
+    /* ---- subject teachers (current term) ---- */
+    async importSubjects(rows, replace) {
+      const { year, term } = this.s;
+      if (replace) check(await sb.from('teacher_subjects').delete().eq('year', year).eq('term', term));
+      const out = rows.map((r) => ({ year, term, grade: r.grade, room: r.room, subject_code: r.code, subject_name: r.subject || '', staff_email: r.email.toLowerCase(), staff_name: r.staffName || '' }));
+      for (let i = 0; i < out.length; i += 500) check(await sb.from('teacher_subjects').upsert(out.slice(i, i + 500), { onConflict: 'year,term,grade,room,subject_code,staff_email', ignoreDuplicates: true }));
+      await this.refresh('subjects');
+    },
+    async clearSubjects() {
+      const { year, term } = this.s;
+      check(await sb.from('teacher_subjects').delete().eq('year', year).eq('term', term));
+      await this.refresh('subjects');
+    },
+
     async setRooms(userId, rooms) {
       check(await sb.from('teacher_rooms').delete().eq('user_id', userId));
       if (rooms.length) check(await sb.from('teacher_rooms').insert(rooms.map(([g, r]) => ({ user_id: userId, grade: g, room: r }))));
-      await this.refresh('teacherRooms', 'students', 'records', 'counsel', 'screenings', 'visits', 'needs', 'referrals');
+      await this.refresh('teacherRooms', 'students', 'records', 'progress', 'screenings', 'visits', 'needs', 'referrals', 'health');
     },
     async setGrades(userId, grades) {
       check(await sb.from('teacher_grades').delete().eq('user_id', userId));
       if (grades.length) check(await sb.from('teacher_grades').insert(grades.map((g) => ({ user_id: userId, grade: g }))));
-      await this.refresh('teacherGrades', 'students', 'records', 'counsel', 'screenings', 'visits', 'needs', 'referrals');
+      await this.refresh('teacherGrades', 'students', 'records', 'progress', 'screenings', 'visits', 'needs', 'referrals', 'health');
     },
     async saveSettings(patch) {
       Object.assign(this.s, patch);
@@ -180,7 +257,6 @@
       const strip = (list) => list.map(({ id, ...rest }) => rest);
       await this.add('students', d.students);
       await this.add('records', strip(d.behavior.records));
-      await this.add('counsel', strip(d.counsel));
       await this.add('screenings', strip(d.care.screenings));
       await this.add('visits', strip(d.care.visits));
       await this.add('needs', strip(d.care.needs));

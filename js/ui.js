@@ -121,6 +121,26 @@
 
   function refreshIcons() { if (window.lucide) window.lucide.createIcons(); }
 
+  // read the first sheet of an .xlsx/.xls (SheetJS, loaded only when needed) or a .csv into rows of strings
+  let xlsxLoading = null;
+  function loadXlsx() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    xlsxLoading = xlsxLoading || new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload = () => resolve(window.XLSX);
+      s.onerror = () => { xlsxLoading = null; reject(new Error('โหลดตัวอ่านไฟล์ Excel ไม่สำเร็จ')); };
+      document.head.appendChild(s);
+    });
+    return xlsxLoading;
+  }
+  async function readSheet(file) {
+    if (/\.csv$/i.test(file.name)) return parseCSV(await file.text());
+    const X = await loadXlsx();
+    const wb = X.read(await file.arrayBuffer(), { type: 'array' });
+    return X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: false });
+  }
+
   // fill <img data-photo="path"> with signed links from the private photo bucket
   async function hydratePhotos(root = document) {
     const imgs = [...root.querySelectorAll('img[data-photo]:not([src])')];
@@ -174,5 +194,5 @@
     return rows.filter((r) => r.some((x) => x.trim()));
   }
 
-  window.UI = { esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, parseStudent, parseMyStudent, dialog, confirmDialog, toast, refreshIcons, hydratePhotos, shrinkImage, download, parseCSV };
+  window.UI = { esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, parseStudent, parseMyStudent, dialog, confirmDialog, toast, refreshIcons, hydratePhotos, shrinkImage, readSheet, download, parseCSV };
 })();

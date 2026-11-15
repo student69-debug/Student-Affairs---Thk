@@ -80,6 +80,10 @@
     'care-visit': (el) => Apps.get('care').openVisit(S(el)),
     'care-need': (el) => Apps.get('care').openNeed(S(el)),
     'care-referral': (el) => Apps.get('care').openReferral(S(el)),
+    'care-health': (el) => Apps.get('care').openHealth(S(el)),
+    'care-health-del': (el) => UI.confirmDialog('ลบบันทึกสุขภาพ', 'ต้องการลบรายการนี้ใช่หรือไม่?', 'ลบรายการ', async () => {
+      await Store.remove('health', el.dataset.id); UI.toast('ลบรายการแล้ว'); render();
+    }, true),
     'registry-edit': (el) => Pages.studentDialog(el.dataset.id),
     'registry-status': (el) => Pages.statusDialog(el.dataset.id),
     'registry-promote': () => Pages.promoteDialog(),
@@ -145,7 +149,7 @@
       saving = Store.saveSettings({ baseScore: b, warnBelow: w, alertBelow: a });
     }
     if (f.dataset.form === 'term') saving = Store.saveSettings({ year: Number(v.year), term: Number(v.term) });
-    if (f.dataset.form === 'parent-view') saving = Store.saveSettings({ parentView: { enabled: !!v.enabled, registry: !!v.registry, behavior: !!v.behavior, screening: v.screening, visits: v.visits, counsel: v.counsel } });
+    if (f.dataset.form === 'parent-view') saving = Store.saveSettings({ parentView: { enabled: !!v.enabled, registry: !!v.registry, behavior: !!v.behavior, screening: v.screening, visits: v.visits, counsel: v.counsel, health: v.health } });
     saving.then(() => { UI.toast('บันทึกการตั้งค่าแล้ว'); render(); }, fail);
   });
 
