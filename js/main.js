@@ -33,7 +33,7 @@
     if (parts[0] === 'settings') return Pages.settings(q);
     if (parts[0] === 'apps') {
       const a = Apps.get(parts[1]);
-      if (a && Store.s.apps[a.id] !== false) return a.page(q);
+      if (a && Store.s.apps[a.id] !== false && Store.appOk(a.id)) return a.page(q);
       return { title: 'ไม่พบแอป', html: `<div class="card">${UI.empty('แอปนี้ไม่ได้เปิดใช้งาน', 'package-x')}</div>` };
     }
     return { title: 'ไม่พบหน้า', html: `<div class="card">${UI.empty('ไม่พบหน้าที่ต้องการ', 'map-pin-off')}</div>` };
@@ -95,6 +95,7 @@
       await Store.importSample(); await Store.load(); UI.toast('นำเข้าข้อมูลตัวอย่างแล้ว'); render();
     }),
     'room-edit': (el) => Pages.roomDialog(el.dataset.id),
+    'apps-edit': (el) => Pages.appsDialog(el.dataset.id),
     'api-issue': () => ApiKeys.issueDialog(),
     'api-revoke': (el) => ApiKeys.revoke(el.dataset.id, el.dataset.name),
     'grade-edit': (el) => Pages.gradeDialog(el.dataset.id),

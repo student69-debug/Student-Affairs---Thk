@@ -4,7 +4,7 @@
   const D = () => Store.data;
   const stat = (...a) => Apps.stat(...a);
   const B = () => Apps.get('behavior');
-  const on = (id) => Store.s.apps[id] !== false;
+  const on = (id) => Store.s.apps[id] !== false && Store.appOk(id);
 
   function avatar(s, lg) {
     // photos load after render through short-lived signed links (UI.hydratePhotos)
@@ -335,6 +335,32 @@
   /* ---------------- ตั้งค่า ---------------- */
   const ROLES = { admin: 'ผู้ดูแลระบบ', counselor: 'ครูแนะแนว', grade_head: 'หัวหน้า / รองหัวหน้าระดับ', teacher: 'ครูที่ปรึกษา / ครูทั่วไป', pending: 'รออนุมัติ (ไม่มีสิทธิ์)' };
   const FUTURE = [['calendar-check', 'เช็กชื่อเข้าแถว / มาสาย'], ['graduation-cap', 'ทุนการศึกษา'], ['door-open', 'ขออนุญาตออกนอกโรงเรียน'], ['heart-handshake', 'กิจกรรม / จิตอาสา']];
+  /* ---- Per-person app access ---- */
+  function appsCell(u, admin) {
+    if (u.role === 'admin') return '<span class="muted small">ทุกแอป</span>';
+    if (u.role === 'pending') return '<span class="muted small">—</span>';
+    const blocked = Apps.all.filter((a) => u.apps && u.apps[a.id] === false);
+    return `<div class="chips">${blocked.length ? Apps.all.filter((a) => !blocked.includes(a)).map((a) => `<span class="badge b-info">${esc(a.short)}</span>`).join('') || '<span class="badge b-danger">ไม่มีแอป</span>' : '<span class="badge b-success">ทุกแอป</span>'}
+      ${admin ? `<button class="icon-btn" title="กำหนดแอปที่ใช้ได้" data-action="apps-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>`;
+  }
+  function appsDialog(userId) {
+    const u = D().users.find((x) => x.id === userId);
+    const cur = u.apps || {};
+    const NOTE = { care: 'คัดกรอง เยี่ยมบ้าน บันทึกสุขภาพ ความต้องการพิเศษ การส่งต่อ', counsel: u.role === 'counselor' ? 'ระบบเคสให้คำปรึกษาเต็มรูปแบบ' : 'ดูความคืบหน้าการดูแลของงานแนะแนว', behavior: 'บันทึก/ดูพฤติกรรมและคะแนน' };
+    UI.dialog({ title: 'แอปที่ใช้ได้', size: 'sm',
+      body: `<div><b>${esc(u.name)}</b><div class="muted small">${esc(ROLES[u.role] || '')} · ${esc(u.email || '')}</div></div>
+        <div class="list" style="border:1px solid var(--ink-200);border-radius:var(--radius-md)">${Apps.all.map((a) => `<label class="list-row" style="cursor:pointer"><span class="app-ic">${icon(a.icon)}</span>
+          <div class="grow"><div class="t">${esc(a.name)}</div><div class="s">${esc(NOTE[a.id] || '')}</div></div>
+          <span class="switch"><input type="checkbox" name="app_${a.id}" ${cur[a.id] === false ? '' : 'checked'}><span></span></span></label>`).join('')}</div>
+        <div class="notice">${icon('shield', 'i16')}<span>ปิดแล้ว แอปนั้นจะหายจากเมนูและหน้านักเรียนของคนนี้ และฐานข้อมูลจะไม่ให้อ่านหรือบันทึกข้อมูลของแอปนั้น — ผู้ดูแลระบบใช้ได้ทุกแอปเสมอ</span></div>`,
+      onSubmit: async (v) => {
+        const apps = {};
+        Apps.all.forEach((a) => { if (!v['app_' + a.id]) apps[a.id] = false; });
+        await Store.update('users', userId, { apps });
+        UI.toast('บันทึกแอปที่ใช้ได้แล้ว · ' + u.name); App.render();
+      } });
+  }
+
   /* ---- Teacher ↔ room assignment ---- */
   const TITLES = ['ว่าที่ร้อยตรีหญิง', 'ว่าที่ร้อยตรี', 'พันจ่าอากาศตรี', 'นางสาว', 'นาง', 'นาย', 'น.ส.', 'ครู', 'ดร.', 'Mr.', 'Mrs.', 'Ms.'];
   function normName(n) {
@@ -482,11 +508,12 @@
     if (tab === 'users') {
       body = `<div class="card"><div class="card-head"><h3>ผู้ใช้และสิทธิ์</h3>${D().users.some((u) => u.role === 'pending') ? `<span class="badge b-warning">รออนุมัติ ${D().users.filter((u) => u.role === 'pending').length} คน</span>` : ''}</div>
         <div class="card-body" style="border-bottom:1px solid var(--ink-200)"><div class="notice">${icon('user-plus', 'i16')}<span>เพิ่มผู้ใช้: ให้ครูกด "สมัครใช้งาน" ที่หน้าเข้าสู่ระบบ แล้วผู้ดูแลระบบเลือกบทบาทให้ที่นี่ — ก่อนอนุมัติจะยังดูข้อมูลนักเรียนไม่ได้ · ครูที่ปรึกษาเห็นรายละเอียดเฉพาะห้องที่กำหนดไว้ในคอลัมน์ "ห้องที่ปรึกษา"</span></div>
-        ${admin ? `<div class="actions" style="margin-top:12px"><button class="btn secondary sm" data-action="room-auto">${icon('wand-sparkles', 'i16')}จับคู่ห้อง / ระดับชั้นอัตโนมัติ</button><span class="muted small">ใช้ชื่อ–นามสกุลที่ครูกรอกตอนสมัคร เทียบกับรายชื่อครูที่ปรึกษา และหัวหน้า/รองหัวหน้าระดับ</span></div>` : ''}</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>ชื่อ</th><th>บทบาท</th><th>สิทธิ์</th><th>ห้องที่ปรึกษา</th></tr></thead><tbody>
+        ${admin ? `<div class="actions" style="margin-top:12px"><button class="btn secondary sm" data-action="room-auto">${icon('wand-sparkles', 'i16')}จับคู่ห้อง / ระดับชั้นอัตโนมัติ</button><span class="muted small">ใช้ชื่อ–นามสกุลที่ครูกรอกตอนสมัคร เทียบกับรายชื่อครูที่ปรึกษา และหัวหน้า/รองหัวหน้าระดับ</span></div>` : ''}</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>ชื่อ</th><th>บทบาท</th><th>สิทธิ์</th><th>ห้องที่ปรึกษา</th><th>แอปที่ใช้ได้</th></tr></thead><tbody>
         ${D().users.map((u) => `<tr><td>${esc(u.name)} ${u.id === Store.user().id ? '<span class="badge b-navy">คุณ</span>' : ''}<div class="muted small">${esc(u.email || '')}</div></td>
           <td>${admin && u.id !== Store.user().id ? `<select class="select" style="height:32px;width:auto" data-user-role="${u.id}">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${k === u.role ? 'selected' : ''}>${v}</option>`).join('')}</select>` : ROLES[u.role]}</td>
           <td class="muted small">${u.role === 'admin' ? 'ทะเบียนกลาง · ตั้งค่า · ทุกแอป · เนื้อหาลับ' : u.role === 'counselor' ? 'ทุกแอป · เนื้อหาลับของการให้คำปรึกษา' : u.role === 'teacher' ? 'ค้นหา/บันทึกพฤติกรรมได้ทุกคน · รายละเอียดเฉพาะห้องที่ปรึกษา' : u.role === 'grade_head' ? 'ค้นหา/บันทึกพฤติกรรมได้ทุกคน · รายละเอียดทุกห้องในระดับชั้นที่ดูแล (ไม่เห็นเนื้อหาลับ)' : 'ยังเข้าถึงข้อมูลไม่ได้'}</td>
-          <td>${u.role === 'admin' || u.role === 'counselor' ? '<span class="muted small">ทุกห้อง</span>' : u.role === 'grade_head' ? `<div class="chips">${Store.gradesOf(u.id).map((g) => `<span class="badge b-navy">ระดับ ม.${g}</span>`).join('') || '<span class="badge b-warning">ยังไม่กำหนดระดับ</span>'}${admin ? `<button class="icon-btn" title="กำหนดระดับชั้น" data-action="grade-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : u.role === 'teacher' ? `<div class="chips">${Store.roomsOf(u.id).map((t) => `<span class="badge b-info">ม.${t.grade}/${t.room}</span>`).join('') || '<span class="badge b-warning">ยังไม่กำหนด</span>'}${admin ? `<button class="icon-btn" title="กำหนดห้องที่ปรึกษา" data-action="room-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : '—'}</td></tr>`).join('')}</tbody></table></div></div>`;
+          <td>${u.role === 'admin' || u.role === 'counselor' ? '<span class="muted small">ทุกห้อง</span>' : u.role === 'grade_head' ? `<div class="chips">${Store.gradesOf(u.id).map((g) => `<span class="badge b-navy">ระดับ ม.${g}</span>`).join('') || '<span class="badge b-warning">ยังไม่กำหนดระดับ</span>'}${admin ? `<button class="icon-btn" title="กำหนดระดับชั้น" data-action="grade-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : u.role === 'teacher' ? `<div class="chips">${Store.roomsOf(u.id).map((t) => `<span class="badge b-info">ม.${t.grade}/${t.room}</span>`).join('') || '<span class="badge b-warning">ยังไม่กำหนด</span>'}${admin ? `<button class="icon-btn" title="กำหนดห้องที่ปรึกษา" data-action="room-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : '—'}</td>
+          <td>${appsCell(u, admin)}</td></tr>`).join('')}</tbody></table></div></div>`;
     } else if (tab === 'term') {
       body = `<form class="card" data-form="term" style="max-width:560px"><div class="card-head"><h3>ปีการศึกษา / ภาคเรียนปัจจุบัน</h3></div><div class="card-body"><div class="form-grid">
         <div class="field"><label>ปีการศึกษา (พ.ศ.)</label><input class="input mono" type="number" name="year" value="${Store.s.year}" ${admin ? '' : 'disabled'}></div>
@@ -534,5 +561,5 @@
     return { title: 'ตั้งค่า', html: lock + tabs + body };
   }
 
-  window.Pages = { home, search, student, registry, reports, settings, roomDialog, gradeDialog, autoRooms, studentDialog, statusDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES };
+  window.Pages = { home, search, student, registry, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES };
 })();

@@ -245,7 +245,7 @@
   window.Apps = {
     all: ALL,
     get: (id) => ALL.find((a) => a.id === id),
-    enabled: () => ALL.filter((a) => Store.s.apps[a.id] !== false),
+    enabled: () => ALL.filter((a) => Store.s.apps[a.id] !== false && Store.appOk(a.id)),
     events: (sid) => window.Apps.enabled().flatMap((a) => a.events(sid)).sort(byDate),
     stat, sLink,
   };

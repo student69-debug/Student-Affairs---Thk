@@ -19,7 +19,7 @@
     visits: { table: 'care_visits', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['by', 'by_name'], ['note', 'note'], ['photo', 'photo']] },
     needs: { table: 'care_needs', order: 'id', cols: [['id', 'id'], ['studentId', 'student_id'], ['kind', 'kind'], ['text', 'text']] },
     referrals: { table: 'care_referrals', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['type', 'type'], ['to', 'to'], ['note', 'note']] },
-    users: { table: 'profiles', order: 'created_at', cols: [['id', 'id'], ['name', 'name'], ['email', 'email'], ['role', 'role']] },
+    users: { table: 'profiles', order: 'created_at', cols: [['id', 'id'], ['name', 'name'], ['email', 'email'], ['role', 'role'], ['apps', 'app_access']] },
   };
   const fromRow = (kind, r) => { const o = {}; MAPS[kind].cols.forEach(([a, b]) => { o[a] = r[b] ?? (b === 'next_at' || b === 'student_id' ? '' : r[b]); }); return o; };
   const toRow = (kind, o) => { const r = {}; MAPS[kind].cols.forEach(([a, b]) => { if (a in o && a !== 'byUser' && a !== 'mine' && a !== 'taught' && !(a === 'by' && (kind === 'records' || kind === 'history' || kind === 'health'))) r[b] = o[a] === '' && (b === 'next_at' || b === 'student_id') ? null : o[a]; }); return r; };
@@ -139,7 +139,7 @@
     async loadProfile() {
       const { data: { user } } = await sb.auth.getUser();
       if (!user) return null;
-      const rows = check(await sb.from('profiles').select('id,name,email,role').eq('id', user.id));
+      const rows = check(await sb.from('profiles').select('id,name,email,role,app_access').eq('id', user.id));
       this.profile = rows[0] ? fromRow('users', rows[0]) : { id: user.id, name: user.email, email: user.email, role: 'none' };
       return this.profile;
     },
@@ -277,6 +277,8 @@
     activeStudents() { return this.data.students.filter((s) => s.status === 'studying'); },
     // students whose full record the signed-in user may see (all for admin/counselor, own rooms for teachers)
     myStudents() { return this.data.students.filter((s) => s.status === 'studying' && s.mine); },
+    // may this person use an app? admins always; others unless the admin switched it off for them (enforced in the database too)
+    appOk(id) { return this.isAdmin() || !(this.profile && this.profile.apps && this.profile.apps[id] === false); },
     seesAll() { const r = this.profile && this.profile.role; return r === 'admin' || r === 'counselor'; },
     roomsOf(userId) { return (this.data.teacherRooms || []).filter((t) => t.userId === userId).sort((a, b) => a.grade - b.grade || a.room - b.room); },
     myRooms() { return this.roomsOf(this.profile.id); },
