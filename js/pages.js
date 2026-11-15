@@ -101,7 +101,7 @@
       ${s.taught && on('behavior') ? `<div class="card"><div class="card-body" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><div class="muted small">คะแนนพฤติกรรม · นักเรียนในรายวิชาที่คุณสอน</div>${UI.meter(B_.score(s.id))}</div></div></div>` : ''}
       ${on('behavior') ? `<div class="card"><div class="card-head"><h3>${s.taught ? 'รายการพฤติกรรมในภาคเรียนนี้' : 'พฤติกรรมที่คุณบันทึกให้นักเรียนคนนี้'}</h3><span class="muted small">${mine.length} รายการ</span></div>
         ${mine.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>วันที่</th><th>รายการ</th><th class="num">คะแนน</th><th>หมายเหตุ</th></tr></thead><tbody>
-        ${mine.map((r) => `<tr><td>${fmtDate(r.at, true)}</td><td>${esc(r.title)}</td><td class="num ${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${UI.signed(r.points)}</td><td class="muted">${esc(r.note) || '—'}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีรายการที่คุณบันทึก', 'clipboard-pen')}</div>` : ''}` };
+        ${mine.map((r) => `<tr><td>${fmtDate(r.at, true)}</td><td>${esc(r.title)}${B_.incidentLine(r)}</td><td class="num ${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${UI.signed(r.points)}</td><td class="muted">${esc(r.note) || '—'}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีรายการที่คุณบันทึก', 'clipboard-pen')}</div>` : ''}` };
   }
 
   function student(id, q) {

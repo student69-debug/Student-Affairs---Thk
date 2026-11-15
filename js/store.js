@@ -12,7 +12,8 @@
     gradeStaff: { table: 'grade_staff', order: 'grade', cols: [['grade', 'grade'], ['title', 'title'], ['name', 'name']] },
     history: { table: 'registry_history', order: 'at', desc: true, cols: [['id', 'id'], ['at', 'at'], ['by', 'by_name'], ['studentId', 'student_id'], ['action', 'action'], ['detail', 'detail']] },
     rules: { table: 'behavior_rules', order: 'sort', cols: [['id', 'id'], ['name', 'name'], ['points', 'points'], ['restore', 'restore'], ['sort', 'sort']] },
-    records: { table: 'behavior_records', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['ruleId', 'rule_id'], ['title', 'title'], ['points', 'points'], ['note', 'note'], ['by', 'by_name'], ['byUser', 'by_user'], ['at', 'at'], ['term', 'term']] },
+    records: { table: 'behavior_records', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['ruleId', 'rule_id'], ['title', 'title'], ['points', 'points'], ['note', 'note'], ['by', 'by_name'], ['byUser', 'by_user'], ['at', 'at'], ['term', 'term'], ['incidentId', 'incident_id'], ['involvement', 'involvement']] },
+    incidents: { table: 'behavior_incidents', order: 'occurred_at', desc: true, cols: [['id', 'id'], ['at', 'occurred_at'], ['place', 'place'], ['detail', 'detail'], ['by', 'created_by_name'], ['byUser', 'created_by']] },
     health: { table: 'health_logs', order: 'log_date', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['date', 'log_date'], ['symptom', 'symptom'], ['referred', 'referred'], ['detail', 'detail'], ['action', 'action_taken'], ['by', 'by_name'], ['byUser', 'by_user'], ['at', 'at']] },
     subjects: { table: 'teacher_subjects', order: 'id', cols: [['id', 'id'], ['year', 'year'], ['term', 'term'], ['grade', 'grade'], ['room', 'room'], ['code', 'subject_code'], ['subject', 'subject_name'], ['email', 'staff_email'], ['staffName', 'staff_name']] },
     screenings: { table: 'care_screenings', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['tool', 'tool'], ['result', 'result'], ['by', 'by_name'], ['note', 'note']] },
@@ -22,7 +23,7 @@
     users: { table: 'profiles', order: 'created_at', cols: [['id', 'id'], ['name', 'name'], ['email', 'email'], ['role', 'role'], ['apps', 'app_access']] },
   };
   const fromRow = (kind, r) => { const o = {}; MAPS[kind].cols.forEach(([a, b]) => { o[a] = r[b] ?? (b === 'next_at' || b === 'student_id' ? '' : r[b]); }); return o; };
-  const toRow = (kind, o) => { const r = {}; MAPS[kind].cols.forEach(([a, b]) => { if (a in o && a !== 'byUser' && a !== 'mine' && a !== 'taught' && !(a === 'by' && (kind === 'records' || kind === 'history' || kind === 'health'))) r[b] = o[a] === '' && (b === 'next_at' || b === 'student_id') ? null : o[a]; }); return r; };
+  const toRow = (kind, o) => { const r = {}; MAPS[kind].cols.forEach(([a, b]) => { if (a in o && a !== 'byUser' && a !== 'mine' && a !== 'taught' && !(a === 'by' && (kind === 'records' || kind === 'history' || kind === 'health' || kind === 'incidents'))) r[b] = o[a] === '' && (b === 'next_at' || b === 'student_id') ? null : o[a]; }); return r; };
 
   function check({ data, error }) {
     if (error) throw new Error(error.message);
@@ -61,6 +62,8 @@
     },
     async progress() { return (await paged((a, b) => sb.rpc('case_progress').range(a, b))).map(progressFrom); },
     async counsellors() { return check(await sb.rpc('counsellor_list')); },
+    // everyone involved in each incident (directory info only, so it works across rooms)
+    async incidentPeople() { return (await paged((a, b) => sb.rpc('incident_people').range(a, b))).map((r) => ({ incidentId: r.incident_id, studentId: r.student_id, involvement: r.involvement })); },
   };
 
   async function fetchAll(kind) {
@@ -79,7 +82,7 @@
   // ตำแหน่งของแต่ละชนิดข้อมูลใน Store.data
   const SLOT = {
     students: ['students'], history: ['history'], users: ['users'], cases: ['cases'], progress: ['progress'], counsellors: ['counsellors'], subjects: ['subjects'],
-    health: ['care', 'health'],
+    health: ['care', 'health'], incidents: ['behavior', 'incidents'], incidentPeople: ['behavior', 'people'],
     teacherRooms: ['teacherRooms'], teacherGrades: ['teacherGrades'], gradeStaff: ['gradeStaff'], rules: ['behavior', 'rules'], records: ['behavior', 'records'],
     screenings: ['care', 'screenings'], visits: ['care', 'visits'], needs: ['care', 'needs'], referrals: ['care', 'referrals'],
   };
@@ -150,7 +153,7 @@
         behavior: {}, care: {}, history: [] };
       this.data.gradeStaff = [];
       this.data.subjects = [];
-      const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'cases', 'progress', 'counsellors', 'screenings', 'visits', 'needs', 'referrals', 'health'];
+      const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'incidents', 'incidentPeople', 'cases', 'progress', 'counsellors', 'screenings', 'visits', 'needs', 'referrals', 'health'];
       if (this.isAdmin()) {
         kinds.push('history', 'gradeStaff', 'subjects');
         const { count } = await sb.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'parent');
@@ -182,6 +185,17 @@
       if (!res.length) throw new Error('ไม่มีสิทธิ์ลบรายการนี้');
       await this.refresh(kind);
     },
+    /* ---- one incident, several students (e.g. a fight) ---- */
+    async recordIncident({ at, place, detail, rule, people }) {
+      const inc = check(await sb.from('behavior_incidents').insert({ occurred_at: at, place: place || '', detail: detail || '' }).select('id').single());
+      check(await sb.from('behavior_records').insert(people.map((p) => ({
+        student_id: p.studentId, rule_id: rule.id, title: rule.name, points: p.points, note: detail || '', at, term: this.termKey(),
+        incident_id: inc.id, involvement: p.involvement,
+      }))));
+      await this.refresh('records', 'incidents', 'incidentPeople');
+      return inc.id;
+    },
+
     /* ---- counselling cases ---- */
     async saveCase(c) {
       const row = { student_id: c.studentId, open_date: c.openDate || null, problem_types: c.types || [], severity: c.severity, plan: c.plan,

@@ -16,6 +16,19 @@
   /* ================= พฤติกรรม / ตัดคะแนน ================= */
   const behavior = {
     id: 'behavior', name: 'พฤติกรรม / ตัดคะแนน', short: 'พฤติกรรม', icon: 'clipboard-pen', rule: 'rule-red',
+    // "เหตุการณ์ 14 พ.ย. 2569 · 12:20 น. · โรงอาหาร · ผู้ก่อเหตุ · ร่วมกับ ..." for records that belong to a multi-student incident
+    incidentLine(r, html = true) {
+      if (!r.incidentId) return '';
+      const inc = (D().behavior.incidents || []).find((x) => x.id === r.incidentId);
+      const others = (D().behavior.people || []).filter((p) => p.incidentId === r.incidentId && p.studentId !== r.studentId);
+      const who = others.map((p) => { const s = Store.student(p.studentId); const n = s ? fullName(s) + ' ' + klass(s) : p.studentId;
+        return html ? `<a href="#/student/${esc(p.studentId)}">${esc(n)}</a> (${esc(p.involvement || '')})` : n + ' (' + (p.involvement || '') + ')'; });
+      const parts = ['เหตุการณ์ ' + fmtDate(inc ? inc.at : r.at, true)];
+      if (inc && inc.place) parts.push(html ? esc(inc.place) : inc.place);
+      if (r.involvement) parts.push(html ? `<b>${esc(r.involvement)}</b>` : r.involvement);
+      if (who.length) parts.push('ร่วมกับ ' + who.join(', '));
+      return html ? `<div class="inc-line">${icon('users', 'i16')}<span>${parts.join(' · ')}</span></div>` : parts.join(' · ');
+    },
     records(sid) { const t = Store.termKey(); return (sid ? of(D().behavior.records, sid) : D().behavior.records).filter((r) => r.term === t).sort(byDate); },
     score(sid) { return Store.s.baseScore + this.records(sid).reduce((a, r) => a + Number(r.points), 0); },
     summary(sid) {
@@ -25,7 +38,8 @@
     },
     events(sid) {
       return this.records(sid).map((r) => ({ app: 'behavior', at: r.at, studentId: r.studentId, by: r.by, dot: r.points >= 0 ? 'behavior pos' : 'behavior', ic: r.points >= 0 ? 'plus' : 'minus',
-        title: `${esc(r.title)} <span class="${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${signed(r.points)}</span>`, note: r.note }));
+        title: `${esc(r.title)} <span class="${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${signed(r.points)}</span>${r.involvement ? ` <span class="badge b-danger">${esc(r.involvement)}</span>` : ''}`,
+        note: [r.incidentId ? this.incidentLine(r, false) : '', r.note].filter(Boolean).join(' · ') }));
     },
     studentTab(sid) {
       const rec = this.records(sid);
@@ -33,7 +47,7 @@
           <div style="flex:1;min-width:220px">${meter(this.score(sid))}</div>
           <button class="btn accent sm no-print" data-action="behavior-record" data-student="${sid}">${icon('clipboard-pen', 'i16')}บันทึกพฤติกรรม</button></div>
         ${rec.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>วันที่</th><th>รายการ</th><th class="num">คะแนน</th><th>หมายเหตุ</th><th>ผู้บันทึก</th></tr></thead><tbody>
-        ${rec.map((r) => `<tr><td>${fmtDate(r.at, true)}</td><td>${esc(r.title)}</td><td class="num ${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${signed(r.points)}</td><td class="muted">${esc(r.note) || '—'}</td><td>${esc(r.by)}</td></tr>`).join('')}
+        ${rec.map((r) => `<tr><td>${fmtDate(r.at, true)}</td><td>${esc(r.title)}${this.incidentLine(r)}</td><td class="num ${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${signed(r.points)}</td><td class="muted">${esc(r.note) || '—'}</td><td>${esc(r.by)}</td></tr>`).join('')}
         </tbody></table></div>` : empty('ยังไม่มีบันทึกพฤติกรรมในภาคเรียนนี้')}`;
     },
     openRecord(sid, restoreOnly = false) {
@@ -46,13 +60,37 @@
           <div class="field full"><label>พฤติกรรม <span class="req">*</span></label><select class="select" name="rule" required>
             ${neg.length ? `<optgroup label="ตัดคะแนน">${opt(neg)}</optgroup>` : ''}${pos.length ? `<optgroup label="เพิ่มคะแนน / คืนคะแนน">${opt(pos)}</optgroup>` : ''}</select></div>
           <div class="field"><label>คะแนน <span class="req">*</span></label><input class="input mono" type="number" name="points" required value="${rules[0] ? rules[0].points : 0}"><span class="help">ติดลบ = ตัดคะแนน</span></div>
-          <div class="field"><label>วันที่ / เวลา</label><input class="input" type="datetime-local" name="at" value="${localInput()}"></div>
+          <div class="field"><label>วันที่ / เวลาที่เกิดเหตุ</label><input class="input" type="datetime-local" name="at" value="${localInput()}"></div>
+          ${restoreOnly ? '' : `<label class="full inc-toggle"><input type="checkbox" name="multi"> <span><b>เหตุการณ์ที่มีนักเรียนหลายคน</b> (เช่น ทะเลาะวิวาท) — ลงผู้ก่อเหตุและผู้ร่วมกระทำพร้อมกัน</span></label>
+          <div class="full inc-box" hidden>
+            <div class="field"><label>บทบาทของนักเรียนคนแรก</label><select class="select" name="role0"><option>ผู้ก่อเหตุ</option><option>ผู้ร่วมกระทำ</option></select></div>
+            <div class="field"><label>สถานที่เกิดเหตุ</label><input class="input" name="place" placeholder="เช่น โรงอาหาร หน้าห้อง ม.3/4"></div>
+            <div class="inc-people"></div>
+            <button type="button" class="btn secondary sm" data-inc="add" style="align-self:flex-start">${icon('user-plus', 'i16')}เพิ่มนักเรียนที่เกี่ยวข้อง</button>
+          </div>`}
           <div class="field full"><label>หมายเหตุ / รายละเอียด</label><textarea class="textarea" name="note" placeholder="บันทึกตามข้อเท็จจริง เช่น มาถึง 08:10 น."></textarea></div></div>
           <div class="notice">${icon('info', 'i16')}<span>บันทึกจะแจ้งไปยังครูที่ปรึกษาโดยอัตโนมัติ</span></div>`,
-        onSubmit: async (v) => {
+        onSubmit: async (v, form) => {
           const id = parseStudent(v.student);
           if (!id) { toast('ไม่พบรหัสนักเรียน กรุณาเลือกจากรายการ'); return false; }
           const rule = D().behavior.rules.find((r) => r.id === v.rule);
+          if (v.multi) {
+            const people = [{ studentId: id, involvement: v.role0, points: Number(v.points) }];
+            for (const row of form.querySelectorAll('.inc-row')) {
+              const raw = row.querySelector('[data-f=sid]').value.trim();
+              if (!raw) continue;
+              const sid = parseStudent(raw);
+              if (!sid) { toast('ไม่พบนักเรียน: ' + raw); return false; }
+              if (people.some((p) => p.studentId === sid)) { toast('มีชื่อซ้ำ: ' + fullName(Store.student(sid))); return false; }
+              people.push({ studentId: sid, involvement: row.querySelector('[data-f=role]').value, points: Number(row.querySelector('[data-f=pts]').value || 0) });
+            }
+            if (people.length < 2) { toast('เพิ่มนักเรียนที่เกี่ยวข้องอย่างน้อย 1 คน หรือยกเลิกการเลือก "เหตุการณ์ที่มีนักเรียนหลายคน"'); return false; }
+            const at = new Date(v.at || Date.now()).toISOString();
+            await Store.recordIncident({ at, place: (v.place || '').trim(), detail: v.note.trim(), rule, people });
+            toast(`บันทึกเหตุการณ์แล้ว · ${rule.name} · ${people.length} คน (${people.map((p) => p.involvement).filter((x, i, a) => a.indexOf(x) === i).join(' / ')})`);
+            App.render();
+            return;
+          }
           const before = this.score(id);
           await Store.add('records', { studentId: id, ruleId: rule.id, title: rule.name, points: Number(v.points), note: v.note.trim(), at: new Date(v.at || Date.now()).toISOString(), term: Store.termKey() });
           const after = this.score(id), p = Number(v.points);
@@ -62,7 +100,32 @@
         },
       });
       const sel = d.form.rule, pts = d.form.points;
-      sel.addEventListener('change', () => { pts.value = sel.selectedOptions[0].dataset.p; });
+      const multi = d.form.multi, box = d.form.querySelector('.inc-box'), list = d.form.querySelector('.inc-people');
+      const addRow = () => {
+        const row = document.createElement('div');
+        row.className = 'inc-row';
+        row.innerHTML = `<input class="input" data-f="sid" list="dl-students" placeholder="พิมพ์รหัสหรือชื่อนักเรียน" autocomplete="off">
+          <select class="select" data-f="role"><option>ผู้ก่อเหตุ</option><option>ผู้ร่วมกระทำ</option></select>
+          <input class="input mono" type="number" data-f="pts" value="${pts.value}" title="คะแนน">
+          <button type="button" class="icon-btn" data-inc="del" title="เอาออก">${icon('x', 'i16')}</button>`;
+        list.appendChild(row);
+        UI.refreshIcons();
+        row.querySelector('[data-f=sid]').focus();
+      };
+      const setMulti = (onOff) => { if (!multi) return; multi.checked = onOff; box.hidden = !onOff; if (onOff && !list.children.length) addRow(); };
+      sel.addEventListener('change', () => {
+        pts.value = sel.selectedOptions[0].dataset.p;
+        list && list.querySelectorAll('[data-f=pts]').forEach((x) => { x.value = pts.value; });
+        if (/ทะเลาะ|วิวาท/.test(sel.selectedOptions[0].textContent)) setMulti(true); // fights usually involve more than one student
+      });
+      if (multi) {
+        multi.addEventListener('change', () => setMulti(multi.checked));
+        d.form.addEventListener('click', (e) => {
+          const b = e.target.closest('[data-inc]');
+          if (!b) return;
+          if (b.dataset.inc === 'add') addRow(); else b.closest('.inc-row').remove();
+        });
+      }
     },
     page(q) {
       const tab = q.tab || 'overview';
@@ -81,7 +144,7 @@
       } else if (tab === 'records') {
         const rec = this.records();
         body = `<div class="card"><div class="card-head"><h3>รายการบันทึกทั้งหมด · ภาคเรียน ${Store.termKey()}</h3><span class="muted small">${rec.length} รายการ</span></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>วันที่</th><th>นักเรียน</th><th>รายการ</th><th class="num">คะแนน</th><th>ผู้บันทึก</th><th></th></tr></thead><tbody>
-          ${rec.slice(0, LIMIT).map((r) => `<tr><td>${fmtDate(r.at, true)}</td><td>${sLink(r.studentId)}</td><td>${esc(r.title)}${r.note ? `<div class="muted small">${esc(r.note)}</div>` : ''}</td><td class="num ${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${signed(r.points)}</td><td>${esc(r.by)}</td>
+          ${rec.slice(0, LIMIT).map((r) => `<tr><td>${fmtDate(r.at, true)}</td><td>${sLink(r.studentId)}</td><td>${esc(r.title)}${r.note ? `<div class="muted small">${esc(r.note)}</div>` : ''}${this.incidentLine(r)}</td><td class="num ${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${signed(r.points)}</td><td>${esc(r.by)}</td>
           <td>${Store.isAdmin() || r.byUser === Store.user().id ? `<button class="icon-btn" title="ลบรายการ" data-action="behavior-del" data-id="${r.id}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="6">${empty('ยังไม่มีบันทึก')}</td></tr>`}
           </tbody></table></div>${more(rec.length, 'รายการล่าสุด')}</div>`;
       } else if (tab === 'rules') {
