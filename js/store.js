@@ -105,14 +105,15 @@
 
     /* ---- parents ---- */
     parentEmail: (studentId) => 'p' + String(studentId).trim() + '@parents.thk-student-affairs.invalid',
-    async parentSignIn(studentId, password) { await this.signIn(this.parentEmail(studentId), password); },
-    async parentActivate(studentId, cid, password) {
+    // parents sign in with student ID + the student's national ID every time (checked and rate limited by the edge function)
+    async parentSignIn(studentId, cid) {
       const res = await fetch(SA_CONFIG.supabaseUrl + '/functions/v1/parent-activate', {
         method: 'POST', headers: { apikey: SA_CONFIG.supabaseKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId, cid, password }),
+        body: JSON.stringify({ studentId, cid }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || 'server');
+      if (!res.ok || !body.token) throw new Error(body.error || 'server');
+      check(await sb.auth.verifyOtp({ token_hash: body.token, type: 'email' }));
     },
     async parentView() { return check(await sb.rpc('parent_view')); },
 

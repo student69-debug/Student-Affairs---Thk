@@ -350,10 +350,3 @@ details.card>summary::-webkit-details-marker{display:none}
 .inc-row{display:grid;grid-template-columns:minmax(0,1fr) 130px 76px 36px;gap:6px;align-items:center}
 @media (max-width:520px){.inc-row{grid-template-columns:minmax(0,1fr) 110px;}.inc-row [data-f=pts]{grid-column:1}}
 
-/* parent login: first-time activation made obvious */
-.first-time{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:var(--radius-md);background:var(--amber-100);color:var(--amber-700);font-size:14px}
-.first-time b{display:block;font-family:var(--font-display);font-size:15px}
-.first-steps{margin:0;padding:12px 14px 12px 32px;border-radius:var(--radius-md);background:var(--blue-100);color:var(--navy-700);font-size:14px;display:flex;flex-direction:column;gap:4px}
-.or-line{display:flex;align-items:center;gap:10px;color:var(--ink-500);font-size:13px}
-.or-line::before,.or-line::after{content:"";flex:1;height:1px;background:var(--ink-200)}
-.login .notice .btn{width:auto}

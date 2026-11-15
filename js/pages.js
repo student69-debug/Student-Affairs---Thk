@@ -540,9 +540,9 @@
         <div class="field"><label>บันทึกสุขภาพ</label>${sel('health', [['hidden', 'ไม่แสดง'], ['symptoms', 'แสดงวันที่ อาการ และการส่งต่อ']])}</div>
         </div>${admin ? '<div class="dialog-foot"><button class="btn primary" type="submit">บันทึก</button></div>' : ''}</form>
         <div class="card"><div class="card-head"><h3>การเข้าใช้งานของผู้ปกครอง</h3></div><div class="card-body" style="display:flex;flex-direction:column;gap:10px;font-size:14px">
-          <div class="stat" style="padding:0"><div class="val">${(D().parentCount || 0).toLocaleString()}<small> บัญชี</small></div><div class="hint">ผู้ปกครองที่เปิดใช้งานแล้ว</div></div>
+          <div class="stat" style="padding:0"><div class="val">${(D().parentCount || 0).toLocaleString()}<small> บัญชี</small></div><div class="hint">ผู้ปกครองที่เคยเข้าใช้งาน</div></div>
           <div><b>ลิงก์สำหรับผู้ปกครอง</b><div class="mono small" style="word-break:break-all">${esc(link)}</div></div>
-          <ol style="margin:0;padding-left:20px"><li>เปิดลิงก์ → แท็บ "ผู้ปกครอง"</li><li>ครั้งแรก: กด "เปิดใช้งานด้วยเลขประจำตัวประชาชน" กรอกรหัสนักเรียน + เลขประจำตัวประชาชนของนักเรียน แล้วตั้งรหัสผ่าน</li><li>ครั้งต่อไป: รหัสนักเรียน + รหัสผ่านที่ตั้งไว้</li><li>ลืมรหัสผ่าน: เปิดใช้งานซ้ำได้ด้วยวิธีเดียวกัน</li></ol>
+          <ol style="margin:0;padding-left:20px"><li>เปิดลิงก์ → แท็บ "ผู้ปกครอง"</li><li>กรอกรหัสนักเรียน + เลขประจำตัวประชาชน 13 หลักของนักเรียน แล้วกดเข้าสู่ระบบ — ใช้แบบนี้ทุกครั้ง ไม่ต้องตั้งรหัสผ่าน</li><li>ลองผิด 5 ครั้งใน 1 ชั่วโมง ระบบจะล็อกรหัสนักเรียนนั้นไว้ 1 ชั่วโมง</li></ol>
           <div class="notice warn">${icon('shield', 'i16')}<span>กรอกผิด 5 ครั้งใน 1 ชั่วโมง ระบบจะล็อกนักเรียนคนนั้นไว้ 1 ชั่วโมง</span></div>
         </div></div></div>`;
     } else if (tab === 'apps') {

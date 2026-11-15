@@ -223,53 +223,37 @@
     invalid: 'รหัสนักเรียนหรือเลขประจำตัวประชาชนไม่ถูกต้อง',
     locked: 'ลองผิดหลายครั้งเกินไป กรุณารอ 1 ชั่วโมงแล้วลองใหม่ หรือติดต่อครูที่ปรึกษา',
     inactive: 'นักเรียนคนนี้ไม่ได้อยู่ในสถานะกำลังศึกษา กรุณาติดต่อโรงเรียน',
-    weak_password: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร',
   };
   const tabsHtml = (parent) => `<div class="login-tabs"><button type="button" class="${parent ? '' : 'on'}" data-login="in">บุคลากร</button><button type="button" class="${parent ? 'on' : ''}" data-login="parent">ผู้ปกครอง</button></div>`;
 
-  // parent sign-in ('parent') and first-time activation / forgot password ('activate')
-  function parentScreen(mode = 'parent', msg = '', sid = '') {
-    const act = mode === 'activate';
+  // parent sign-in: student ID + the student's national ID, every time (no password to remember)
+  function parentScreen(mode = 'parent', msg = '') {
     gate(`<form class="card rule login" id="login-form" novalidate>${BRAND}${tabsHtml(true)}
-      <h2>${act ? 'ใช้งานครั้งแรก / ลืมรหัสผ่าน' : 'เข้าสู่ระบบผู้ปกครอง'}</h2>
-      ${act ? `<ol class="first-steps"><li>กรอก<b>รหัสนักเรียน</b>และ<b>เลขประจำตัวประชาชน 13 หลักของนักเรียน</b></li><li><b>ตั้งรหัสผ่านใหม่</b>ของคุณเอง (อย่างน้อย 8 ตัว)</li><li>ครั้งต่อไปเข้าด้วยรหัสนักเรียน + รหัสผ่านที่ตั้งไว้</li></ol>`
-        : `<div class="first-time"><div>${icon('sparkles', 'i20')}</div><div class="grow"><b>ยังไม่เคยใช้งาน?</b><span>ต้องเปิดใช้งานก่อน 1 ครั้ง ด้วยเลขประจำตัวประชาชนของนักเรียน</span></div></div>
-        <button type="button" class="btn secondary" data-login="activate">${icon('key-round', 'i16')}ใช้งานครั้งแรก / ลืมรหัสผ่าน</button>
-        <div class="or-line"><span>เคยตั้งรหัสผ่านแล้ว</span></div>`}
+      <h2>เข้าสู่ระบบผู้ปกครอง</h2>
+      <div class="first-steps-plain muted small">ใช้ <b>รหัสนักเรียน</b> และ <b>เลขประจำตัวประชาชน 13 หลักของนักเรียน</b> เข้าได้ทุกครั้ง ไม่ต้องตั้งรหัสผ่าน</div>
       ${msg ? `<div class="notice">${icon('info', 'i16')}<span>${esc(msg)}</span></div>` : ''}
       <div id="login-err"></div>
-      <div class="field"><label>รหัสนักเรียน <span class="req">*</span></label><input class="input mono" name="studentId" required inputmode="numeric" pattern="[0-9]{3,10}" autocomplete="username" value="${esc(sid)}"></div>
-      ${act ? `<div class="field"><label>เลขประจำตัวประชาชนของนักเรียน <span class="req">*</span></label><input class="input mono" name="cid" required maxlength="17" autocomplete="off" placeholder="13 หลัก"></div>` : ''}
-      <div class="field"><label>${act ? 'ตั้งรหัสผ่านใหม่' : 'รหัสผ่าน'} <span class="req">*</span></label><input class="input" type="password" name="password" required minlength="8" autocomplete="${act ? 'new-password' : 'current-password'}">${act ? '<span class="help">อย่างน้อย 8 ตัวอักษร · ใช้เข้าสู่ระบบครั้งต่อไปคู่กับรหัสนักเรียน</span>' : ''}</div>
-      ${act ? '<div class="field"><label>ยืนยันรหัสผ่าน <span class="req">*</span></label><input class="input" type="password" name="password2" required minlength="8" autocomplete="new-password"></div>' : ''}
-      <button class="btn primary" type="submit">${act ? 'เปิดใช้งาน' : 'เข้าสู่ระบบ'}</button>
-      ${act ? '<div class="muted small" style="text-align:center">เคยตั้งรหัสผ่านแล้ว? <a href="#" data-login="parent">กลับไปหน้าเข้าสู่ระบบ</a></div>' : ''}
+      <div class="field"><label>รหัสนักเรียน <span class="req">*</span></label><input class="input mono" name="studentId" required inputmode="numeric" pattern="[0-9]{3,10}" autocomplete="username"></div>
+      <div class="field"><label>เลขประจำตัวประชาชนของนักเรียน <span class="req">*</span></label><input class="input mono" type="password" name="cid" required inputmode="numeric" maxlength="17" autocomplete="current-password" placeholder="13 หลัก">
+        <label class="small muted" style="display:flex;gap:6px;align-items:center;margin-top:6px;cursor:pointer"><input type="checkbox" id="cid-show"> แสดงตัวเลข</label></div>
+      <button class="btn primary" type="submit">เข้าสู่ระบบ</button>
     </form>`);
     const form = document.getElementById('login-form');
     bindTabs(form);
+    form.querySelector('#cid-show').addEventListener('change', (e) => { form.cid.type = e.target.checked ? 'text' : 'password'; });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!form.checkValidity()) { form.reportValidity(); return; }
       const v = Object.fromEntries(new FormData(form).entries());
-      if (act && v.password !== v.password2) { UI.toast('รหัสผ่านทั้งสองช่องไม่ตรงกัน'); return; }
       const btn = form.querySelector('button[type=submit]');
-      btn.disabled = true; btn.textContent = 'กำลังดำเนินการ…';
+      btn.disabled = true; btn.textContent = 'กำลังเข้าสู่ระบบ…';
       try {
-        if (act) await Store.parentActivate(v.studentId.trim(), v.cid.replace(/[\s-]/g, ''), v.password);
-        await Store.parentSignIn(v.studentId, v.password);
+        await Store.parentSignIn(v.studentId.trim(), v.cid.replace(/[s-]/g, ''));
         boot();
       } catch (err) {
-        btn.disabled = false; btn.textContent = act ? 'เปิดใช้งาน' : 'เข้าสู่ระบบ';
-        if (!act && /Invalid login/i.test(err.message)) {
-          // most failures are parents who never activated: say so right in the form and offer the way in
-          const box = document.getElementById('login-err');
-          box.innerHTML = `<div class="notice danger">${icon('alert-circle', 'i16')}<div class="grow">รหัสนักเรียนหรือรหัสผ่านไม่ถูกต้อง<br><b>ถ้ายังไม่เคยใช้งาน</b> ต้องเปิดใช้งานก่อน — รหัสผ่านไม่ใช่เลขประจำตัวประชาชน
-            <button type="button" class="btn primary sm" id="go-activate" style="margin-top:8px">${icon('key-round', 'i16')}ไปเปิดใช้งานครั้งแรก</button></div></div>`;
-          UI.refreshIcons();
-          document.getElementById('go-activate').addEventListener('click', () => parentScreen('activate', '', v.studentId.trim()));
-          return;
-        }
-        UI.toast(PARENT_ERRORS[err.message] || 'ดำเนินการไม่สำเร็จ กรุณาลองใหม่');
+        btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
+        document.getElementById('login-err').innerHTML = `<div class="notice danger">${icon('alert-circle', 'i16')}<span>${esc(PARENT_ERRORS[err.message] || 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่')}</span></div>`;
+        UI.refreshIcons();
       }
     });
   }
@@ -277,7 +261,7 @@
     form.querySelectorAll('[data-login]').forEach((a) => a.addEventListener('click', (e) => {
       e.preventDefault();
       const m = a.dataset.login;
-      if (m === 'parent' || m === 'activate') parentScreen(m); else loginScreen(m);
+      if (m === 'parent' || m === 'activate') parentScreen('parent'); else loginScreen(m);
     }));
   }
 
