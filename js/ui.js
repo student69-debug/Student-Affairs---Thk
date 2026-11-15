@@ -121,6 +121,33 @@
 
   function refreshIcons() { if (window.lucide) window.lucide.createIcons(); }
 
+  // fill <img data-photo="path"> with signed links from the private photo bucket
+  async function hydratePhotos(root = document) {
+    const imgs = [...root.querySelectorAll('img[data-photo]:not([src])')];
+    if (!imgs.length) return;
+    try {
+      const urls = await Store.photoUrls(imgs.map((i) => i.dataset.photo));
+      imgs.forEach((i) => { const u = urls.get(i.dataset.photo); if (u) i.src = u; });
+    } catch (e) { /* photo stays as a blank circle */ }
+  }
+
+  // resize an image file to fit `max` px on its longest side, return a JPEG Blob
+  function shrinkImage(file, max = 400, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const r = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        c.toBlob((b) => (b ? resolve(b) : reject(new Error('แปลงรูปไม่ได้'))), 'image/jpeg', quality);
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = () => reject(new Error('อ่านไฟล์รูปไม่ได้'));
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
   function download(filename, text, type = 'text/csv;charset=utf-8') {
     const blob = new Blob(['﻿' + text], { type });
     const a = document.createElement('a');
@@ -147,5 +174,5 @@
     return rows.filter((r) => r.some((x) => x.trim()));
   }
 
-  window.UI = { esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, parseStudent, parseMyStudent, dialog, confirmDialog, toast, refreshIcons, download, parseCSV };
+  window.UI = { esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, parseStudent, parseMyStudent, dialog, confirmDialog, toast, refreshIcons, hydratePhotos, shrinkImage, download, parseCSV };
 })();

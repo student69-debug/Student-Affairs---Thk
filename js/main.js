@@ -58,6 +58,7 @@
     document.querySelector('.shell').classList.remove('nav-open');
     UI.refreshIcons();
     if (page.after) page.after();
+    UI.hydratePhotos(document.getElementById('content'));
     window.scrollTo(0, window.__keepScroll);
   }
 
@@ -142,6 +143,7 @@
       saving = Store.saveSettings({ baseScore: b, warnBelow: w, alertBelow: a });
     }
     if (f.dataset.form === 'term') saving = Store.saveSettings({ year: Number(v.year), term: Number(v.term) });
+    if (f.dataset.form === 'parent-view') saving = Store.saveSettings({ parentView: { enabled: !!v.enabled, registry: !!v.registry, behavior: !!v.behavior, screening: v.screening, visits: v.visits, counsel: v.counsel } });
     saving.then(() => { UI.toast('บันทึกการตั้งค่าแล้ว'); render(); }, fail);
   });
 
@@ -201,17 +203,67 @@
 
   /* ---------- Sign-in ---------- */
   const gateEl = document.getElementById('gate');
-  function gate(html) {
+  function gate(html, light = false) {
     gateEl.innerHTML = html;
+    gateEl.classList.toggle('light', light);
     gateEl.hidden = false;
     document.querySelector('.shell').hidden = true;
     UI.refreshIcons();
   }
   const BRAND = `<div class="brand-row"><div class="brand-mark">S</div><div><b>STUDENT AFFAIRS</b><span>กลุ่มบริหารกิจการนักเรียน · ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม</span></div></div>`;
 
+  const PARENT_ERRORS = {
+    invalid: 'รหัสนักเรียนหรือเลขประจำตัวประชาชนไม่ถูกต้อง',
+    locked: 'ลองผิดหลายครั้งเกินไป กรุณารอ 1 ชั่วโมงแล้วลองใหม่ หรือติดต่อครูที่ปรึกษา',
+    inactive: 'นักเรียนคนนี้ไม่ได้อยู่ในสถานะกำลังศึกษา กรุณาติดต่อโรงเรียน',
+    weak_password: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร',
+  };
+  const tabsHtml = (parent) => `<div class="login-tabs"><button type="button" class="${parent ? '' : 'on'}" data-login="in">บุคลากร</button><button type="button" class="${parent ? 'on' : ''}" data-login="parent">ผู้ปกครอง</button></div>`;
+
+  // parent sign-in ('parent') and first-time activation / forgot password ('activate')
+  function parentScreen(mode = 'parent', msg = '') {
+    const act = mode === 'activate';
+    gate(`<form class="card rule login" id="login-form" novalidate>${BRAND}${tabsHtml(true)}
+      <h2>${act ? 'เปิดใช้งานครั้งแรก / ลืมรหัสผ่าน' : 'เข้าสู่ระบบผู้ปกครอง'}</h2>
+      ${msg ? `<div class="notice">${icon('info', 'i16')}<span>${esc(msg)}</span></div>` : ''}
+      <div class="field"><label>รหัสนักเรียน <span class="req">*</span></label><input class="input mono" name="studentId" required inputmode="numeric" pattern="[0-9]{3,10}" autocomplete="username"></div>
+      ${act ? `<div class="field"><label>เลขประจำตัวประชาชนของนักเรียน <span class="req">*</span></label><input class="input mono" name="cid" required maxlength="17" autocomplete="off" placeholder="13 หลัก"></div>` : ''}
+      <div class="field"><label>${act ? 'ตั้งรหัสผ่านใหม่' : 'รหัสผ่าน'} <span class="req">*</span></label><input class="input" type="password" name="password" required minlength="8" autocomplete="${act ? 'new-password' : 'current-password'}">${act ? '<span class="help">อย่างน้อย 8 ตัวอักษร · ใช้เข้าสู่ระบบครั้งต่อไปคู่กับรหัสนักเรียน</span>' : ''}</div>
+      ${act ? '<div class="field"><label>ยืนยันรหัสผ่าน <span class="req">*</span></label><input class="input" type="password" name="password2" required minlength="8" autocomplete="new-password"></div>' : ''}
+      <button class="btn primary" type="submit">${act ? 'เปิดใช้งาน' : 'เข้าสู่ระบบ'}</button>
+      <div class="muted small" style="text-align:center">${act ? '<a href="#" data-login="parent">กลับไปหน้าเข้าสู่ระบบ</a>' : 'ใช้ครั้งแรก หรือลืมรหัสผ่าน? <a href="#" data-login="activate">เปิดใช้งานด้วยเลขประจำตัวประชาชน</a>'}</div>
+    </form>`);
+    const form = document.getElementById('login-form');
+    bindTabs(form);
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      const v = Object.fromEntries(new FormData(form).entries());
+      if (act && v.password !== v.password2) { UI.toast('รหัสผ่านทั้งสองช่องไม่ตรงกัน'); return; }
+      const btn = form.querySelector('button[type=submit]');
+      btn.disabled = true; btn.textContent = 'กำลังดำเนินการ…';
+      try {
+        if (act) await Store.parentActivate(v.studentId.trim(), v.cid.replace(/[\s-]/g, ''), v.password);
+        await Store.parentSignIn(v.studentId, v.password);
+        boot();
+      } catch (err) {
+        btn.disabled = false; btn.textContent = act ? 'เปิดใช้งาน' : 'เข้าสู่ระบบ';
+        UI.toast(PARENT_ERRORS[err.message] || (/Invalid login/i.test(err.message) ? 'รหัสนักเรียนหรือรหัสผ่านไม่ถูกต้อง — ถ้ายังไม่เคยใช้ ให้กด "เปิดใช้งานด้วยเลขประจำตัวประชาชน"' : 'ดำเนินการไม่สำเร็จ กรุณาลองใหม่'));
+      }
+    });
+  }
+  function bindTabs(form) {
+    form.querySelectorAll('[data-login]').forEach((a) => a.addEventListener('click', (e) => {
+      e.preventDefault();
+      const m = a.dataset.login;
+      if (m === 'parent' || m === 'activate') parentScreen(m); else loginScreen(m);
+    }));
+  }
+
   function loginScreen(mode = 'in', msg = '') {
+    if (mode === 'parent' || mode === 'activate') return parentScreen(mode, msg);
     const up = mode === 'up';
-    gate(`<form class="card rule login" id="login-form" novalidate>${BRAND}
+    gate(`<form class="card rule login" id="login-form" novalidate>${BRAND}${tabsHtml(false)}
       <h2>${up ? 'สมัครใช้งาน' : 'เข้าสู่ระบบ'}</h2>
       ${msg ? `<div class="notice">${icon('info', 'i16')}<span>${esc(msg)}</span></div>` : ''}
       ${up ? '<div class="field"><label>ชื่อ – นามสกุล <span class="req">*</span></label><input class="input" name="name" required placeholder="ครูสมศรี วงศ์ใหญ่" autocomplete="name"></div>' : ''}
@@ -221,7 +273,7 @@
       <div class="muted small" style="text-align:center">${up ? 'มีบัญชีแล้ว? <a href="#" data-login="in">เข้าสู่ระบบ</a>' : 'ยังไม่มีบัญชี? <a href="#" data-login="up">สมัครใช้งาน</a> · ผู้ดูแลระบบจะอนุมัติสิทธิ์ให้'}</div>
     </form>`);
     const form = document.getElementById('login-form');
-    form.querySelectorAll('[data-login]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); loginScreen(a.dataset.login); }));
+    bindTabs(form);
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!form.checkValidity()) { form.reportValidity(); return; }
@@ -255,8 +307,9 @@
   async function boot() {
     try {
       const session = await Store.session();
-      if (!session) return loginScreen();
+      if (!session) return loginScreen(/^#\/?parent/.test(location.hash) ? 'parent' : 'in');
       const p = await Store.loadProfile();
+      if (p && p.role === 'parent') return Parent.render(gate);
       if (!p || p.role === 'pending' || p.role === 'none') return pendingScreen(p);
       gate(`<div class="login" style="align-items:center">${icon('loader', 'i28')}<div class="muted">กำลังโหลดข้อมูล…</div></div>`);
       await Store.load();

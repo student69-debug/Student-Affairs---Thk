@@ -7,7 +7,8 @@
   const on = (id) => Store.s.apps[id] !== false;
 
   function avatar(s, lg) {
-    if (s && s.photo) return `<img class="avatar ${lg ? 'lg' : ''}" src="${s.photo}" alt="" style="object-fit:cover">`;
+    // photos load after render through short-lived signed links (UI.hydratePhotos)
+    if (s && s.photoPath) return `<img class="avatar ${lg ? 'lg' : ''}" data-photo="${esc(s.photoPath)}" alt="" style="object-fit:cover">`;
     return `<div class="avatar ${lg ? 'lg' : ''}">${esc(initials(s))}</div>`;
   }
 
@@ -75,6 +76,7 @@
           const list = D().students.filter((s) => !t || [s.id, s.first, s.last, s.nick, fullName(s), klass(s)].some((x) => String(x).toLowerCase().includes(t)));
           out.innerHTML = `<div class="card-head"><h3>ผลการค้นหา</h3><span class="muted small">${list.length} คน</span></div>` + (list.length ? `<div class="list">${list.slice(0, 60).map((s) => `<a class="list-row" href="#/student/${s.id}">${avatar(s)}<div class="grow"><div class="t">${esc(fullName(s))} <span class="muted small">(${esc(s.nick)})</span></div><div class="s"><span class="mono">${s.id}</span> · ${klass(s)} เลขที่ ${s.no} · ${esc(s.advisor)}</div></div>${s.status !== 'studying' ? statusBadge(s.status) : ''}${on('behavior') && s.status === 'studying' && s.mine ? meter(B().score(s.id)) : ''}</a>`).join('')}</div>` : empty('ไม่พบนักเรียนที่ตรงกับคำค้น', 'search-x'));
           UI.refreshIcons();
+          UI.hydratePhotos(out);
         };
         inp.addEventListener('input', run);
         inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const f = out.querySelector('a.list-row'); if (f) location.hash = f.getAttribute('href'); } });
@@ -202,7 +204,7 @@
         if (!s && Store.student(val.id)) { UI.toast('รหัสนักเรียนนี้มีอยู่แล้ว'); return false; }
         const obj = { cid: val.cid, prefix: val.prefix, first: val.first.trim(), last: val.last.trim(), nick: val.nick.trim(), grade: Number(val.grade), room: Number(val.room), no: Number(val.no) || 1, advisor: val.advisor.trim(), guardian: val.guardian.trim(), guardianPhone: val.guardianPhone.trim(), address: val.address.trim() };
         const commit = async (photo) => {
-          if (photo) obj.photo = photo;
+          if (photo) obj.photoPath = await Store.uploadPhoto(s ? s.id : val.id, photo);
           if (s) {
             const changed = FIELDS.filter(([k]) => k in obj && String(s[k]) !== String(obj[k])).map(([k, l]) => `${l}: ${s[k] || '—'} → ${obj[k] || '—'}`);
             if (photo) changed.push('รูปถ่าย');
@@ -215,13 +217,9 @@
           UI.toast('บันทึกข้อมูลนักเรียนแล้ว'); App.render();
         };
         const file = form.photoFile.files[0];
-        if (!file) return commit('');
-        return new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => { const c = document.createElement('canvas'); const r = Math.min(1, 240 / Math.max(img.width, img.height)); c.width = img.width * r; c.height = img.height * r; c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); commit(c.toDataURL('image/jpeg', 0.8)).then(resolve, reject); };
-          img.onerror = () => reject(new Error('อ่านไฟล์รูปไม่ได้'));
-          img.src = URL.createObjectURL(file);
-        });
+        if (!file) return commit(null);
+        // shrink to about 300×400 (≈30–50 KB) before storing
+        return UI.shrinkImage(file, 400, 0.82).then(commit);
       } });
   }
 
@@ -418,7 +416,7 @@
 
   function settings(q) {
     const tab = q.tab || 'users';
-    const tabs = `<div class="tabs">${[['users', 'ผู้ใช้และสิทธิ์'], ['term', 'ปีการศึกษา / ภาคเรียน'], ['apps', 'จัดการแอป'], ['data', 'ข้อมูลระบบ']].map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/settings?tab=${k}">${l}</button>`).join('')}</div>`;
+    const tabs = `<div class="tabs">${[['users', 'ผู้ใช้และสิทธิ์'], ['term', 'ปีการศึกษา / ภาคเรียน'], ['apps', 'จัดการแอป'], ['parents', 'ผู้ปกครอง'], ['data', 'ข้อมูลระบบ']].map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/settings?tab=${k}">${l}</button>`).join('')}</div>`;
     const admin = Store.isAdmin();
     const lock = admin ? '' : `<div class="notice warn">${icon('lock', 'i16')}<span>เฉพาะผู้ดูแลระบบที่แก้ไขการตั้งค่าได้ </span></div>`;
     let body = '';
@@ -436,6 +434,26 @@
         <div class="field"><label>ภาคเรียน</label><select class="select" name="term" ${admin ? '' : 'disabled'}><option value="1" ${Store.s.term === 1 ? 'selected' : ''}>1</option><option value="2" ${Store.s.term === 2 ? 'selected' : ''}>2</option></select></div>
         <div class="full notice">${icon('info', 'i16')}<span>คะแนนพฤติกรรมนับแยกตามภาคเรียน เมื่อเปลี่ยนภาคเรียน คะแนนทุกคนเริ่มจากคะแนนตั้งต้นใหม่ (บันทึกเดิมยังเก็บไว้)</span></div></div></div>
         ${admin ? '<div class="dialog-foot"><button class="btn primary" type="submit">บันทึก</button></div>' : ''}</form>`;
+    } else if (tab === 'parents') {
+      const pv = Store.s.parentView || {};
+      const dis = admin ? '' : 'disabled';
+      const sel = (name, opts) => `<select class="select" name="${name}" ${dis}>${opts.map(([k, l]) => `<option value="${k}" ${pv[name] === k ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+      const chk = (name, label) => `<label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" name="${name}" ${pv[name] !== false ? 'checked' : ''} ${dis}> ${label}</label>`;
+      const link = location.origin + location.pathname + '#/parent';
+      body = `<div class="grid g-main"><form class="card" data-form="parent-view"><div class="card-head"><h3>ผู้ปกครองเห็นอะไรบ้าง</h3></div><div class="card-body" style="display:flex;flex-direction:column;gap:14px">
+        ${chk('enabled', '<b>เปิดให้ผู้ปกครองเข้าใช้งาน</b>')}
+        ${chk('registry', 'ข้อมูลทะเบียน และชื่อครูที่ปรึกษา')}
+        ${chk('behavior', 'คะแนนพฤติกรรม และรายการตัด/เพิ่มคะแนนทั้งหมดในภาคเรียน')}
+        <div class="field"><label>ผลคัดกรอง</label>${sel('screening', [['hidden', 'ไม่แสดง'], ['summary', 'แสดงแค่ ปกติ / ครูจะติดต่อผู้ปกครอง'], ['full', 'แสดงผลจริง (ปกติ / เสี่ยง / มีปัญหา)']])}</div>
+        <div class="field"><label>การเยี่ยมบ้าน</label>${sel('visits', [['hidden', 'ไม่แสดง'], ['dates', 'แสดงเฉพาะวันที่เยี่ยม'], ['full', 'แสดงวันที่และบันทึก']])}</div>
+        <div class="field"><label>การให้คำปรึกษา</label>${sel('counsel', [['hidden', 'ไม่แสดง'], ['count', 'แสดงจำนวนครั้งและวันที่ (ไม่แสดงเนื้อหา)']])}<span class="help">การให้คำปรึกษาระดับ "ลับ" การส่งต่อ และข้อมูลสุขภาพ ไม่แสดงต่อผู้ปกครองในทุกกรณี</span></div>
+        </div>${admin ? '<div class="dialog-foot"><button class="btn primary" type="submit">บันทึก</button></div>' : ''}</form>
+        <div class="card"><div class="card-head"><h3>การเข้าใช้งานของผู้ปกครอง</h3></div><div class="card-body" style="display:flex;flex-direction:column;gap:10px;font-size:14px">
+          <div class="stat" style="padding:0"><div class="val">${(D().parentCount || 0).toLocaleString()}<small> บัญชี</small></div><div class="hint">ผู้ปกครองที่เปิดใช้งานแล้ว</div></div>
+          <div><b>ลิงก์สำหรับผู้ปกครอง</b><div class="mono small" style="word-break:break-all">${esc(link)}</div></div>
+          <ol style="margin:0;padding-left:20px"><li>เปิดลิงก์ → แท็บ "ผู้ปกครอง"</li><li>ครั้งแรก: กด "เปิดใช้งานด้วยเลขประจำตัวประชาชน" กรอกรหัสนักเรียน + เลขประจำตัวประชาชนของนักเรียน แล้วตั้งรหัสผ่าน</li><li>ครั้งต่อไป: รหัสนักเรียน + รหัสผ่านที่ตั้งไว้</li><li>ลืมรหัสผ่าน: เปิดใช้งานซ้ำได้ด้วยวิธีเดียวกัน</li></ol>
+          <div class="notice warn">${icon('shield', 'i16')}<span>กรอกผิด 5 ครั้งใน 1 ชั่วโมง ระบบจะล็อกนักเรียนคนนั้นไว้ 1 ชั่วโมง</span></div>
+        </div></div></div>`;
     } else if (tab === 'apps') {
       body = `<div class="card"><div class="card-head"><h3>แอปที่ติดตั้ง</h3><span class="muted small">แอปที่เปิดจะขึ้นในเมนูและหน้านักเรียนรายคนเอง</span></div><div class="list">
         ${Apps.all.map((a) => `<div class="list-row"><span class="app-ic">${icon(a.icon)}</span><div class="grow"><div class="t">${esc(a.name)}</div><div class="s">ใช้รหัสนักเรียน · มีการ์ดสรุป · ส่งเหตุการณ์ลงไทม์ไลน์</div></div>

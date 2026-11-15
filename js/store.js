@@ -6,7 +6,7 @@
 
   // [ชื่อในแอป, ชื่อคอลัมน์ในฐานข้อมูล]
   const MAPS = {
-    students: { table: 'students', order: 'id', cols: [['id', 'id'], ['cid', 'cid'], ['prefix', 'prefix'], ['first', 'first_name'], ['last', 'last_name'], ['nick', 'nick'], ['grade', 'grade'], ['room', 'room'], ['no', 'no'], ['advisor', 'advisor'], ['guardian', 'guardian'], ['guardianPhone', 'guardian_phone'], ['address', 'address'], ['status', 'status'], ['photo', 'photo'], ['mine', 'mine']] },
+    students: { table: 'students', order: 'id', cols: [['id', 'id'], ['cid', 'cid'], ['prefix', 'prefix'], ['first', 'first_name'], ['last', 'last_name'], ['nick', 'nick'], ['grade', 'grade'], ['room', 'room'], ['no', 'no'], ['advisor', 'advisor'], ['guardian', 'guardian'], ['guardianPhone', 'guardian_phone'], ['address', 'address'], ['status', 'status'], ['photoPath', 'photo_path'], ['mine', 'mine']] },
     teacherRooms: { table: 'teacher_rooms', order: 'user_id', cols: [['userId', 'user_id'], ['grade', 'grade'], ['room', 'room']] },
     teacherGrades: { table: 'teacher_grades', order: 'user_id', cols: [['userId', 'user_id'], ['grade', 'grade']] },
     gradeStaff: { table: 'grade_staff', order: 'grade', cols: [['grade', 'grade'], ['title', 'title'], ['name', 'name']] },
@@ -36,6 +36,7 @@
       // students come through students_list(): everyone sees the directory, personal fields only for own rooms
       let q = kind === 'students' ? sb.rpc('students_list').range(from, from + PAGE - 1) : sb.from(m.table).select(m.cols.map((c) => c[1]).join(',')).range(from, from + PAGE - 1);
       if (m.order && kind !== 'students') q = q.order(m.order, { ascending: !m.desc });
+      if (kind === 'users') q = q.neq('role', 'parent'); // parent accounts are counted separately, not listed
       return q.then(check);
     };
     // fetch pages a few at a time in parallel; stop at the first short page
@@ -73,7 +74,37 @@
     async signUp(name, email, password) {
       return check(await sb.auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: location.origin + location.pathname } }));
     },
-    async signOut() { await sb.auth.signOut(); location.hash = '#/'; location.reload(); },
+    async signOut() { const wasParent = this.profile && this.profile.role === 'parent'; await sb.auth.signOut(); location.hash = wasParent ? '#/parent' : '#/'; location.reload(); },
+
+    /* ---- parents ---- */
+    parentEmail: (studentId) => 'p' + String(studentId).trim() + '@parents.thk-student-affairs.invalid',
+    async parentSignIn(studentId, password) { await this.signIn(this.parentEmail(studentId), password); },
+    async parentActivate(studentId, cid, password) {
+      const res = await fetch(SA_CONFIG.supabaseUrl + '/functions/v1/parent-activate', {
+        method: 'POST', headers: { apikey: SA_CONFIG.supabaseKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId, cid, password }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'server');
+    },
+    async parentView() { return check(await sb.rpc('parent_view')); },
+
+    /* ---- photos (private Storage bucket, short-lived signed links) ---- */
+    _photoUrls: new Map(),
+    async photoUrls(paths) {
+      const need = [...new Set(paths)].filter((p) => p && !this._photoUrls.has(p));
+      if (need.length) {
+        const { data } = await sb.storage.from('student-photos').createSignedUrls(need, 3600);
+        (data || []).forEach((d) => { if (d.signedUrl) this._photoUrls.set(d.path, d.signedUrl); });
+      }
+      return this._photoUrls;
+    },
+    async uploadPhoto(studentId, blob) {
+      const path = studentId + '.jpg';
+      check(await sb.storage.from('student-photos').upload(path, blob, { upsert: true, contentType: 'image/jpeg', cacheControl: '3600' }));
+      this._photoUrls.delete(path);
+      return path;
+    },
 
     async loadProfile() {
       const { data: { user } } = await sb.auth.getUser();
@@ -85,11 +116,15 @@
 
     async load() {
       const s = check(await sb.from('app_settings').select('*').eq('id', 1).single());
-      this.data = { settings: { year: s.year, term: s.term, baseScore: s.base_score, warnBelow: s.warn_below, alertBelow: s.alert_below, apps: s.apps || {} },
+      this.data = { settings: { year: s.year, term: s.term, baseScore: s.base_score, warnBelow: s.warn_below, alertBelow: s.alert_below, apps: s.apps || {}, parentView: s.parent_view || {} },
         behavior: {}, care: {}, history: [] };
       this.data.gradeStaff = [];
       const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'counsel', 'screenings', 'visits', 'needs', 'referrals'];
-      if (this.isAdmin()) kinds.push('history', 'gradeStaff');
+      if (this.isAdmin()) {
+        kinds.push('history', 'gradeStaff');
+        const { count } = await sb.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'parent');
+        this.data.parentCount = count || 0;
+      }
       const lists = await Promise.all(kinds.map(fetchAll));
       kinds.forEach((k, i) => setSlot(k, lists[i]));
     },
@@ -129,7 +164,7 @@
     async saveSettings(patch) {
       Object.assign(this.s, patch);
       const s = this.s;
-      check(await sb.from('app_settings').update({ year: s.year, term: s.term, base_score: s.baseScore, warn_below: s.warnBelow, alert_below: s.alertBelow, apps: s.apps }).eq('id', 1));
+      check(await sb.from('app_settings').update({ year: s.year, term: s.term, base_score: s.baseScore, warn_below: s.warnBelow, alert_below: s.alertBelow, apps: s.apps, parent_view: s.parentView }).eq('id', 1));
     },
     async log(studentId, action, detail) {
       await this.add('history', { studentId: studentId || '', action, detail });
