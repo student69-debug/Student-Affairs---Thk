@@ -10,6 +10,7 @@
       ${link('', 'layout-dashboard', 'หน้าแรก', is(''))}
       ${link('search', 'search', 'ค้นหานักเรียน', is('search') || is('student'))}
       ${link('registry', 'database', 'ทะเบียนนักเรียน', is('registry'), admin ? '' : 'locked')}
+      ${link('teachers', 'contact-round', 'ทะเบียนครู', is('teachers'), admin ? '' : 'locked')}
       <div class="nav-label">แอปพลิเคชัน</div>
       ${Apps.enabled().map((a) => link('apps/' + a.id, a.icon, a.name, is('apps/' + a.id), 'sub')).join('')}
       <div class="nav-label">ระบบ</div>
@@ -29,6 +30,7 @@
     if (parts[0] === 'search') return Pages.search(q);
     if (parts[0] === 'student') return Pages.student(decodeURIComponent(parts[1] || ''), q);
     if (parts[0] === 'registry') return Pages.registry(q);
+    if (parts[0] === 'teachers') return Pages.teachers(q);
     if (parts[0] === 'reports') return Pages.reports(q);
     if (parts[0] === 'settings') return Pages.settings(q);
     if (parts[0] === 'apps') {

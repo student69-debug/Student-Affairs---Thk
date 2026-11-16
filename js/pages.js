@@ -219,26 +219,70 @@
 
   /* ---------------- ทะเบียนนักเรียน ---------------- */
   const FIELDS = [['id', 'รหัสนักเรียน'], ['cid', 'เลขประจำตัวประชาชน'], ['prefix', 'คำนำหน้า'], ['first', 'ชื่อ'], ['last', 'นามสกุล'], ['nick', 'ชื่อเล่น'], ['grade', 'ชั้น'], ['room', 'ห้อง'], ['no', 'เลขที่'], ['advisor', 'ครูที่ปรึกษา'], ['guardian', 'ผู้ปกครอง'], ['guardianPhone', 'เบอร์โทร'], ['address', 'ที่อยู่']];
+
+  // ตารางผู้ใช้ (ใช้ทั้งในทะเบียนครูและตั้งค่า → ผู้ใช้และสิทธิ์)
+  function usersTable(list, admin) {
+    if (!list.length) return empty('ไม่พบครูตามเงื่อนไข', 'search-x');
+    return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ชื่อ</th><th>บทบาท</th><th>สิทธิ์</th><th>ห้องที่ปรึกษา</th><th>แอปที่ใช้ได้</th>${admin ? '<th></th>' : ''}</tr></thead><tbody>
+        ${list.map((u) => `<tr><td>${esc(u.name)} ${u.id === Store.user().id ? '<span class="badge b-navy">คุณ</span>' : ''}<div class="muted small">${esc(u.email || '')}</div></td>
+          <td>${admin && u.id !== Store.user().id ? `<select class="select" style="height:32px;width:auto" data-user-role="${u.id}">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${k === u.role ? 'selected' : ''}>${v}</option>`).join('')}</select>` : ROLES[u.role]}</td>
+          <td class="muted small">${u.role === 'admin' ? 'ทะเบียนกลาง · ตั้งค่า · ทุกแอป · เนื้อหาลับ' : u.role === 'counselor' ? 'ทุกแอป · เนื้อหาลับของการให้คำปรึกษา' : u.role === 'teacher' ? 'ค้นหา/บันทึกพฤติกรรมได้ทุกคน · รายละเอียดเฉพาะห้องที่ปรึกษา' : u.role === 'grade_head' ? 'ค้นหา/บันทึกพฤติกรรมได้ทุกคน · รายละเอียดทุกห้องในระดับชั้นที่ดูแล (ไม่เห็นเนื้อหาลับ)' : 'ยังเข้าถึงข้อมูลไม่ได้'}</td>
+          <td>${u.role === 'admin' || u.role === 'counselor' ? '<span class="muted small">ทุกห้อง</span>' : u.role === 'grade_head' ? `<div class="chips">${Store.gradesOf(u.id).map((g) => `<span class="badge b-navy">ระดับ ม.${g}</span>`).join('') || '<span class="badge b-warning">ยังไม่กำหนดระดับ</span>'}${admin ? `<button class="icon-btn" title="กำหนดระดับชั้น" data-action="grade-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : u.role === 'teacher' ? `<div class="chips">${Store.roomsOf(u.id).map((t) => `<span class="badge b-info">ม.${t.grade}/${t.room}</span>`).join('') || '<span class="badge b-warning">ยังไม่กำหนด</span>'}${admin ? `<button class="icon-btn" title="กำหนดห้องที่ปรึกษา" data-action="room-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : '—'}</td>
+          <td>${appsCell(u, admin)}</td>${admin ? `<td style="text-align:right">${u.id !== Store.user().id ? `<button class="icon-btn danger" title="ลบผู้ใช้ออกจากระบบ" aria-label="ลบผู้ใช้ ${esc(u.name)}" data-action="user-delete" data-id="${u.id}">${icon('user-x', 'i16')}</button>` : ''}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
+  }
+
+  const STAFF_ACTIONS = ['สมัครใช้งาน', 'อนุมัติผู้ใช้', 'เปลี่ยนบทบาท', 'เปลี่ยนสิทธิ์แอป', 'กำหนดห้องที่ปรึกษา', 'กำหนดระดับชั้น', 'ลบบัญชีผู้ใช้'];
+  const isStaffEvent = (x) => STAFF_ACTIONS.includes(x.action) || (x.action === 'ลบไม่สำเร็จ' && /บัญชีผู้ใช้/.test(x.detail || ''));
+  const histBadge = (x) => `<span class="badge ${/ไม่สำเร็จ/.test(x.action) ? 'b-warning' : /^ลบ/.test(x.action) ? 'b-danger' : /อนุมัติ|สมัคร/.test(x.action) ? 'b-success' : /เปลี่ยน|กำหนด/.test(x.action) ? 'b-info' : 'b-neutral'}">${esc(x.action)}</span>`;
+
+  // ทะเบียนครู: รายชื่อบุคลากร บทบาท ห้อง/ระดับชั้น แอป + ประวัติการเปลี่ยนแปลงของบัญชี
+  function teachers(q) {
+    if (!Store.isAdmin()) return { title: 'ทะเบียนครู', html: `<div class="card lock-box">${icon('lock', 'i28')}<h3>เฉพาะผู้ดูแลระบบ</h3><p class="muted" style="margin:0">ทะเบียนครูและการกำหนดสิทธิ์ ดูและแก้ไขได้เฉพาะผู้ดูแลระบบ</p></div>` };
+    const tab = q.tab === 'history' ? 'history' : 'list';
+    const tabs = `<div class="tabs">${[['list', 'รายชื่อครู'], ['history', 'ประวัติการเปลี่ยนแปลง']].map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/teachers?tab=${k}">${l}</button>`).join('')}</div>`;
+    const actions = `<button class="btn secondary" data-action="room-auto">${icon('wand-sparkles')}จับคู่ห้อง / ระดับชั้นอัตโนมัติ</button>`;
+    if (tab === 'history') {
+      const h = D().history.filter(isStaffEvent);
+      return { title: 'ทะเบียนครู', actions, html: tabs + `<div class="card"><div class="card-head"><h3>ประวัติการเปลี่ยนแปลง · ครู / บัญชีผู้ใช้</h3><span class="muted small">สมัคร อนุมัติ เปลี่ยนบทบาท สิทธิ์แอป ห้อง/ระดับชั้น และการลบบัญชี</span></div>
+        ${h.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>เมื่อ</th><th>ผู้ดำเนินการ</th><th>การกระทำ</th><th>บัญชีที่เกี่ยวข้อง / รายละเอียด</th></tr></thead><tbody>${h.map((x) => `<tr><td>${fmtDate(x.at, true)}</td><td>${esc(x.by || '—')}</td><td>${histBadge(x)}</td><td>${esc(x.detail)}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีประวัติของครู / บัญชีผู้ใช้')}</div>` };
+    }
+    const staff = D().users.filter((u) => u.role !== 'parent');
+    const count = (r) => staff.filter((u) => u.role === r).length;
+    const roleOpts = Object.entries(ROLES).filter(([k]) => k !== 'parent');
+    return { title: 'ทะเบียนครู', actions, html: tabs + `
+      <div class="grid g4">
+        ${Apps.stat('users', 'บุคลากรทั้งหมด', staff.length, 'คน', '')}
+        ${Apps.stat('hourglass', 'รออนุมัติ', count('pending'), 'คน', 'amber', count('pending') ? 'เลือกบทบาทในตารางเพื่ออนุมัติ' : '')}
+        ${Apps.stat('school', 'ครูที่ปรึกษา', count('teacher'), 'คน', 'green', `ยังไม่กำหนดห้อง ${staff.filter((u) => u.role === 'teacher' && !Store.roomsOf(u.id).length).length} คน`)}
+        ${Apps.stat('layers', 'หัวหน้าระดับ / แนะแนว / ผู้ดูแล', count('grade_head') + count('counselor') + count('admin'), 'คน', '')}
+      </div>
+      <div class="card"><div class="toolbar">
+        <input class="input grow" id="tf-q" placeholder="ค้นหาชื่อ / อีเมล" value="${esc(q.q || '')}">
+        <select class="select" id="tf-role"><option value="">ทุกบทบาท</option>${roleOpts.map(([k, l]) => `<option value="${k}" ${q.role === k ? 'selected' : ''}>${esc(l)} (${count(k)})</option>`).join('')}</select>
+      </div><div id="tf-out"></div>
+      <div class="card-body muted small" style="border-top:1px solid var(--ink-200)">${icon('user-plus', 'i16')} เพิ่มครู: ให้ครูกด "สมัครใช้งาน" ที่หน้าเข้าสู่ระบบ แล้วเลือกบทบาทให้ในตารางนี้ · ทุกการเปลี่ยนแปลงถูกบันทึกในแท็บประวัติ</div></div>`,
+      after: () => {
+        const $ = (id) => document.getElementById(id);
+        const draw = () => {
+          const t = $('tf-q').value.trim().toLowerCase(), r = $('tf-role').value;
+          const list = staff.filter((u) => (!r || u.role === r) && (!t || (u.name || '').toLowerCase().includes(t) || (u.email || '').toLowerCase().includes(t)));
+          $('tf-out').innerHTML = `<div class="card-body muted small" style="padding:10px 20px;border-bottom:1px solid var(--ink-200)">${list.length} คน</div>` + usersTable(list, true);
+          UI.refreshIcons();
+        };
+        ['tf-q', 'tf-role'].forEach((id) => $(id).addEventListener('input', draw));
+        draw();
+      } };
+  }
+
   function registry(q) {
     if (!Store.isAdmin()) return { title: 'ทะเบียนนักเรียน', html: `<div class="card lock-box">${icon('lock', 'i28')}<h3>เฉพาะผู้ดูแลระบบ</h3><p class="muted" style="margin:0">ทะเบียนนักเรียน (ข้อมูลกลาง) แก้ไขได้เฉพาะผู้ดูแลระบบ<br>แอปอื่นอ่านข้อมูลผ่านรหัสนักเรียนเท่านั้น</p><a class="btn secondary" href="#/settings?tab=users">ไปที่ผู้ใช้และสิทธิ์</a></div>` };
     const tab = q.tab || 'list';
     const tabs = `<div class="tabs">${[['list', 'รายชื่อนักเรียน'], ['history', 'ประวัติการเปลี่ยนแปลง']].map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/registry?tab=${k}">${l}</button>`).join('')}</div>`;
     const actions = `<button class="btn secondary" data-action="registry-import">${icon('file-up')}นำเข้าจาก Excel</button><button class="btn secondary" data-action="registry-promote">${icon('arrow-up-circle')}เลื่อนชั้น</button><button class="btn primary" data-action="registry-edit">${icon('user-plus')}เพิ่มนักเรียน</button>`;
     if (tab === 'history') {
-      // แยกประวัติ: นักเรียน (ทะเบียน + ข้อมูลในแอป) กับ ครู / บัญชีผู้ใช้
-      const STAFF_ACTIONS = ['สมัครใช้งาน', 'อนุมัติผู้ใช้', 'เปลี่ยนบทบาท', 'เปลี่ยนสิทธิ์แอป', 'กำหนดห้องที่ปรึกษา', 'กำหนดระดับชั้น', 'ลบบัญชีผู้ใช้'];
-      const isStaff = (x) => STAFF_ACTIONS.includes(x.action) || (x.action === 'ลบไม่สำเร็จ' && /บัญชีผู้ใช้/.test(x.detail || ''));
-      const all = D().history, staff = all.filter(isStaff), stud = all.filter((x) => !isStaff(x));
-      const who = q.who === 'staff' ? 'staff' : 'students';
-      const h = who === 'staff' ? staff : stud;
-      const seg = `<div class="seg no-print">${[['students', 'นักเรียน', stud.length, 'graduation-cap'], ['staff', 'ครู / บัญชีผู้ใช้', staff.length, 'user-cog']].map(([k, l, n, ic]) => `<button class="${k === who ? 'on' : ''}" data-action="go" data-href="#/registry?tab=history&who=${k}">${icon(ic, 'i16')}${l} <span class="n">${n}</span></button>`).join('')}</div>`;
-      const badge = (x) => `<span class="badge ${/ไม่สำเร็จ/.test(x.action) ? 'b-warning' : /^ลบ/.test(x.action) ? 'b-danger' : /อนุมัติ|สมัคร/.test(x.action) ? 'b-success' : /เปลี่ยน|กำหนด/.test(x.action) ? 'b-info' : 'b-neutral'}">${esc(x.action)}</span>`;
-      const table = who === 'staff'
-        ? `<table class="tbl"><thead><tr><th>เมื่อ</th><th>ผู้ดำเนินการ</th><th>การกระทำ</th><th>บัญชีที่เกี่ยวข้อง / รายละเอียด</th></tr></thead><tbody>${h.map((x) => `<tr><td>${fmtDate(x.at, true)}</td><td>${esc(x.by)}</td><td>${badge(x)}</td><td>${esc(x.detail)}</td></tr>`).join('')}</tbody></table>`
-        : `<table class="tbl"><thead><tr><th>เมื่อ</th><th>ผู้แก้ไข</th><th>นักเรียน</th><th>การกระทำ</th><th>รายละเอียด</th></tr></thead><tbody>${h.map((x) => `<tr><td>${fmtDate(x.at, true)}</td><td>${esc(x.by)}</td><td>${x.studentId ? Apps.sLink(x.studentId) : '—'}</td><td>${badge(x)}</td><td>${esc(x.detail)}</td></tr>`).join('')}</tbody></table>`;
-      return { title: 'ทะเบียนนักเรียน (ข้อมูลกลาง)', actions, html: tabs + `<div class="card"><div class="card-head"><h3>ประวัติการเปลี่ยนแปลง</h3><span class="muted small">ใคร ทำอะไร เมื่อไร</span></div>
-        <div class="card-body" style="border-bottom:1px solid var(--ink-200)">${seg}</div>
-        ${h.length ? `<div class="tbl-wrap">${table}</div>` : empty(who === 'staff' ? 'ยังไม่มีประวัติของครู / บัญชีผู้ใช้' : 'ยังไม่มีประวัติของนักเรียน')}</div>` };
+      const h = D().history.filter((x) => !isStaffEvent(x));
+      return { title: 'ทะเบียนนักเรียน (ข้อมูลกลาง)', actions, html: tabs + `<div class="card"><div class="card-head"><h3>ประวัติการเปลี่ยนแปลง · นักเรียน</h3><span class="muted small">ใคร ทำอะไร เมื่อไร · ประวัติของครูอยู่ที่ <a href="#/teachers?tab=history">ทะเบียนครู</a></span></div>
+        ${h.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>เมื่อ</th><th>ผู้แก้ไข</th><th>นักเรียน</th><th>การกระทำ</th><th>รายละเอียด</th></tr></thead><tbody>${h.map((x) => `<tr><td>${fmtDate(x.at, true)}</td><td>${esc(x.by)}</td><td>${x.studentId ? Apps.sLink(x.studentId) : '—'}</td><td>${histBadge(x)}</td><td>${esc(x.detail)}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีประวัติของนักเรียน')}</div>` };
     }
     return { title: 'ทะเบียนนักเรียน (ข้อมูลกลาง)', actions, html: tabs + `
       <div class="notice">${icon('database', 'i16')}<span>ฐานข้อมูลกลางเก็บเฉพาะทะเบียนนักเรียน ไม่เก็บคะแนนหรือบันทึกใด ๆ · ย้ายออก/จบ ไม่ลบข้อมูล เพื่อเก็บประวัติ</span></div>
@@ -604,12 +648,7 @@
     if (tab === 'users') {
       body = `<div class="card"><div class="card-head"><h3>ผู้ใช้และสิทธิ์</h3>${D().users.some((u) => u.role === 'pending') ? `<span class="badge b-warning">รออนุมัติ ${D().users.filter((u) => u.role === 'pending').length} คน</span>` : ''}</div>
         <div class="card-body" style="border-bottom:1px solid var(--ink-200)"><div class="notice">${icon('user-plus', 'i16')}<span>เพิ่มผู้ใช้: ให้ครูกด "สมัครใช้งาน" ที่หน้าเข้าสู่ระบบ แล้วผู้ดูแลระบบเลือกบทบาทให้ที่นี่ — ก่อนอนุมัติจะยังดูข้อมูลนักเรียนไม่ได้ · ครูที่ปรึกษาเห็นรายละเอียดเฉพาะห้องที่กำหนดไว้ในคอลัมน์ "ห้องที่ปรึกษา"</span></div>
-        ${admin ? `<div class="actions" style="margin-top:12px"><button class="btn secondary sm" data-action="room-auto">${icon('wand-sparkles', 'i16')}จับคู่ห้อง / ระดับชั้นอัตโนมัติ</button><span class="muted small">ใช้ชื่อ–นามสกุลที่ครูกรอกตอนสมัคร เทียบกับรายชื่อครูที่ปรึกษา และหัวหน้า/รองหัวหน้าระดับ</span></div>` : ''}</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>ชื่อ</th><th>บทบาท</th><th>สิทธิ์</th><th>ห้องที่ปรึกษา</th><th>แอปที่ใช้ได้</th>${admin ? '<th></th>' : ''}</tr></thead><tbody>
-        ${D().users.map((u) => `<tr><td>${esc(u.name)} ${u.id === Store.user().id ? '<span class="badge b-navy">คุณ</span>' : ''}<div class="muted small">${esc(u.email || '')}</div></td>
-          <td>${admin && u.id !== Store.user().id ? `<select class="select" style="height:32px;width:auto" data-user-role="${u.id}">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${k === u.role ? 'selected' : ''}>${v}</option>`).join('')}</select>` : ROLES[u.role]}</td>
-          <td class="muted small">${u.role === 'admin' ? 'ทะเบียนกลาง · ตั้งค่า · ทุกแอป · เนื้อหาลับ' : u.role === 'counselor' ? 'ทุกแอป · เนื้อหาลับของการให้คำปรึกษา' : u.role === 'teacher' ? 'ค้นหา/บันทึกพฤติกรรมได้ทุกคน · รายละเอียดเฉพาะห้องที่ปรึกษา' : u.role === 'grade_head' ? 'ค้นหา/บันทึกพฤติกรรมได้ทุกคน · รายละเอียดทุกห้องในระดับชั้นที่ดูแล (ไม่เห็นเนื้อหาลับ)' : 'ยังเข้าถึงข้อมูลไม่ได้'}</td>
-          <td>${u.role === 'admin' || u.role === 'counselor' ? '<span class="muted small">ทุกห้อง</span>' : u.role === 'grade_head' ? `<div class="chips">${Store.gradesOf(u.id).map((g) => `<span class="badge b-navy">ระดับ ม.${g}</span>`).join('') || '<span class="badge b-warning">ยังไม่กำหนดระดับ</span>'}${admin ? `<button class="icon-btn" title="กำหนดระดับชั้น" data-action="grade-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : u.role === 'teacher' ? `<div class="chips">${Store.roomsOf(u.id).map((t) => `<span class="badge b-info">ม.${t.grade}/${t.room}</span>`).join('') || '<span class="badge b-warning">ยังไม่กำหนด</span>'}${admin ? `<button class="icon-btn" title="กำหนดห้องที่ปรึกษา" data-action="room-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : '—'}</td>
-          <td>${appsCell(u, admin)}</td>${admin ? `<td style="text-align:right">${u.id !== Store.user().id ? `<button class="icon-btn danger" title="ลบผู้ใช้ออกจากระบบ" aria-label="ลบผู้ใช้ ${esc(u.name)}" data-action="user-delete" data-id="${u.id}">${icon('user-x', 'i16')}</button>` : ''}</td>` : ''}</tr>`).join('')}</tbody></table></div></div>`;
+        ${admin ? `<div class="actions" style="margin-top:12px"><button class="btn secondary sm" data-action="room-auto">${icon('wand-sparkles', 'i16')}จับคู่ห้อง / ระดับชั้นอัตโนมัติ</button><span class="muted small">ใช้ชื่อ–นามสกุลที่ครูกรอกตอนสมัคร เทียบกับรายชื่อครูที่ปรึกษา และหัวหน้า/รองหัวหน้าระดับ</span></div>` : ''}</div>${usersTable(D().users, admin)}</div>`;
     } else if (tab === 'term') {
       body = `<form class="card" data-form="term" style="max-width:560px"><div class="card-head"><h3>ปีการศึกษา / ภาคเรียนปัจจุบัน</h3></div><div class="card-body"><div class="form-grid">
         <div class="field"><label>ปีการศึกษา (พ.ศ.)</label><input class="input mono" type="number" name="year" value="${Store.s.year}" ${admin ? '' : 'disabled'}></div>
@@ -657,5 +696,5 @@
     return { title: 'ตั้งค่า', html: lock + tabs + body };
   }
 
-  window.Pages = { home, search, student, registry, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES };
+  window.Pages = { home, search, student, registry, teachers, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES };
 })();
