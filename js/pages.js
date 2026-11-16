@@ -25,6 +25,71 @@
   }
 
   /* ---------------- หน้าแรก ---------------- */
+
+  /* ---------------- แดชบอร์ด (หน้าแรก) — ข้อมูลตามสิทธิ์ของผู้ใช้ ---------------- */
+  const GRADES = [1, 2, 3, 4, 5, 6];
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+  // vertical bars, one series; every bar labelled (few bars) and has a hover title
+  function vbars(items, { unit = '', color = 'var(--navy-700)' } = {}) {
+    const max = Math.max(1, ...items.map((x) => x.v));
+    return `<div class="vbars" style="--n:${items.length}">${items.map((x) => `<div class="vb" title="${esc(x.k)}: ${x.v.toLocaleString()} ${unit}">
+      <span class="vb-val">${x.v.toLocaleString()}</span><i style="height:${x.v ? Math.max(3, (x.v / max) * 100) : 0}%;background:${color}"></i><span class="vb-lbl">${esc(x.k)}</span></div>`).join('')}</div>`;
+  }
+  // 100% stacked horizontal bar per row + one shared legend (labels + counts, never colour alone)
+  function stack(rows, parts, unit = 'คน') {
+    const legend = `<div class="ch-legend">${parts.map((p) => {
+      const tot = rows.reduce((a, r) => a + (r.v[p.k] || 0), 0);
+      return `<span><i style="background:${p.c}"></i>${p.l} <b>${tot.toLocaleString()}</b></span>`; }).join('')}</div>`;
+    return legend + `<div class="hstack">${rows.map((r) => { const n = parts.reduce((a, p) => a + (r.v[p.k] || 0), 0);
+      return `<div class="hs-row"><span class="hs-lbl">${esc(r.k)}</span><div class="hs-bar">${n ? parts.filter((p) => r.v[p.k]).map((p) => `<i style="flex:${r.v[p.k]};background:${p.c}" title="${esc(r.k)} · ${p.l}: ${r.v[p.k]} ${unit} (${pct(r.v[p.k], n)}%)"></i>`).join('') : '<em>ไม่มีข้อมูล</em>'}</div><span class="hs-n">${n.toLocaleString()}</span></div>`; }).join('')}</div>`;
+  }
+  // progress bar per row (e.g. home visits done / students)
+  function progressRows(rows) {
+    return `<div class="hstack">${rows.map((r) => `<div class="hs-row"><span class="hs-lbl">${esc(r.k)}</span><div class="hs-bar prog" title="${esc(r.k)}: ${r.a.toLocaleString()} จาก ${r.b.toLocaleString()} คน"><i style="width:${pct(r.a, r.b)}%"></i></div><span class="hs-n">${pct(r.a, r.b)}%</span></div>`).join('')}</div>`;
+  }
+  const chartCard = (title, sub, body, link) => `<div class="card chart-card"><div class="card-head"><div><h3>${title}</h3>${sub ? `<div class="muted small">${sub}</div>` : ''}</div>${link ? `<a class="small" href="${link}">ดูรายละเอียด</a>` : ''}</div><div class="card-body">${body}</div></div>`;
+
+  function dashboard(act) {
+    if (!act.length) return '';
+    const byGrade = (fn) => GRADES.map((g) => ({ g, list: act.filter((s) => s.grade === g) })).filter((x) => x.list.length).map((x) => ({ k: 'ม.' + x.g, ...fn(x.list) }));
+    const cards = [];
+    cards.push(chartCard('นักเรียนแยกตามระดับชั้น', `กำลังศึกษา ${act.length.toLocaleString()} คน`, vbars(byGrade((l) => ({ v: l.length })), { unit: 'คน' }), Store.isAdmin() ? '#/registry' : ''));
+    if (on('behavior')) {
+      const lv = byGrade((l) => { const v = { ok: 0, watch: 0, high: 0 }; l.forEach((s) => { v[scoreLevel(B().score(s.id)).key]++; }); return { v }; });
+      cards.push(chartCard('ระดับคะแนนพฤติกรรม', `ภาคเรียน ${Store.termKey()} · เฝ้าระวังต่ำกว่า ${Store.s.warnBelow} · เสี่ยงสูงต่ำกว่า ${Store.s.alertBelow}`,
+        stack(lv, [{ k: 'ok', l: 'ปกติ', c: 'var(--green-600)' }, { k: 'watch', l: 'เฝ้าระวัง', c: 'var(--amber-500)' }, { k: 'high', l: 'เสี่ยงสูง', c: 'var(--red-700)' }]), '#/apps/behavior'));
+      // last 8 weeks (weeks start on Sunday): number of records, deductions vs. added points
+      const ids = new Set(act.map((s) => s.id)), now = new Date(); now.setHours(0, 0, 0, 0);
+      const start = new Date(now); start.setDate(start.getDate() - start.getDay() - 7 * 7);
+      const weeks = Array.from({ length: 8 }, (_, i) => { const d = new Date(start); d.setDate(d.getDate() + i * 7); return { d, neg: 0, pos: 0 }; });
+      B().records().forEach((r) => { if (!ids.has(r.studentId)) return; const i = Math.floor((new Date(r.at) - start) / (7 * 864e5)); if (i >= 0 && i < 8) weeks[i][Number(r.points) < 0 ? 'neg' : 'pos']++; });
+      const max = Math.max(1, ...weeks.map((w) => w.neg + w.pos));
+      const wk = `<div class="ch-legend"><span><i style="background:var(--red-600)"></i>หักคะแนน <b>${weeks.reduce((a, w) => a + w.neg, 0)}</b></span><span><i style="background:var(--green-600)"></i>เพิ่มคะแนน <b>${weeks.reduce((a, w) => a + w.pos, 0)}</b></span></div>
+        <div class="vbars" style="--n:8">${weeks.map((w) => { const lbl = w.d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+          return `<div class="vb" title="สัปดาห์ ${lbl}: หัก ${w.neg} · เพิ่ม ${w.pos} รายการ"><span class="vb-val">${w.neg + w.pos || ''}</span>
+          <div class="vb-stack" style="height:${((w.neg + w.pos) / max) * 100}%">${w.pos ? `<i style="flex:${w.pos};background:var(--green-600)"></i>` : ''}${w.neg ? `<i style="flex:${w.neg};background:var(--red-600)"></i>` : ''}</div><span class="vb-lbl">${lbl}</span></div>`; }).join('')}</div>`;
+      cards.push(chartCard('การบันทึกพฤติกรรม 8 สัปดาห์ล่าสุด', 'จำนวนรายการต่อสัปดาห์', wk, '#/apps/behavior?tab=records'));
+    }
+    if (on('care')) {
+      const care = Apps.get('care');
+      const scr = byGrade((l) => { const v = { normal: 0, risk: 0, problem: 0, none: 0 }; l.forEach((s) => { const x = care.latestScreen(s.id); v[x && v[x.result] !== undefined ? x.result : 'none']++; }); return { v }; });
+      cards.push(chartCard('ผลคัดกรองนักเรียนล่าสุด', 'นับผลล่าสุดของแต่ละคน', stack(scr, [{ k: 'normal', l: 'ปกติ', c: 'var(--green-600)' }, { k: 'risk', l: 'เสี่ยง', c: 'var(--amber-500)' }, { k: 'problem', l: 'มีปัญหา', c: 'var(--red-700)' }, { k: 'none', l: 'ยังไม่คัดกรอง', c: 'var(--ink-200)' }]), '#/apps/care'));
+      const vis = byGrade((l) => ({ a: l.filter((s) => care.latestVisit(s.id)).length, b: l.length }));
+      const done = vis.reduce((a, x) => a + x.a, 0);
+      cards.push(chartCard('การเยี่ยมบ้าน', `เยี่ยมแล้ว ${done.toLocaleString()} จาก ${act.length.toLocaleString()} คน (${pct(done, act.length)}%)`, progressRows(vis), '#/apps/care'));
+    }
+    if (on('counsel')) {
+      const ids = new Set(act.map((s) => s.id));
+      const prog = (D().progress || []).filter((p) => Store.seesAll() || ids.has(p.studentId));
+      const months = Array.from({ length: 6 }, (_, i) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 5 + i); return { key: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'), k: d.toLocaleDateString('th-TH', { month: 'short' }), v: 0 }; });
+      prog.forEach((p) => p.sessionDates.forEach((d) => { const m = months.find((x) => x.key === String(d).slice(0, 7)); if (m) m.v++; }));
+      const open = prog.filter((p) => !p.closed).length;
+      cards.push(chartCard('การให้คำปรึกษา 6 เดือนล่าสุด', `จำนวนครั้งต่อเดือน · เคสเปิดอยู่ ${open} · ปิดแล้ว ${prog.length - open}`, vbars(months, { unit: 'ครั้ง', color: 'var(--blue-600)' }), '#/apps/counsel'));
+    }
+    return `<div class="dash-head"><h3>ภาพรวมข้อมูล</h3><span class="muted small">${Store.seesAll() ? 'นักเรียนทั้งโรงเรียน' : esc(Store.myScopeText() || 'นักเรียนในความดูแล')} · ภาคเรียน ${Store.termKey()}</span></div>
+      <div class="grid g-dash">${cards.join('')}</div>`;
+  }
+
   function home() {
     const ev = Apps.events();
     const today = ev.filter((e) => isToday(e.at));
@@ -54,6 +119,7 @@
         ${stat('messages-square', 'ให้คำปรึกษาเดือนนี้', cMonth, 'ครั้ง', 'green')}
         ${stat('calendar-clock', 'นัดติดตาม 7 วัน', fu, 'นัด', 'red')}
       </div>
+      ${dashboard(act)}
       <div class="grid g-main">
         <div class="card"><div class="card-head"><h3>บันทึกล่าสุด</h3><span class="muted small">วันนี้ ${today.length} รายการ</span></div>${timeline(ev.slice(0, 10), true)}</div>
         <div class="card"><div class="card-head"><h3>นักเรียนที่ต้องเฝ้าระวัง</h3><a class="small" href="#/apps/behavior">ดูทั้งหมด</a></div>
