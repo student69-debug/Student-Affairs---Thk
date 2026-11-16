@@ -317,12 +317,20 @@
     const blocked = () => UI.dialog({ title: 'ลบนักเรียนไม่ได้', size: 'sm', submitLabel: 'เปลี่ยนสถานะแทน',
       body: `<p style="margin:0">${who} มีข้อมูลในแอปแล้ว (บันทึกพฤติกรรม การดูแล การให้คำปรึกษา หรือสุขภาพ) จึงลบไม่ได้ เพื่อเก็บประวัติไว้</p><p class="muted" style="margin:8px 0 0">ถ้านักเรียนย้ายออกหรือจบแล้ว ให้เปลี่ยนสถานะแทน</p>`,
       onSubmit: () => { setTimeout(() => statusDialog(id), 0); } });
-    UI.confirmDialog('ลบนักเรียน', `ลบ ${who} ออกจากทะเบียน?<br><span class="muted small">ใช้สำหรับรายการที่เพิ่มผิดหรือทดสอบเท่านั้น · ลบแล้วกู้คืนไม่ได้ · ถ้านักเรียนมีข้อมูลในแอปใดแล้ว ระบบจะไม่ยอมลบ</span>`, 'ลบนักเรียน', async () => {
-      const r = await Store.deleteStudent(id);
-      if (r === 'has_data') { setTimeout(blocked, 0); return; }
-      UI.toast(r === 'ok' ? 'ลบแล้ว · ' + fullName(s) : 'ไม่พบนักเรียนรหัสนี้');
-      App.render();
-    }, true);
+    UI.dialog({ title: 'ลบนักเรียน', size: 'sm', submitLabel: 'ลบนักเรียน', submitClass: 'accent',
+      body: `<p style="margin:0">ลบ ${who} ออกจากทะเบียน?</p>
+        <div class="notice warn">${icon('info', 'i16')}<span>ใช้สำหรับรายการที่เพิ่มผิดหรือทดสอบเท่านั้น · ลบแล้วกู้คืนไม่ได้ · ถ้านักเรียนมีข้อมูลในแอปใดแล้ว ระบบจะไม่ยอมลบ</span></div>
+        <div class="field"><label>ยืนยันด้วยรหัสผ่านของคุณ <span class="req">*</span></label><input class="input" type="password" name="password" required autocomplete="current-password"><span class="help">รหัสผ่านที่ใช้เข้าสู่ระบบ (${esc(Store.user().email || '')}) · การลบและการกรอกรหัสผิดจะถูกบันทึกในประวัติการเปลี่ยนแปลง</span></div>
+        <div id="del-err"></div>`,
+      onSubmit: async (v, form) => {
+        const r = await Store.deleteStudent(id, v.password);
+        const err = (m) => { form.querySelector('#del-err').innerHTML = `<div class="notice danger">${icon('circle-alert', 'i16')}<span>${m}</span></div>`; UI.refreshIcons(); form.password.value = ''; form.password.focus(); return false; };
+        if (r === 'bad_password') return err('รหัสผ่านไม่ถูกต้อง · ผิดครบ 5 ครั้งใน 15 นาที จะลบไม่ได้ชั่วคราว');
+        if (r === 'locked') return err('กรอกรหัสผ่านผิดหลายครั้ง · ลองใหม่ในอีก 15 นาที');
+        if (r === 'has_data') { setTimeout(blocked, 0); return; }
+        UI.toast(r === 'ok' ? 'ลบแล้ว · ' + fullName(s) : 'ไม่พบนักเรียนรหัสนี้');
+        App.render();
+      } });
   }
 
   function promoteDialog() {
