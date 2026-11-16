@@ -290,6 +290,7 @@
     if (/Password should contain|Password should be at least|weak.?password/i.test(m)) return 'รหัสผ่านต้องมีอย่างน้อย 8 ตัว และมีตัวอังกฤษพิมพ์เล็ก พิมพ์ใหญ่ และตัวเลข เช่น Thk12345';
     if (/pwned|leaked|known to be weak|compromised/i.test(m)) return 'รหัสผ่านนี้ง่ายเกินไปหรือเคยรั่วไหล กรุณาตั้งรหัสผ่านใหม่';
     if (/already registered|already exists/i.test(m)) return 'อีเมลนี้สมัครไว้แล้ว — กด "เข้าสู่ระบบ" แทน หรือติดต่อผู้ดูแลระบบ';
+    if (/email rate limit/i.test(m)) return 'ระบบส่งอีเมลยืนยันครบจำนวนต่อชั่วโมงแล้ว — กรุณาลองสมัครใหม่ในอีกประมาณ 1 ชั่วโมง หรือแจ้งผู้ดูแลระบบ';
     if (/rate limit|too many|security purposes/i.test(m)) return 'มีการส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่ หรือติดต่อผู้ดูแลระบบ';
     if (/invalid.*email|email.*invalid|Unable to validate email/i.test(m)) return 'รูปแบบอีเมลไม่ถูกต้อง';
     if (/Failed to fetch|NetworkError|network/i.test(m)) return 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ กรุณาลองใหม่';
