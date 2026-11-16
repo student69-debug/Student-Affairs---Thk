@@ -390,3 +390,7 @@ details.card>summary::-webkit-details-marker{display:none}
 .hs-bar.prog i{background:var(--navy-600);border-radius:4px}
 .chart-card .card-head > a{white-space:nowrap;flex-shrink:0}
 .chart-card .card-head{align-items:flex-start;gap:12px}
+.pw-rules{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:3px;font-size:13px;color:var(--ink-500)}
+.pw-rules li{display:flex;align-items:center;gap:6px}
+.pw-rules li.ok{color:#1b7a3d}
+.pw-rules li.bad{color:var(--red-700);font-weight:500}

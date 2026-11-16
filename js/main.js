@@ -267,6 +267,23 @@
     }));
   }
 
+  // password rules for staff sign-up (same as the Supabase Auth policy: 8+ chars, lower + upper case letter, digit)
+  const PW_RULES = [['len', 'อย่างน้อย 8 ตัวอักษร'], ['lower', 'มีตัวอังกฤษพิมพ์เล็ก (a–z) อย่างน้อย 1 ตัว'], ['upper', 'มีตัวอังกฤษพิมพ์ใหญ่ (A–Z) อย่างน้อย 1 ตัว'], ['digit', 'มีตัวเลข (0–9) อย่างน้อย 1 ตัว']];
+  const pwMissing = (p) => [p.length >= 8 ? '' : 'len', /[a-z]/.test(p) ? '' : 'lower', /[A-Z]/.test(p) ? '' : 'upper', /[0-9]/.test(p) ? '' : 'digit'].filter(Boolean);
+
+  // Supabase Auth messages are English; show staff a Thai sentence that says what to do
+  function authError(m = '') {
+    if (/Invalid login/i.test(m)) return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+    if (/not confirmed/i.test(m)) return 'ยังไม่ได้ยืนยันอีเมล — กรุณาเปิดลิงก์ในอีเมลก่อน';
+    if (/Password should contain|Password should be at least|weak.?password/i.test(m)) return 'รหัสผ่านต้องมีอย่างน้อย 8 ตัว และมีตัวอังกฤษพิมพ์เล็ก พิมพ์ใหญ่ และตัวเลข เช่น Thk12345';
+    if (/pwned|leaked|known to be weak|compromised/i.test(m)) return 'รหัสผ่านนี้ง่ายเกินไปหรือเคยรั่วไหล กรุณาตั้งรหัสผ่านใหม่';
+    if (/already registered|already exists/i.test(m)) return 'อีเมลนี้สมัครไว้แล้ว — กด "เข้าสู่ระบบ" แทน หรือติดต่อผู้ดูแลระบบ';
+    if (/rate limit|too many|security purposes/i.test(m)) return 'มีการส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่ หรือติดต่อผู้ดูแลระบบ';
+    if (/invalid.*email|email.*invalid|Unable to validate email/i.test(m)) return 'รูปแบบอีเมลไม่ถูกต้อง';
+    if (/Failed to fetch|NetworkError|network/i.test(m)) return 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ กรุณาลองใหม่';
+    return 'ดำเนินการไม่สำเร็จ: ' + m;
+  }
+
   function loginScreen(mode = 'in', msg = '') {
     if (mode === 'parent' || mode === 'activate') return parentScreen(mode, msg);
     const up = mode === 'up';
@@ -275,15 +292,28 @@
       ${msg ? `<div class="notice">${icon('info', 'i16')}<span>${esc(msg)}</span></div>` : ''}
       ${up ? '<div class="field"><label>ชื่อ – นามสกุล <span class="req">*</span></label><input class="input" name="name" required placeholder="ครูสมศรี วงศ์ใหญ่" autocomplete="name"></div>' : ''}
       <div class="field"><label>อีเมล <span class="req">*</span></label><input class="input" type="email" name="email" required autocomplete="email"></div>
-      <div class="field"><label>รหัสผ่าน <span class="req">*</span></label><input class="input" type="password" name="password" required minlength="8" autocomplete="${up ? 'new-password' : 'current-password'}">${up ? '<span class="help">อย่างน้อย 8 ตัวอักษร</span>' : ''}</div>
+      <div class="field"><label>รหัสผ่าน <span class="req">*</span></label><input class="input" type="password" name="password" required autocomplete="${up ? 'new-password' : 'current-password'}">${up ? `<ul class="pw-rules" data-pw-rules>${PW_RULES.map(([k, t]) => `<li data-rule="${k}">${icon('circle', 'i16')}<span>${t}</span></li>`).join('')}</ul>` : ''}</div>
       <button class="btn primary" type="submit">${up ? 'สมัครใช้งาน' : 'เข้าสู่ระบบ'}</button>
       <div class="muted small" style="text-align:center">${up ? 'มีบัญชีแล้ว? <a href="#" data-login="in">เข้าสู่ระบบ</a>' : 'ยังไม่มีบัญชี? <a href="#" data-login="up">สมัครใช้งาน</a> · ผู้ดูแลระบบจะอนุมัติสิทธิ์ให้'}</div>
     </form>`);
     const form = document.getElementById('login-form');
     bindTabs(form);
+    const rulesBox = form.querySelector('[data-pw-rules]');
+    const paintRules = (showMissing) => {
+      const miss = pwMissing(form.password.value);
+      rulesBox.querySelectorAll('[data-rule]').forEach((li) => {
+        const ok = !miss.includes(li.dataset.rule);
+        li.className = ok ? 'ok' : (showMissing ? 'bad' : '');
+        li.querySelector('svg, i').outerHTML = icon(ok ? 'circle-check' : (showMissing ? 'circle-x' : 'circle'), 'i16');
+      });
+      UI.refreshIcons();
+      return miss;
+    };
+    if (rulesBox) form.password.addEventListener('input', () => paintRules(false));
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!form.checkValidity()) { form.reportValidity(); return; }
+      if (up && paintRules(true).length) { UI.toast('รหัสผ่านยังไม่ครบเงื่อนไข · ดูรายการสีแดงใต้ช่องรหัสผ่าน'); form.password.focus(); return; }
       const v = Object.fromEntries(new FormData(form).entries());
       const btn = form.querySelector('button[type=submit]');
       btn.disabled = true; btn.textContent = 'กำลังดำเนินการ…';
@@ -297,8 +327,7 @@
         boot();
       } catch (err) {
         btn.disabled = false; btn.textContent = up ? 'สมัครใช้งาน' : 'เข้าสู่ระบบ';
-        const m = /Invalid login/i.test(err.message) ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : /not confirmed/i.test(err.message) ? 'ยังไม่ได้ยืนยันอีเมล — กรุณาเปิดลิงก์ในอีเมลก่อน' : err.message;
-        UI.toast(m);
+        UI.toast(authError(err.message));
       }
     });
   }
