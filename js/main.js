@@ -88,6 +88,18 @@
     'registry-edit': (el) => Pages.studentDialog(el.dataset.id),
     'registry-status': (el) => Pages.statusDialog(el.dataset.id),
     'registry-delete': (el) => Pages.deleteDialog(el.dataset.id),
+    'user-delete': (el) => {
+      const u = (Store.data.users || []).find((x) => x.id === el.dataset.id);
+      if (!u) return;
+      UI.deleteDialog({ title: 'ลบผู้ใช้ออกจากระบบ', label: 'ลบผู้ใช้',
+        text: `<p style="margin:0 0 10px">ลบ <b>${UI.esc(u.name || '—')}</b> (${UI.esc(u.email || '')}) ออกจากระบบ?</p>
+          <div class="notice warn">${UI.icon('info', 'i16')}<span>บัญชีนี้จะเข้าระบบไม่ได้อีก · ห้อง/ระดับชั้นที่กำหนดไว้จะถูกลบด้วย · ข้อมูลที่ครูคนนี้เคยบันทึกยังอยู่ครบ · ถ้าสมัครใหม่ต้องอนุมัติใหม่</span></div>`,
+        run: (pw) => Store.deleteUser(u.id, pw),
+        onDone: (r) => {
+          const msg = { ok: 'ลบผู้ใช้แล้ว · ' + (u.name || u.email), self: 'ลบบัญชีของตัวเองไม่ได้', last_admin: 'ลบไม่ได้ · ต้องมีผู้ดูแลระบบอย่างน้อย 1 คน', not_found: 'ไม่พบผู้ใช้นี้ (อาจถูกลบไปแล้ว)' }[r] || ('ลบไม่สำเร็จ: ' + r);
+          UI.toast(msg); render();
+        } });
+    },
     'registry-promote': () => Pages.promoteDialog(),
     'registry-import': () => Pages.importDialog(),
     'registry-template': () => Pages.template(),

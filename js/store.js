@@ -190,6 +190,12 @@
       await this.refresh(kind);
     },
     // delete with the user's password (checked + logged in the database); kind: record | health | case | subjects
+    // remove a user account (admin only, own password, logged). returns ok | bad_password | locked | self | last_admin | not_found
+    async deleteUser(id, password) {
+      const r = check(await sb.rpc('admin_delete_user', { p_id: id, p_password: password }));
+      if (r === 'ok') await this.refresh('users', 'teacherRooms', 'teacherGrades', 'history');
+      return r;
+    },
     async deleteItem(kind, id, password) {
       const r = check(await sb.rpc('delete_item', { p_kind: kind, p_id: String(id), p_password: password }));
       const slots = { record: ['records'], health: ['health'], case: ['cases', 'progress'], subjects: ['subjects'] }[kind];
