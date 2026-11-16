@@ -300,8 +300,9 @@
     },
   };
 
-  function stat(ic, label, val, unit, tone, hint = '') {
-    return `<div class="card stat"><div class="lbl"><span class="ic ${tone}">${icon(ic)}</span>${esc(label)}</div><div class="val">${val}<small> ${unit}</small></div>${hint ? `<div class="hint">${esc(hint)}</div>` : ''}</div>`;
+  function stat(ic, label, val, unit, tone, hint = '', href = '') {
+    const tag = href ? 'a' : 'div';
+    return `<${tag} class="card stat${href ? ' link' : ''}"${href ? ` href="${href}"` : ''}><div class="lbl"><span class="ic ${tone}">${icon(ic)}</span>${esc(label)}</div><div class="val">${val}<small> ${unit}</small></div>${hint ? `<div class="hint">${esc(hint)}</div>` : ''}</${tag}>`;
   }
 
   const ALL = [care, window.CounselApp, behavior];

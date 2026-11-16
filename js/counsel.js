@@ -95,7 +95,7 @@
       const mine = new Set(Store.myStudents().map((s) => s.id));
       const list = progress().filter((p) => mine.has(p.studentId));
       return { title: 'ให้คำปรึกษา', html: `<div class="notice">${icon('info', 'i16')}<span>หน้านี้แสดงความคืบหน้าของนักเรียนในความดูแลของคุณที่อยู่ในความดูแลของงานแนะแนว — รายละเอียดเคสเห็นเฉพาะครูแนะแนว</span></div>
-        <div class="card"><div class="card-head"><h3>นักเรียนในความดูแลของงานแนะแนว</h3><span class="muted small">${list.filter((p) => !p.closed).length} เคสที่ยังเปิด</span></div>${progressTable(list, true)}</div>` };
+        <div class="card" id="appts"><div class="card-head"><h3>นักเรียนในความดูแลของงานแนะแนว</h3><span class="muted small">${list.filter((p) => !p.closed).length} เคสที่ยังเปิด</span></div>${progressTable(list, true)}</div>` };
     }
     if (q.case) return editorPage(q);
     const tab = q.tab || 'overview';
@@ -126,7 +126,7 @@
         ${Apps.stat('calendar-clock', 'นัดภายใน 7 วัน', soon.length, 'นัด', 'amber', `เลยกำหนด ${appts.filter((c) => dayDiff(c.nextAppt) < 0).length}`)}
         ${Apps.stat('folder-plus', 'เปิดเคสเดือนนี้', all.filter((c) => c.openDate >= monthStart).length, 'เคส', 'green')}</div>
       <div class="grid g-main">
-        <div class="card"><div class="card-head"><h3>นัดหมายที่ต้องติดตาม</h3></div>${appts.length ? `<div class="list">${appts.slice(0, 12).map((c) => { const s = Store.student(c.studentId), dd = dayDiff(c.nextAppt);
+        <div class="card" id="appts"><div class="card-head"><h3>นัดหมายที่ต้องติดตาม</h3></div>${appts.length ? `<div class="list">${appts.slice(0, 12).map((c) => { const s = Store.student(c.studentId), dd = dayDiff(c.nextAppt);
           return `<a class="list-row" href="#/apps/counsel?case=${c.id}"><div class="grow"><div class="t">${esc(fullName(s))} <span class="muted small">${s ? klass(s) : ''}</span></div><div class="s">${kBadges(c.types)} · ${esc(ownerName(c.owner))}</div></div><span class="badge ${dd < 0 ? 'b-danger' : dd <= 2 ? 'b-warning' : 'b-info'}">${fmtDate(c.nextAppt)}${dd < 0 ? ' เลยกำหนด' : dd === 0 ? ' วันนี้' : ''}</span></a>`; }).join('')}</div>` : empty('ไม่มีนัดหมาย', 'calendar')}</div>
         <div class="card"><div class="card-head"><h3>จำนวนเคสตามประเภทปัญหา</h3><span class="muted small">เคสที่ยังเปิด</span></div><div class="card-body kbars">
           ${kcount.map(([k, l, n]) => `<div class="kbar" title="${esc(l)}"><span class="k">${k}</span><span class="l">${esc(l)}</span><span class="bar"><i style="width:${(n / kmax) * 100}%"></i></span><span class="n">${n}</span></div>`).join('')}</div></div>

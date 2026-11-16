@@ -60,6 +60,8 @@
     if (page.after) page.after();
     UI.hydratePhotos(document.getElementById('content'));
     window.scrollTo(0, window.__keepScroll);
+    const target = q.go && document.getElementById(q.go);
+    if (target) { target.scrollIntoView({ block: 'start' }); target.classList.add('flash'); setTimeout(() => target.classList.remove('flash'), 1600); }
   }
 
   function fail(err) { UI.toast('บันทึกไม่สำเร็จ: ' + err.message); render(); }

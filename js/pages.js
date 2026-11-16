@@ -117,7 +117,7 @@
         ${stat('file-plus', 'บันทึกใหม่วันนี้', today.length, 'รายการ', '', 'จากทุกแอป')}
         ${stat('triangle-alert', 'นักเรียนเฝ้าระวัง', watch.length, 'คน', 'amber', 'คะแนนต่ำ / คัดกรองมีปัญหา')}
         ${stat('messages-square', 'ให้คำปรึกษาเดือนนี้', cMonth, 'ครั้ง', 'green')}
-        ${stat('calendar-clock', 'นัดติดตาม 7 วัน', fu, 'นัด', 'red')}
+        ${stat('calendar-clock', 'นัดติดตาม 7 วัน', fu, 'นัด', 'red', '', on('counsel') ? '#/apps/counsel?go=appts' : '')}
       </div>
       ${dashboard(act)}
       <div class="grid g-main">
