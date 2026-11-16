@@ -112,7 +112,7 @@
       <div class="page-head"><div><h2>ภาพรวมวันนี้</h2><p>${fmtDate(new Date().toISOString())} · ภาคเรียนที่ ${Store.s.term}/${Store.s.year}${Store.seesAll() ? ' · นักเรียนทั้งโรงเรียน' : Store.myScopeText() ? ' · ' + Store.myScopeText() + ' (' + act.length.toLocaleString() + ' คน)' : ''}</p></div>
         <div class="actions">${on('behavior') ? `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}
         ${on('counsel') && Store.seesAll() ? `<button class="btn secondary" data-action="counsel-record">${icon('message-square-plus')}บันทึกให้คำปรึกษา</button>` : ''}</div></div>
-      ${!Store.seesAll() && !Store.myScopeText() ? `<div class="notice warn">${icon('info', 'i16')}<span>บัญชีของคุณยังไม่ได้กำหนด${Store.user().role === 'grade_head' ? 'ระดับชั้นที่ดูแล' : 'ห้องที่ปรึกษา'} — ค้นหาและบันทึกพฤติกรรมได้ แต่จะยังไม่เห็นรายละเอียดนักเรียน กรุณาแจ้งผู้ดูแลระบบ</span></div>` : ''}
+      ${!Store.seesAll() && !Store.myScopeText() && Store.user().role !== 'inspector' ? `<div class="notice warn">${icon('info', 'i16')}<span>บัญชีของคุณยังไม่ได้กำหนด${Store.user().role === 'grade_head' ? 'ระดับชั้นที่ดูแล' : 'ห้องที่ปรึกษา'} — ค้นหาและบันทึกพฤติกรรมได้ แต่จะยังไม่เห็นรายละเอียดนักเรียน กรุณาแจ้งผู้ดูแลระบบ</span></div>` : ''}
       <div class="grid g4">
         ${stat('file-plus', 'บันทึกใหม่วันนี้', today.length, 'รายการ', '', 'จากทุกแอป')}
         ${stat('triangle-alert', 'นักเรียนเฝ้าระวัง', watch.length, 'คน', 'amber', 'คะแนนต่ำ / คัดกรองมีปัญหา')}
@@ -226,8 +226,8 @@
     return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ชื่อ</th><th>บทบาท</th><th>สิทธิ์</th><th>ห้องที่ปรึกษา</th><th>แอปที่ใช้ได้</th>${admin ? '<th></th>' : ''}</tr></thead><tbody>
         ${list.map((u) => `<tr><td>${esc(u.name)} ${u.id === Store.user().id ? '<span class="badge b-navy">คุณ</span>' : ''}<div class="muted small">${esc(u.email || '')}</div></td>
           <td>${admin && u.id !== Store.user().id ? `<select class="select" style="height:32px;width:auto" data-user-role="${u.id}">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${k === u.role ? 'selected' : ''}>${v}</option>`).join('')}</select>` : ROLES[u.role]}</td>
-          <td class="muted small">${u.role === 'admin' ? 'ทะเบียนกลาง · ตั้งค่า · ทุกแอป · เนื้อหาลับ' : u.role === 'counselor' ? 'ทุกแอป · เนื้อหาลับของการให้คำปรึกษา' : u.role === 'teacher' ? 'ค้นหา/บันทึกพฤติกรรมได้ทุกคน · รายละเอียดเฉพาะห้องที่ปรึกษา' : u.role === 'grade_head' ? 'ค้นหา/บันทึกพฤติกรรมได้ทุกคน · รายละเอียดทุกห้องในระดับชั้นที่ดูแล (ไม่เห็นเนื้อหาลับ)' : 'ยังเข้าถึงข้อมูลไม่ได้'}</td>
-          <td>${u.role === 'admin' || u.role === 'counselor' ? '<span class="muted small">ทุกห้อง</span>' : u.role === 'grade_head' ? `<div class="chips">${Store.gradesOf(u.id).map((g) => `<span class="badge b-navy">ระดับ ม.${g}</span>`).join('') || '<span class="badge b-warning">ยังไม่กำหนดระดับ</span>'}${admin ? `<button class="icon-btn" title="กำหนดระดับชั้น" data-action="grade-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : u.role === 'teacher' ? `<div class="chips">${Store.roomsOf(u.id).map((t) => `<span class="badge b-info">ม.${t.grade}/${t.room}</span>`).join('') || '<span class="badge b-warning">ยังไม่กำหนด</span>'}${admin ? `<button class="icon-btn" title="กำหนดห้องที่ปรึกษา" data-action="room-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : '—'}</td>
+          <td class="muted small">${u.role === 'admin' ? 'ทะเบียนกลาง · ตั้งค่า · ทุกแอป · เนื้อหาลับ' : u.role === 'counselor' ? 'ทุกแอป · เนื้อหาลับของการให้คำปรึกษา' : u.role === 'teacher' ? 'ค้นหา/บันทึกพฤติกรรมได้ทุกคน · รายละเอียดเฉพาะห้องที่ปรึกษา' : u.role === 'grade_head' ? 'ค้นหา/บันทึกพฤติกรรมได้ทุกคน · รายละเอียดทุกห้องในระดับชั้นที่ดูแล (ไม่เห็นเนื้อหาลับ)' : u.role === 'inspector' ? 'ดู/บันทึกพฤติกรรมได้ทั้งโรงเรียน · รายละเอียดอื่นเฉพาะห้องที่ปรึกษา (ถ้ามี)' : 'ยังเข้าถึงข้อมูลไม่ได้'}</td>
+          <td>${u.role === 'admin' || u.role === 'counselor' ? '<span class="muted small">ทุกห้อง</span>' : u.role === 'grade_head' ? `<div class="chips">${Store.gradesOf(u.id).map((g) => `<span class="badge b-navy">ระดับ ม.${g}</span>`).join('') || '<span class="badge b-warning">ยังไม่กำหนดระดับ</span>'}${admin ? `<button class="icon-btn" title="กำหนดระดับชั้น" data-action="grade-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : u.role === 'teacher' || u.role === 'inspector' ? `<div class="chips">${Store.roomsOf(u.id).map((t) => `<span class="badge b-info">ม.${t.grade}/${t.room}</span>`).join('') || (u.role === 'inspector' ? '<span class="muted small">ไม่มี (ไม่บังคับ)</span>' : '<span class="badge b-warning">ยังไม่กำหนด</span>')}${admin ? `<button class="icon-btn" title="กำหนดห้องที่ปรึกษา" data-action="room-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : '—'}</td>
           <td>${appsCell(u, admin)}</td>${admin ? `<td style="text-align:right">${u.id !== Store.user().id ? `<button class="icon-btn danger" title="ลบผู้ใช้ออกจากระบบ" aria-label="ลบผู้ใช้ ${esc(u.name)}" data-action="user-delete" data-id="${u.id}">${icon('user-x', 'i16')}</button>` : ''}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
   }
 
@@ -254,7 +254,7 @@
         ${Apps.stat('users', 'บุคลากรทั้งหมด', staff.length, 'คน', '')}
         ${Apps.stat('hourglass', 'รออนุมัติ', count('pending'), 'คน', 'amber', count('pending') ? 'เลือกบทบาทในตารางเพื่ออนุมัติ' : '')}
         ${Apps.stat('school', 'ครูที่ปรึกษา', count('teacher'), 'คน', 'green', `ยังไม่กำหนดห้อง ${staff.filter((u) => u.role === 'teacher' && !Store.roomsOf(u.id).length).length} คน`)}
-        ${Apps.stat('layers', 'หัวหน้าระดับ / แนะแนว / ผู้ดูแล', count('grade_head') + count('counselor') + count('admin'), 'คน', '')}
+        ${Apps.stat('layers', 'หัวหน้าระดับ / สารวัตร / แนะแนว / ผู้ดูแล', count('grade_head') + count('inspector') + count('counselor') + count('admin'), 'คน', '')}
       </div>
       <div class="card"><div class="toolbar">
         <input class="input grow" id="tf-q" placeholder="ค้นหาชื่อ / อีเมล" value="${esc(q.q || '')}">
@@ -500,7 +500,7 @@
   }
 
   /* ---------------- ตั้งค่า ---------------- */
-  const ROLES = { admin: 'ผู้ดูแลระบบ', counselor: 'ครูแนะแนว', grade_head: 'หัวหน้า / รองหัวหน้าระดับ', teacher: 'ครูที่ปรึกษา / ครูทั่วไป', pending: 'รออนุมัติ (ไม่มีสิทธิ์)' };
+  const ROLES = { admin: 'ผู้ดูแลระบบ', counselor: 'ครูแนะแนว', grade_head: 'หัวหน้า / รองหัวหน้าระดับ', inspector: 'สารวัตรนักเรียน', teacher: 'ครูที่ปรึกษา / ครูทั่วไป', pending: 'รออนุมัติ (ไม่มีสิทธิ์)' };
   const FUTURE = [['calendar-check', 'เช็กชื่อเข้าแถว / มาสาย'], ['graduation-cap', 'ทุนการศึกษา'], ['door-open', 'ขออนุญาตออกนอกโรงเรียน'], ['heart-handshake', 'กิจกรรม / จิตอาสา']];
   /* ---- Per-person app access ---- */
   function appsCell(u, admin) {

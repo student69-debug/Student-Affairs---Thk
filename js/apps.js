@@ -132,7 +132,7 @@
       const base = '#/apps/behavior';
       let body = '';
       if (tab === 'overview') {
-        const list = Store.myStudents().map((s) => ({ s, sc: this.score(s.id) })).sort((a, b) => a.sc - b.sc);
+        const list = (Store.user().role === 'inspector' ? Store.activeStudents() : Store.myStudents()).map((s) => ({ s, sc: this.score(s.id) })).sort((a, b) => a.sc - b.sc);
         const hi = list.filter((x) => x.sc < Store.s.alertBelow).length, w = list.filter((x) => x.sc >= Store.s.alertBelow && x.sc < Store.s.warnBelow).length;
         body = `<div class="grid g3">
           ${stat('users', 'นักเรียนทั้งหมด', list.length, 'คน', '')}
