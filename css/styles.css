@@ -261,11 +261,16 @@ a.app-card:hover{box-shadow:var(--shadow-2);border-color:var(--navy-300);color:i
 @media (max-width:520px){.g4{grid-template-columns:minmax(0,1fr)}}
 
 /* ---------- Print ---------- */
+/* no page margin = the browser has nowhere to print its own header/footer (date, title, URL, page no.);
+   the page's white space comes from padding on .content instead */
+@page{margin:0}
 @media print{
+  html,body{margin:0}
+  .content{padding:12mm 14mm !important}
   .sidebar,.topbar,.no-print,.toasts,.tabs{display:none !important}
   .shell{display:block}
   body{background:var(--white)}
-  .content{padding:0;max-width:none}
+  .content{max-width:none}
   .card{box-shadow:none;break-inside:avoid}
   .print-only{display:block}
 }
