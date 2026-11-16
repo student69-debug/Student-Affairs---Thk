@@ -411,3 +411,9 @@ details.card>summary::-webkit-details-marker{display:none}
 .pending-steps{text-align:left;margin:4px 0 0;padding-left:22px;display:grid;gap:6px;color:var(--ink-700);font-size:14px}
 .icon-btn.danger{color:var(--red-700)}
 .icon-btn.danger:hover{background:var(--red-50)}
+.bsearch .card-head h3{display:flex;align-items:center;gap:8px}
+.bsearch-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.bsearch-row .field{margin:0;min-width:140px}
+.bsearch-row .field.grow{flex:1;min-width:220px}
+.bsearch-row .btn{height:40px}
+@media (max-width:640px){.bsearch-row .field,.bsearch-row .btn{width:100%}}

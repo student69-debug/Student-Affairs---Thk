@@ -169,20 +169,54 @@
         html: tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + body };
     },
     // รายการบันทึก: กรองตามประเภทพฤติกรรม ภาคเรียน ชั้น ช่วงวันที่ และชื่อ/รหัส — ดูได้ทั้งรายรายการและสรุปรายคน
+    // พฤติกรรมแบบเดียวกับหน้าบันทึก: ตัดคะแนน / เพิ่มคะแนน (+ ชื่อที่มีในบันทึกเก่าแต่ไม่อยู่ในตาราง)
+    typeOptions(selected = '') {
+      const rules = D().behavior.rules, names = new Set(rules.map((r) => r.name));
+      const opt = (name, label) => `<option value="${esc(name)}" ${name === selected ? 'selected' : ''}>${esc(label)}</option>`;
+      const neg = rules.filter((r) => r.points < 0), pos = rules.filter((r) => r.points >= 0);
+      const other = [...new Set(D().behavior.records.map((r) => r.title).filter((x) => x && !names.has(x)))].sort((a, b) => a.localeCompare(b, 'th'));
+      return '<option value="">ทุกพฤติกรรม</option>'
+        + (neg.length ? `<optgroup label="ตัดคะแนน">${neg.map((r) => opt(r.name, `${r.name} (${signed(r.points)})`)).join('')}</optgroup>` : '')
+        + (pos.length ? `<optgroup label="เพิ่มคะแนน / คืนคะแนน">${pos.map((r) => opt(r.name, `${r.name} (${signed(r.points)})`)).join('')}</optgroup>` : '')
+        + (other.length ? `<optgroup label="อื่น ๆ (จากบันทึกเดิม)">${other.map((x) => opt(x, x)).join('')}</optgroup>` : '');
+    },
+    gradeOptions(selected = '') {
+      const grades = [...new Set(Store.activeStudents().map((s) => String(s.grade)))].sort((a, b) => a.localeCompare(b, 'th', { numeric: true }));
+      return '<option value="">ทุกระดับชั้น</option>' + grades.map((g) => `<option value="${esc(g)}" ${g === String(selected) ? 'selected' : ''}>ม.${esc(g)}</option>`).join('');
+    },
+    // การ์ดค้นหาบนหน้าแรก → เปิดผลในแท็บรายการบันทึก (สรุปรายคน)
+    searchCard() {
+      return `<form class="card bsearch" id="home-bsearch"><div class="card-head"><h3>${icon('search', 'i16')} ค้นหาประวัติพฤติกรรม</h3><span class="muted small">ดูว่ามีกี่ราย ใครบ้าง</span></div>
+        <div class="card-body bsearch-row">
+          <div class="field"><label>ระดับชั้น</label><select class="select" name="grade">${this.gradeOptions()}</select></div>
+          <div class="field grow"><label>พฤติกรรม</label><select class="select" name="type">${this.typeOptions()}</select></div>
+          <div class="field"><label>ตั้งแต่วันที่</label><input class="input" type="date" name="from"></div>
+          <div class="field"><label>ถึงวันที่</label><input class="input" type="date" name="to"></div>
+          <button class="btn primary" type="submit">${icon('search', 'i16')}ค้นหา</button>
+        </div></form>`;
+    },
+    bindSearchCard() {
+      const f = document.getElementById('home-bsearch');
+      if (!f) return;
+      f.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (f.from.value && f.to.value && f.from.value > f.to.value) { toast('วันที่เริ่มต้องไม่หลังวันที่สิ้นสุด'); return; }
+        const p = new URLSearchParams({ tab: 'records', view: 'people' });
+        ['grade', 'type', 'from', 'to'].forEach((k) => { if (f[k].value) p.set(k, f[k].value); });
+        location.hash = '#/apps/behavior?' + p.toString();
+      });
+    },
     recordsSearch(q) {
-      const all = D().behavior.records, cur = Store.termKey();
-      const count = {}; all.forEach((r) => { count[r.title] = (count[r.title] || 0) + 1; });
-      const titles = Object.keys(count).sort((x, y) => count[y] - count[x] || x.localeCompare(y, 'th'));
+      const all = D().behavior.records, cur = Store.termKey(), dated = !!(q.from || q.to);
       const terms = [...new Set(all.map((r) => r.term).filter(Boolean))].sort().reverse();
       if (!terms.includes(cur)) terms.unshift(cur);
-      const grades = [...new Set(Store.activeStudents().map((s) => s.grade))].sort((x, y) => String(x).localeCompare(String(y), 'th', { numeric: true }));
       return `<div class="card"><div class="toolbar no-print bf-bar">
           <input class="input grow" id="bf-q" placeholder="ค้นหาชื่อ / รหัสนักเรียน" value="${esc(q.q || '')}">
-          <select class="select" id="bf-title"><option value="">ทุกประเภทพฤติกรรม</option>${titles.map((x) => `<option value="${esc(x)}" ${q.type === x ? 'selected' : ''}>${esc(x)} (${count[x]})</option>`).join('')}</select>
-          <select class="select" id="bf-term"><option value="">ทุกภาคเรียน (ย้อนหลังทั้งหมด)</option>${terms.map((x) => `<option value="${esc(x)}" ${x === cur ? 'selected' : ''}>ภาคเรียน ${esc(x)}${x === cur ? ' (ปัจจุบัน)' : ''}</option>`).join('')}</select>
-          <select class="select" id="bf-grade"><option value="">ทุกระดับชั้น</option>${grades.map((g) => `<option value="${esc(g)}">${esc(g)}</option>`).join('')}</select>
-          <span class="bf-dates"><input class="input" type="date" id="bf-from" title="ตั้งแต่วันที่" aria-label="ตั้งแต่วันที่"><span class="muted">–</span><input class="input" type="date" id="bf-to" title="ถึงวันที่" aria-label="ถึงวันที่"></span>
-          <select class="select" id="bf-view"><option value="list">แสดงรายรายการ</option><option value="people">สรุปรายคน</option></select>
+          <select class="select" id="bf-title">${this.typeOptions(q.type || '')}</select>
+          <select class="select" id="bf-term"><option value="">ทุกภาคเรียน (ย้อนหลังทั้งหมด)</option>${terms.map((x) => `<option value="${esc(x)}" ${x === cur && !dated ? 'selected' : ''}>ภาคเรียน ${esc(x)}${x === cur ? ' (ปัจจุบัน)' : ''}</option>`).join('')}</select>
+          <select class="select" id="bf-grade">${this.gradeOptions(q.grade || '')}</select>
+          <span class="bf-dates"><input class="input" type="date" id="bf-from" title="ตั้งแต่วันที่" aria-label="ตั้งแต่วันที่" value="${esc(q.from || '')}"><span class="muted">–</span><input class="input" type="date" id="bf-to" title="ถึงวันที่" aria-label="ถึงวันที่" value="${esc(q.to || '')}"></span>
+          <select class="select" id="bf-view"><option value="list">แสดงรายรายการ</option><option value="people" ${q.view === 'people' ? 'selected' : ''}>สรุปรายคน</option></select>
         </div><div id="bf-out"></div></div>`;
     },
     bindRecordsSearch() {

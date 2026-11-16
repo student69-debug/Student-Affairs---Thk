@@ -119,6 +119,7 @@
         ${stat('messages-square', 'ให้คำปรึกษาเดือนนี้', cMonth, 'ครั้ง', 'green')}
         ${stat('calendar-clock', 'นัดติดตาม 7 วัน', fu, 'นัด', 'red', '', on('counsel') ? '#/apps/counsel?go=appts' : '')}
       </div>
+      ${on('behavior') ? B().searchCard() : ''}
       ${dashboard(act)}
       <div class="grid g-main">
         <div class="card"><div class="card-head"><h3>บันทึกล่าสุด</h3><span class="muted small">วันนี้ ${today.length} รายการ</span></div>${timeline(ev.slice(0, 10), true)}</div>
@@ -126,7 +127,7 @@
           ${watch.length ? `<div class="list">${watch.slice(0, 8).map(({ s, reasons }) => `<a class="list-row" href="#/student/${s.id}">${avatar(s)}<div class="grow"><div class="t">${esc(fullName(s))}</div><div class="s">${klass(s)} · ${esc(s.advisor)}</div></div><div class="chips">${reasons.join('')}</div></a>`).join('')}</div>` : empty('ไม่มีนักเรียนที่ต้องเฝ้าระวัง', 'smile')}</div>
       </div>
       <div><h3 style="font-size:17px;font-weight:500;margin-bottom:12px">ทางลัดไปแต่ละแอป</h3>
-      <div class="grid g-auto">${Apps.enabled().map((a) => `<a class="card app-card ${a.rule}" href="#/apps/${a.id}"><div class="top"><span class="app-ic">${icon(a.icon)}</span><h4>${esc(a.name)}</h4>${icon('chevron-right', 'i16')}</div></a>`).join('')}</div></div>` };
+      <div class="grid g-auto">${Apps.enabled().map((a) => `<a class="card app-card ${a.rule}" href="#/apps/${a.id}"><div class="top"><span class="app-ic">${icon(a.icon)}</span><h4>${esc(a.name)}</h4>${icon('chevron-right', 'i16')}</div></a>`).join('')}</div></div>`, after: () => { if (on('behavior')) B().bindSearchCard(); } };
   }
 
   /* ---------------- ค้นหานักเรียน ---------------- */
