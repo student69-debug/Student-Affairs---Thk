@@ -226,12 +226,13 @@
     const actions = `<button class="btn secondary" data-action="registry-import">${icon('file-up')}นำเข้าจาก Excel</button><button class="btn secondary" data-action="registry-promote">${icon('arrow-up-circle')}เลื่อนชั้น</button><button class="btn primary" data-action="registry-edit">${icon('user-plus')}เพิ่มนักเรียน</button>`;
     if (tab === 'history') {
       // แยกประวัติ: นักเรียน (ทะเบียน + ข้อมูลในแอป) กับ ครู / บัญชีผู้ใช้
-      const isStaff = (x) => /บัญชีผู้ใช้/.test(x.action) || (x.action === 'ลบไม่สำเร็จ' && /บัญชีผู้ใช้/.test(x.detail || ''));
+      const STAFF_ACTIONS = ['สมัครใช้งาน', 'อนุมัติผู้ใช้', 'เปลี่ยนบทบาท', 'เปลี่ยนสิทธิ์แอป', 'กำหนดห้องที่ปรึกษา', 'กำหนดระดับชั้น', 'ลบบัญชีผู้ใช้'];
+      const isStaff = (x) => STAFF_ACTIONS.includes(x.action) || (x.action === 'ลบไม่สำเร็จ' && /บัญชีผู้ใช้/.test(x.detail || ''));
       const all = D().history, staff = all.filter(isStaff), stud = all.filter((x) => !isStaff(x));
       const who = q.who === 'staff' ? 'staff' : 'students';
       const h = who === 'staff' ? staff : stud;
       const seg = `<div class="seg no-print">${[['students', 'นักเรียน', stud.length, 'graduation-cap'], ['staff', 'ครู / บัญชีผู้ใช้', staff.length, 'user-cog']].map(([k, l, n, ic]) => `<button class="${k === who ? 'on' : ''}" data-action="go" data-href="#/registry?tab=history&who=${k}">${icon(ic, 'i16')}${l} <span class="n">${n}</span></button>`).join('')}</div>`;
-      const badge = (x) => `<span class="badge ${/ไม่สำเร็จ/.test(x.action) ? 'b-warning' : /^ลบ/.test(x.action) ? 'b-danger' : 'b-neutral'}">${esc(x.action)}</span>`;
+      const badge = (x) => `<span class="badge ${/ไม่สำเร็จ/.test(x.action) ? 'b-warning' : /^ลบ/.test(x.action) ? 'b-danger' : /อนุมัติ|สมัคร/.test(x.action) ? 'b-success' : /เปลี่ยน|กำหนด/.test(x.action) ? 'b-info' : 'b-neutral'}">${esc(x.action)}</span>`;
       const table = who === 'staff'
         ? `<table class="tbl"><thead><tr><th>เมื่อ</th><th>ผู้ดำเนินการ</th><th>การกระทำ</th><th>บัญชีที่เกี่ยวข้อง / รายละเอียด</th></tr></thead><tbody>${h.map((x) => `<tr><td>${fmtDate(x.at, true)}</td><td>${esc(x.by)}</td><td>${badge(x)}</td><td>${esc(x.detail)}</td></tr>`).join('')}</tbody></table>`
         : `<table class="tbl"><thead><tr><th>เมื่อ</th><th>ผู้แก้ไข</th><th>นักเรียน</th><th>การกระทำ</th><th>รายละเอียด</th></tr></thead><tbody>${h.map((x) => `<tr><td>${fmtDate(x.at, true)}</td><td>${esc(x.by)}</td><td>${x.studentId ? Apps.sLink(x.studentId) : '—'}</td><td>${badge(x)}</td><td>${esc(x.detail)}</td></tr>`).join('')}</tbody></table>`;

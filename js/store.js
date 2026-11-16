@@ -182,7 +182,7 @@
     },
     async update(kind, id, patch) {
       check(await sb.from(MAPS[kind].table).update(toRow(kind, patch)).eq('id', id));
-      await this.refresh(kind);
+      await this.refresh(kind, ...(kind === 'users' && this.isAdmin() ? ['history'] : []));
     },
     async upsert(kind, list) {
       const rows = list.map((o) => toRow(kind, o));
@@ -261,14 +261,13 @@
     },
 
     async setRooms(userId, rooms) {
-      check(await sb.from('teacher_rooms').delete().eq('user_id', userId));
-      if (rooms.length) check(await sb.from('teacher_rooms').insert(rooms.map(([g, r]) => ({ user_id: userId, grade: g, room: r }))));
-      await this.refresh('teacherRooms', 'students', 'records', 'progress', 'screenings', 'visits', 'needs', 'referrals', 'health');
+      // one call: replaces the set and logs the change in the staff history
+      check(await sb.rpc('admin_set_rooms', { p_user: userId, p_rooms: rooms.map(([g, r]) => [Number(g), Number(r)]) }));
+      await this.refresh('teacherRooms', 'history', 'students', 'records', 'progress', 'screenings', 'visits', 'needs', 'referrals', 'health');
     },
     async setGrades(userId, grades) {
-      check(await sb.from('teacher_grades').delete().eq('user_id', userId));
-      if (grades.length) check(await sb.from('teacher_grades').insert(grades.map((g) => ({ user_id: userId, grade: g }))));
-      await this.refresh('teacherGrades', 'students', 'records', 'progress', 'screenings', 'visits', 'needs', 'referrals', 'health');
+      check(await sb.rpc('admin_set_grades', { p_user: userId, p_grades: grades.map(Number) }));
+      await this.refresh('teacherGrades', 'history', 'students', 'records', 'progress', 'screenings', 'visits', 'needs', 'referrals', 'health');
     },
     async saveSettings(patch) {
       Object.assign(this.s, patch);
