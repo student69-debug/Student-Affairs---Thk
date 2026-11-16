@@ -394,3 +394,4 @@ details.card>summary::-webkit-details-marker{display:none}
 .pw-rules li{display:flex;align-items:center;gap:6px}
 .pw-rules li.ok{color:#1b7a3d}
 .pw-rules li.bad{color:var(--red-700);font-weight:500}
+.appt-dt{display:grid;grid-template-columns:1fr 130px;gap:8px}

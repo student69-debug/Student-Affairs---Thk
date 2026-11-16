@@ -44,10 +44,10 @@
   }
 
   /* ---- counselling cases: full content for counsellors/admins, progress for homeroom teachers / grade heads ---- */
-  const CASE_COLS = 'id,student_id,open_date,problem_types,severity,plan,next_appt,owner_email,consent,updated_at,sessions:counsel_case_sessions(session_no,session_date,note_a,note_b,note_c,note_d,checklist)';
+  const CASE_COLS = 'id,student_id,open_date,problem_types,severity,plan,next_appt,next_appt_time,owner_email,consent,updated_at,sessions:counsel_case_sessions(session_no,session_date,note_a,note_b,note_c,note_d,checklist)';
   const caseFrom = (r) => ({
     id: r.id, studentId: r.student_id, openDate: r.open_date, types: r.problem_types || [], severity: r.severity, plan: r.plan,
-    nextAppt: r.next_appt || '', owner: r.owner_email || '', consent: r.consent || [], updatedAt: r.updated_at,
+    nextAppt: r.next_appt || '', nextTime: (r.next_appt_time || '').slice(0, 5), owner: r.owner_email || '', consent: r.consent || [], updatedAt: r.updated_at,
     sessions: (r.sessions || []).sort((a, b) => a.session_no - b.session_no)
       .map((s) => ({ no: s.session_no, date: s.session_date || '', notes: [s.note_a, s.note_b, s.note_c, s.note_d], check: s.checklist || [] })),
   });
@@ -215,7 +215,7 @@
     /* ---- counselling cases ---- */
     async saveCase(c) {
       const row = { student_id: c.studentId, open_date: c.openDate || null, problem_types: c.types || [], severity: c.severity, plan: c.plan,
-        next_appt: c.nextAppt || null, owner_email: c.owner || null, consent: Array.from({ length: 8 }, (_, i) => !!(c.consent && c.consent[i])) };
+        next_appt: c.nextAppt || null, next_appt_time: (c.nextAppt && c.nextTime) || null, owner_email: c.owner || null, consent: Array.from({ length: 8 }, (_, i) => !!(c.consent && c.consent[i])) };
       if (c.legacyId) row.legacy_id = c.legacyId;
       let id = c.id;
       if (id) check(await sb.from('counsel_cases').update(row).eq('id', id));

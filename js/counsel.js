@@ -29,6 +29,7 @@
   const sLink = (id) => Apps.sLink(id);
   const today = () => new Date().toISOString().slice(0, 10);
   const dayDiff = (d) => Math.round((new Date(d + 'T00:00') - new Date(today() + 'T00:00')) / 864e5);
+  const apptText = (c) => fmtDate(c.nextAppt) + (c.nextTime ? ' · ' + c.nextTime + ' น.' : '');
   const sessionDates = (c) => c.sessions.filter((s) => s.date).map((s) => s.date);
 
   function cases(sid) { return (D().cases || []).filter((c) => !sid || c.studentId === sid); }
@@ -40,7 +41,7 @@
     if (isC()) {
       const l = cases(sid), o = open(l)[0];
       return { big: `${l.length}<small> เคส</small>`, label: 'เคสให้คำปรึกษา', badge: o ? sevBadge(o.severity) : '',
-        rows: [['สถานะ', o ? esc(o.plan) : l.length ? 'ยุติแล้ว' : '—'], ['นัดถัดไป', o && o.nextAppt ? fmtDate(o.nextAppt) : '—']] };
+        rows: [['สถานะ', o ? esc(o.plan) : l.length ? 'ยุติแล้ว' : '—'], ['นัดถัดไป', o && o.nextAppt ? apptText(o) : '—']] };
     }
     const p = progress(sid), o = p.find((x) => !x.closed);
     return { big: o ? '<span style="font-size:18px">อยู่ในความดูแล</span>' : '<span class="muted" style="font-size:18px">—</span>', label: 'การดูแลของงานแนะแนว', badge: '',
@@ -73,7 +74,7 @@
     return `<div class="tbl-wrap"><table class="tbl"><thead><tr>${showStudent ? '<th>นักเรียน</th>' : ''}<th>เปิดเคส</th><th>ประเภทปัญหา</th><th>ความรุนแรง</th><th>แผน</th><th class="num">ครั้ง</th><th>นัดถัดไป</th><th>ผู้รับผิดชอบ</th></tr></thead><tbody>
       ${list.map((c) => { const due = c.nextAppt && c.plan !== CLOSED ? dayDiff(c.nextAppt) : null;
         return `<tr class="clickable" data-action="go" data-href="#/apps/counsel?case=${c.id}">${showStudent ? `<td>${sLink(c.studentId)}</td>` : ''}<td>${fmtDate(c.openDate)}</td><td>${kBadges(c.types) || '—'}</td><td>${sevBadge(c.severity)}</td><td>${planBadge(c.plan)}</td><td class="num">${sessionDates(c).length}</td>
-        <td>${c.nextAppt && c.plan !== CLOSED ? `<span class="${due < 0 ? 'pts-neg' : ''}">${fmtDate(c.nextAppt)}${due < 0 ? ' (เลยกำหนด)' : due === 0 ? ' (วันนี้)' : ''}</span>` : '—'}</td><td>${esc(ownerName(c.owner))}</td></tr>`; }).join('')}
+        <td>${c.nextAppt && c.plan !== CLOSED ? `<span class="${due < 0 ? 'pts-neg' : ''}">${apptText(c)}${due < 0 ? ' (เลยกำหนด)' : due === 0 ? ' (วันนี้)' : ''}</span>` : '—'}</td><td>${esc(ownerName(c.owner))}</td></tr>`; }).join('')}
       </tbody></table></div>`;
   }
 
@@ -114,7 +115,7 @@
     const all = cases(), o = open(all);
     const m = new Date(); m.setDate(1);
     const monthStart = m.toISOString().slice(0, 10);
-    const appts = o.filter((c) => c.nextAppt).sort((a, b) => (a.nextAppt < b.nextAppt ? -1 : 1));
+    const appts = o.filter((c) => c.nextAppt).sort((a, b) => ((a.nextAppt + (a.nextTime || '99')) < (b.nextAppt + (b.nextTime || '99')) ? -1 : 1));
     const soon = appts.filter((c) => dayDiff(c.nextAppt) <= 7);
     const close = o.filter((c) => c.severity !== 'ปลอดภัย').sort((a, b) => SEV.indexOf(b.severity) - SEV.indexOf(a.severity));
     const kcount = KTYPES.map(([k, l]) => [k, l, o.filter((c) => c.types.includes(k)).length]);
@@ -127,7 +128,7 @@
         ${Apps.stat('folder-plus', 'เปิดเคสเดือนนี้', all.filter((c) => c.openDate >= monthStart).length, 'เคส', 'green')}</div>
       <div class="grid g-main">
         <div class="card" id="appts"><div class="card-head"><h3>นัดหมายที่ต้องติดตาม</h3></div>${appts.length ? `<div class="list">${appts.slice(0, 12).map((c) => { const s = Store.student(c.studentId), dd = dayDiff(c.nextAppt);
-          return `<a class="list-row" href="#/apps/counsel?case=${c.id}"><div class="grow"><div class="t">${esc(fullName(s))} <span class="muted small">${s ? klass(s) : ''}</span></div><div class="s">${kBadges(c.types)} · ${esc(ownerName(c.owner))}</div></div><span class="badge ${dd < 0 ? 'b-danger' : dd <= 2 ? 'b-warning' : 'b-info'}">${fmtDate(c.nextAppt)}${dd < 0 ? ' เลยกำหนด' : dd === 0 ? ' วันนี้' : ''}</span></a>`; }).join('')}</div>` : empty('ไม่มีนัดหมาย', 'calendar')}</div>
+          return `<a class="list-row" href="#/apps/counsel?case=${c.id}"><div class="grow"><div class="t">${esc(fullName(s))} <span class="muted small">${s ? klass(s) : ''}</span></div><div class="s">${kBadges(c.types)} · ${esc(ownerName(c.owner))}</div></div><span class="badge ${dd < 0 ? 'b-danger' : dd <= 2 ? 'b-warning' : 'b-info'}">${apptText(c)}${dd < 0 ? ' เลยกำหนด' : dd === 0 ? ' วันนี้' : ''}</span></a>`; }).join('')}</div>` : empty('ไม่มีนัดหมาย', 'calendar')}</div>
         <div class="card"><div class="card-head"><h3>จำนวนเคสตามประเภทปัญหา</h3><span class="muted small">เคสที่ยังเปิด</span></div><div class="card-body kbars">
           ${kcount.map(([k, l, n]) => `<div class="kbar" title="${esc(l)}"><span class="k">${k}</span><span class="l">${esc(l)}</span><span class="bar"><i style="width:${(n / kmax) * 100}%"></i></span><span class="n">${n}</span></div>`).join('')}</div></div>
       </div>
@@ -182,7 +183,7 @@
           <div class="field"><label>ผู้รับผิดชอบเคส</label><select class="select" name="owner">${ownerOpts.map((x) => `<option value="${esc(x.email)}" ${x.email === c.owner ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
           <div class="field"><label>ระดับความรุนแรง</label><div class="radio-row" style="min-height:40px">${SEV.map((v) => `<label><input type="radio" name="severity" value="${v}" ${c.severity === v ? 'checked' : ''}> ${sevBadge(v)}</label>`).join('')}</div></div>
           <div class="field"><label>แผนการดำเนินงาน</label><select class="select" name="plan">${PLANS.map((v) => `<option ${c.plan === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-          <div class="field"><label>นัดหมายครั้งถัดไป</label><input class="input" type="date" name="nextAppt" value="${esc(c.nextAppt)}"></div>
+          <div class="field"><label>นัดหมายครั้งถัดไป (วันที่ · เวลา)</label><div class="appt-dt"><input class="input" type="date" name="nextAppt" value="${esc(c.nextAppt)}"><input class="input" type="time" name="nextTime" step="300" value="${esc(c.nextTime || '')}" aria-label="เวลานัด"></div></div>
           <div class="field full"><label>ประเภทปัญหา (รหัส K)</label><div class="kgrid">${KTYPES.map(([k, l]) => `<label class="kchk"><input type="checkbox" name="k" value="${k}" ${c.types.includes(k) ? 'checked' : ''}><b>${k}</b> ${esc(l)}</label>`).join('')}</div></div>
         </div></div></div>
 
@@ -217,6 +218,7 @@
     c.severity = (form.querySelector('input[name=severity]:checked') || {}).value || 'ปลอดภัย';
     c.plan = f.plan.value;
     c.nextAppt = f.nextAppt.value;
+    c.nextTime = f.nextAppt.value ? f.nextTime.value : '';
     c.types = [...form.querySelectorAll('input[name=k]:checked')].map((x) => x.value);
     c.consent = STEPS.map((_, i) => !!(f['consent' + i] && f['consent' + i].checked));
     c.sessions = c.sessions.map((ss, i) => ({ date: f['sdate' + i].value, notes: [0, 1, 2, 3].map((j) => f[`n${i}_${j}`].value), check: CHECK.map((_, j) => f[`c${i}_${j}`].checked) }));
@@ -294,7 +296,7 @@
     const $ = (id) => document.getElementById(id);
     $('io-exp-cases').addEventListener('click', () => {
       const rows = [['เลขประจำตัว', 'ชื่อ - นามสกุล', 'ชั้น', 'วันที่เปิดเคส', 'ประเภทปัญหา', 'ความรุนแรง', 'แผนการดำเนินงาน', 'นัดหมายครั้งถัดไป', 'ผู้รับผิดชอบ', 'จำนวนครั้ง']]
-        .concat(cases().map((c) => { const s = Store.student(c.studentId); return [c.studentId, s ? fullName(s) : '', s ? klass(s) : '', c.openDate, c.types.join(' '), c.severity, c.plan, c.nextAppt, ownerName(c.owner), sessionDates(c).length]; }));
+        .concat(cases().map((c) => { const s = Store.student(c.studentId); return [c.studentId, s ? fullName(s) : '', s ? klass(s) : '', c.openDate, c.types.join(' '), c.severity, c.plan, c.nextAppt + (c.nextAppt && c.nextTime ? ' ' + c.nextTime : ''), ownerName(c.owner), sessionDates(c).length]; }));
       UI.download('เคสให้คำปรึกษา.csv', rows.map(csvLine).join('\n'));
     });
     $('io-exp-sessions').addEventListener('click', () => {
