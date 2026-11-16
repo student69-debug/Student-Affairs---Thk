@@ -331,6 +331,7 @@
               footer: '<button type="button" class="btn primary" data-close>เข้าใจแล้ว</button>' });
             return;
           }
+          UI.toast('สมัครใช้งานเรียบร้อยแล้ว · รอผู้ดูแลระบบอนุมัติสิทธิ์');
         } else {
           await Store.signIn(v.email.trim(), v.password);
         }
@@ -343,8 +344,9 @@
   }
 
   function pendingScreen(p) {
-    gate(`<div class="card rule login" style="text-align:center;align-items:center">${BRAND}${icon('hourglass', 'i28')}<h2>รอผู้ดูแลระบบอนุมัติ</h2>
-      <p class="muted" style="margin:0">บัญชี ${esc(p ? p.email : '')} สมัครเรียบร้อยแล้ว<br>เมื่อผู้ดูแลระบบกำหนดบทบาทให้ จะเข้าใช้งานได้ทันที</p>
+    gate(`<div class="card rule login" style="text-align:center;align-items:center">${BRAND}${icon('hourglass', 'i28')}<h2>สมัครเรียบร้อย · รอผู้ดูแลระบบอนุมัติ</h2>
+      <p class="muted" style="margin:0">บัญชี <b>${esc(p ? p.email : '')}</b> สมัครเรียบร้อยแล้ว ไม่ต้องทำอะไรเพิ่ม</p>
+      <ol class="pending-steps"><li>แจ้งผู้ดูแลระบบ (งานกิจการนักเรียน) ว่าสมัครแล้ว</li><li>เมื่อได้รับอนุมัติ กด <b>ตรวจสอบอีกครั้ง</b> หรือเข้าสู่ระบบใหม่ด้วยอีเมลและรหัสผ่านเดิม</li></ol>
       <div class="actions"><button class="btn secondary" id="gate-retry">ตรวจสอบอีกครั้ง</button><button class="btn ghost" id="gate-out">ออกจากระบบ</button></div></div>`);
     document.getElementById('gate-retry').addEventListener('click', boot);
     document.getElementById('gate-out').addEventListener('click', () => Store.signOut());
