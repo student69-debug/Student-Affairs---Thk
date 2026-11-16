@@ -121,6 +121,12 @@
     async apiKeys() { return check(await sb.rpc('admin_list_app_keys')); },
     async issueKey(name, scopes) { const rows = check(await sb.rpc('admin_issue_app_key', { p_name: name, p_scopes: scopes })); return rows[0]; },
     async revokeKey(id) { check(await sb.rpc('admin_revoke_app_key', { p_client_id: id })); },
+    // admin only; the database refuses a student that has data in any app (move out / graduate instead)
+    async deleteStudent(id) {
+      const r = check(await sb.rpc('admin_delete_student', { p_id: id }));
+      if (r === 'ok') { try { await sb.storage.from('student-photos').remove([id + '.jpg']); } catch (e) { /* no photo */ } await this.refresh('students', 'history'); }
+      return r;
+    },
     async apiLog(clientId) { return check(await sb.rpc('admin_api_log', { p_client_id: clientId, p_limit: 100 })); },
 
     /* ---- photos (private Storage bucket, short-lived signed links) ---- */

@@ -243,7 +243,7 @@
             .sort((a, b) => a.grade - b.grade || a.room - b.room || a.no - b.no);
           document.getElementById('rg-table').innerHTML = `<table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชื่อเล่น</th><th>ชั้น</th><th class="num">เลขที่</th><th>ครูที่ปรึกษา</th><th>สถานะ</th><th></th></tr></thead><tbody>
             ${list.slice(0, 300).map((s) => `<tr><td class="mono">${s.id}</td><td><a href="#/student/${s.id}">${esc(fullName(s))}</a></td><td>${esc(s.nick)}</td><td>${klass(s)}</td><td class="num">${s.no}</td><td>${esc(s.advisor)}</td><td>${statusBadge(s.status)}</td>
-            <td style="text-align:right;white-space:nowrap"><button class="icon-btn" title="แก้ไข" data-action="registry-edit" data-id="${s.id}">${icon('pencil', 'i16')}</button><button class="icon-btn" title="เปลี่ยนสถานะ" data-action="registry-status" data-id="${s.id}">${icon('user-cog', 'i16')}</button></td></tr>`).join('') || `<tr><td colspan="8">${empty('ไม่พบข้อมูล')}</td></tr>`}</tbody></table>${list.length > 300 ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง 300 จาก ${list.length.toLocaleString()} คน — พิมพ์ค้นหาหรือเลือกชั้น/สถานะเพื่อกรอง</div>` : `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">ทั้งหมด ${list.length.toLocaleString()} คน</div>`}`;
+            <td style="text-align:right;white-space:nowrap"><button class="icon-btn" title="แก้ไข" data-action="registry-edit" data-id="${s.id}">${icon('pencil', 'i16')}</button><button class="icon-btn" title="เปลี่ยนสถานะ" data-action="registry-status" data-id="${s.id}">${icon('user-cog', 'i16')}</button><button class="icon-btn" title="ลบ (เฉพาะรายการที่เพิ่มผิด)" data-action="registry-delete" data-id="${s.id}">${icon('trash-2', 'i16')}</button></td></tr>`).join('') || `<tr><td colspan="8">${empty('ไม่พบข้อมูล')}</td></tr>`}</tbody></table>${list.length > 300 ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง 300 จาก ${list.length.toLocaleString()} คน — พิมพ์ค้นหาหรือเลือกชั้น/สถานะเพื่อกรอง</div>` : `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">ทั้งหมด ${list.length.toLocaleString()} คน</div>`}`;
           UI.refreshIcons();
         };
         ['rg-q', 'rg-grade', 'rg-status'].forEach((i) => document.getElementById(i).addEventListener('input', draw));
@@ -307,6 +307,22 @@
         await Store.log(s.id, 'เปลี่ยนสถานะ', detail);
         UI.toast('เปลี่ยนสถานะแล้ว · ' + fullName(s)); App.render();
       } });
+  }
+
+  // remove a student added by mistake; students with any app data are moved out / graduated instead
+  function deleteDialog(id) {
+    const s = Store.student(id);
+    if (!s) return;
+    const who = `<b>${esc(fullName(s))}</b> <span class="mono">${esc(s.id)}</span> ${klass(s)}`;
+    const blocked = () => UI.dialog({ title: 'ลบนักเรียนไม่ได้', size: 'sm', submitLabel: 'เปลี่ยนสถานะแทน',
+      body: `<p style="margin:0">${who} มีข้อมูลในแอปแล้ว (บันทึกพฤติกรรม การดูแล การให้คำปรึกษา หรือสุขภาพ) จึงลบไม่ได้ เพื่อเก็บประวัติไว้</p><p class="muted" style="margin:8px 0 0">ถ้านักเรียนย้ายออกหรือจบแล้ว ให้เปลี่ยนสถานะแทน</p>`,
+      onSubmit: () => { setTimeout(() => statusDialog(id), 0); } });
+    UI.confirmDialog('ลบนักเรียน', `ลบ ${who} ออกจากทะเบียน?<br><span class="muted small">ใช้สำหรับรายการที่เพิ่มผิดหรือทดสอบเท่านั้น · ลบแล้วกู้คืนไม่ได้ · ถ้านักเรียนมีข้อมูลในแอปใดแล้ว ระบบจะไม่ยอมลบ</span>`, 'ลบนักเรียน', async () => {
+      const r = await Store.deleteStudent(id);
+      if (r === 'has_data') { setTimeout(blocked, 0); return; }
+      UI.toast(r === 'ok' ? 'ลบแล้ว · ' + fullName(s) : 'ไม่พบนักเรียนรหัสนี้');
+      App.render();
+    }, true);
   }
 
   function promoteDialog() {
@@ -627,5 +643,5 @@
     return { title: 'ตั้งค่า', html: lock + tabs + body };
   }
 
-  window.Pages = { home, search, student, registry, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES };
+  window.Pages = { home, search, student, registry, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES };
 })();

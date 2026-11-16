@@ -86,6 +86,7 @@
     }, true),
     'registry-edit': (el) => Pages.studentDialog(el.dataset.id),
     'registry-status': (el) => Pages.statusDialog(el.dataset.id),
+    'registry-delete': (el) => Pages.deleteDialog(el.dataset.id),
     'registry-promote': () => Pages.promoteDialog(),
     'registry-import': () => Pages.importDialog(),
     'registry-template': () => Pages.template(),
