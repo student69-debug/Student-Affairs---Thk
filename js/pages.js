@@ -317,17 +317,11 @@
     const blocked = () => UI.dialog({ title: 'ลบนักเรียนไม่ได้', size: 'sm', submitLabel: 'เปลี่ยนสถานะแทน',
       body: `<p style="margin:0">${who} มีข้อมูลในแอปแล้ว (บันทึกพฤติกรรม การดูแล การให้คำปรึกษา หรือสุขภาพ) จึงลบไม่ได้ เพื่อเก็บประวัติไว้</p><p class="muted" style="margin:8px 0 0">ถ้านักเรียนย้ายออกหรือจบแล้ว ให้เปลี่ยนสถานะแทน</p>`,
       onSubmit: () => { setTimeout(() => statusDialog(id), 0); } });
-    UI.dialog({ title: 'ลบนักเรียน', size: 'sm', submitLabel: 'ลบนักเรียน', submitClass: 'accent',
-      body: `<p style="margin:0">ลบ ${who} ออกจากทะเบียน?</p>
-        <div class="notice warn">${icon('info', 'i16')}<span>ใช้สำหรับรายการที่เพิ่มผิดหรือทดสอบเท่านั้น · ลบแล้วกู้คืนไม่ได้ · ถ้านักเรียนมีข้อมูลในแอปใดแล้ว ระบบจะไม่ยอมลบ</span></div>
-        <div class="field"><label>ยืนยันด้วยรหัสผ่านของคุณ <span class="req">*</span></label><input class="input" type="password" name="password" required autocomplete="current-password"><span class="help">รหัสผ่านที่ใช้เข้าสู่ระบบ (${esc(Store.user().email || '')}) · การลบและการกรอกรหัสผิดจะถูกบันทึกในประวัติการเปลี่ยนแปลง</span></div>
-        <div id="del-err"></div>`,
-      onSubmit: async (v, form) => {
-        const r = await Store.deleteStudent(id, v.password);
-        const err = (m) => { form.querySelector('#del-err').innerHTML = `<div class="notice danger">${icon('circle-alert', 'i16')}<span>${m}</span></div>`; UI.refreshIcons(); form.password.value = ''; form.password.focus(); return false; };
-        if (r === 'bad_password') return err('รหัสผ่านไม่ถูกต้อง · ผิดครบ 5 ครั้งใน 15 นาที จะลบไม่ได้ชั่วคราว');
-        if (r === 'locked') return err('กรอกรหัสผ่านผิดหลายครั้ง · ลองใหม่ในอีก 15 นาที');
-        if (r === 'has_data') { setTimeout(blocked, 0); return; }
+    UI.deleteDialog({ title: 'ลบนักเรียน', label: 'ลบนักเรียน',
+      text: `<p style="margin:0 0 10px">ลบ ${who} ออกจากทะเบียน?</p><div class="notice warn">${icon('info', 'i16')}<span>ใช้สำหรับรายการที่เพิ่มผิดหรือทดสอบเท่านั้น · ลบแล้วกู้คืนไม่ได้ · ถ้านักเรียนมีข้อมูลในแอปใดแล้ว ระบบจะไม่ยอมลบ</span></div>`,
+      run: (pw) => Store.deleteStudent(id, pw),
+      onDone: (r) => {
+        if (r === 'has_data') { blocked(); return; }
         UI.toast(r === 'ok' ? 'ลบแล้ว · ' + fullName(s) : 'ไม่พบนักเรียนรหัสนี้');
         App.render();
       } });
@@ -560,9 +554,9 @@
   function bindSubjects() {
     const $ = (id) => document.getElementById(id);
     $('sj-template').addEventListener('click', () => UI.download('แม่แบบครูประจำวิชา.csv', ['อีเมล,ชื่อครู,ชั้น,ห้อง,รหัสวิชา,ชื่อวิชา', 'somsri@thk.ac.th,นางสาวสมศรี ตัวอย่าง,ม.1,2,ค21101,คณิตศาสตร์ 1'].join('\n')));
-    if ($('sj-clear')) $('sj-clear').addEventListener('click', () => UI.confirmDialog('ล้างครูประจำวิชา', 'ลบข้อมูลครูประจำวิชาของภาคเรียนนี้ทั้งหมด — ครูประจำวิชาจะไม่เห็นพฤติกรรมของห้องที่สอนจนกว่าจะนำเข้าใหม่', 'ล้างข้อมูล', async () => {
-      await Store.clearSubjects(); UI.toast('ล้างข้อมูลครูประจำวิชาแล้ว'); App.render();
-    }, true));
+    if ($('sj-clear')) $('sj-clear').addEventListener('click', () => UI.deleteDialog({ title: 'ล้างครูประจำวิชา', label: 'ล้างข้อมูล', text: 'ลบข้อมูลครูประจำวิชาของภาคเรียนนี้ทั้งหมด — ครูประจำวิชาจะไม่เห็นพฤติกรรมของห้องที่สอนจนกว่าจะนำเข้าใหม่',
+      run: (pw) => Store.deleteItem('subjects', Store.s.year + '/' + Store.s.term, pw),
+      onDone: () => { UI.toast('ล้างข้อมูลครูประจำวิชาแล้ว'); App.render(); } }));
     $('sj-run').addEventListener('click', async () => {
       const f = $('sj-file').files[0];
       if (!f) { UI.toast('เลือกไฟล์ก่อน'); return; }

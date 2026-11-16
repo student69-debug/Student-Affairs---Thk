@@ -105,6 +105,24 @@
     return { close, form };
   }
 
+  // every delete in the site: the user's own password is checked in the database and each attempt is logged.
+  // run(password) must resolve to 'ok' | 'bad_password' | 'locked' | other; onDone(result) runs after the dialog closes.
+  function deleteDialog({ title, text, label = 'ลบ', run, onDone }) {
+    const u = window.Store && Store.user ? Store.user() : null;
+    dialog({ title, size: 'sm', submitLabel: label, submitClass: 'accent',
+      body: `<div>${text}</div>
+        <div class="field"><label>ยืนยันด้วยรหัสผ่านของคุณ <span class="req">*</span></label><input class="input" type="password" name="password" required autocomplete="current-password">
+        <span class="help">รหัสผ่านที่ใช้เข้าสู่ระบบ${u && u.email ? ' (' + esc(u.email) + ')' : ''} · การลบและการกรอกรหัสผิดจะถูกบันทึกในประวัติ</span></div>
+        <div data-del-err></div>`,
+      onSubmit: async (v, form) => {
+        const r = await run(v.password);
+        const err = (m) => { form.querySelector('[data-del-err]').innerHTML = `<div class="notice danger">${icon('circle-alert', 'i16')}<span>${m}</span></div>`; refreshIcons(); form.password.value = ''; form.password.focus(); return false; };
+        if (r === 'bad_password') return err('รหัสผ่านไม่ถูกต้อง · ผิดครบ 5 ครั้งใน 15 นาที จะลบไม่ได้ชั่วคราว');
+        if (r === 'locked') return err('กรอกรหัสผ่านผิดหลายครั้ง · ลองใหม่ในอีก 15 นาที');
+        setTimeout(() => onDone && onDone(r), 0);
+      } });
+  }
+
   function confirmDialog(title, text, label, onYes, danger = false) {
     dialog({ title, size: 'sm', body: `<p style="margin:0">${text}</p>`, submitLabel: label, submitClass: danger ? 'accent' : 'primary', onSubmit: onYes });
   }
@@ -194,5 +212,5 @@
     return rows.filter((r) => r.some((x) => x.trim()));
   }
 
-  window.UI = { esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, parseStudent, parseMyStudent, dialog, confirmDialog, toast, refreshIcons, hydratePhotos, shrinkImage, readSheet, download, parseCSV };
+  window.UI = { esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, parseStudent, parseMyStudent, dialog, confirmDialog, deleteDialog, toast, refreshIcons, hydratePhotos, shrinkImage, readSheet, download, parseCSV };
 })();

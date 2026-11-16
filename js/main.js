@@ -73,19 +73,18 @@
     'behavior-record': (el) => Apps.get('behavior').openRecord(S(el)),
     'behavior-restore': (el) => Apps.get('behavior').openRecord(S(el), true),
     'behavior-rule': (el) => Apps.get('behavior').ruleDialog(el.dataset.id),
-    'behavior-del': (el) => UI.confirmDialog('ลบรายการบันทึก', 'ต้องการลบรายการนี้ใช่หรือไม่? คะแนนจะถูกคำนวณใหม่', 'ลบรายการ', async () => {
-      await Store.remove('records', el.dataset.id);
-      UI.toast('ลบรายการแล้ว'); render();
-    }, true),
+    'behavior-del': (el) => UI.deleteDialog({ title: 'ลบรายการบันทึก', text: 'ต้องการลบรายการนี้ใช่หรือไม่? คะแนนจะถูกคำนวณใหม่', label: 'ลบรายการ',
+      run: (pw) => Store.deleteItem('record', el.dataset.id, pw),
+      onDone: (r) => { UI.toast(r === 'ok' ? 'ลบรายการแล้ว' : 'ไม่พบรายการนี้'); render(); } }),
     'counsel-record': (el) => Apps.get('counsel').openRecord(S(el)),
     'care-screen': (el) => Apps.get('care').openScreen(S(el)),
     'care-visit': (el) => Apps.get('care').openVisit(S(el)),
     'care-need': (el) => Apps.get('care').openNeed(S(el)),
     'care-referral': (el) => Apps.get('care').openReferral(S(el)),
     'care-health': (el) => Apps.get('care').openHealth(S(el)),
-    'care-health-del': (el) => UI.confirmDialog('ลบบันทึกสุขภาพ', 'ต้องการลบรายการนี้ใช่หรือไม่?', 'ลบรายการ', async () => {
-      await Store.remove('health', el.dataset.id); UI.toast('ลบรายการแล้ว'); render();
-    }, true),
+    'care-health-del': (el) => UI.deleteDialog({ title: 'ลบบันทึกสุขภาพ', text: 'ต้องการลบรายการนี้ใช่หรือไม่?', label: 'ลบรายการ',
+      run: (pw) => Store.deleteItem('health', el.dataset.id, pw),
+      onDone: (r) => { UI.toast(r === 'ok' ? 'ลบรายการแล้ว' : 'ไม่พบรายการนี้'); render(); } }),
     'registry-edit': (el) => Pages.studentDialog(el.dataset.id),
     'registry-status': (el) => Pages.statusDialog(el.dataset.id),
     'registry-delete': (el) => Pages.deleteDialog(el.dataset.id),

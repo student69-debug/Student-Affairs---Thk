@@ -236,9 +236,9 @@
       } else if (act === 'cancel') {
         draft = null; history.back();
       } else if (act === 'delete') {
-        UI.confirmDialog('ลบเคส', 'ลบเคสนี้พร้อมบันทึกการให้คำปรึกษาทั้งหมด และกู้คืนไม่ได้ — ถ้าต้องการปิดเคส ให้เปลี่ยนแผนเป็น "ยุติให้คำปรึกษา" แทน', 'ลบเคส', async () => {
-          await Store.deleteCase(draft.id); draft = null; toast('ลบเคสแล้ว'); location.hash = '#/apps/counsel?tab=cases';
-        }, true);
+        UI.deleteDialog({ title: 'ลบเคส', label: 'ลบเคส', text: 'ลบเคสนี้พร้อมบันทึกการให้คำปรึกษาทั้งหมด และกู้คืนไม่ได้ — ถ้าต้องการปิดเคส ให้เปลี่ยนแผนเป็น "ยุติให้คำปรึกษา" แทน',
+          run: (pw) => Store.deleteItem('case', draft.id, pw),
+          onDone: (r) => { draft = null; toast(r === 'ok' ? 'ลบเคสแล้ว' : 'ไม่พบเคสนี้'); location.hash = '#/apps/counsel?tab=cases'; } });
       }
     });
     form.addEventListener('submit', async (e) => {

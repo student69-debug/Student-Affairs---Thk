@@ -189,6 +189,13 @@
       for (let i = 0; i < rows.length; i += 500) check(await sb.from(MAPS[kind].table).upsert(rows.slice(i, i + 500)));
       await this.refresh(kind);
     },
+    // delete with the user's password (checked + logged in the database); kind: record | health | case | subjects
+    async deleteItem(kind, id, password) {
+      const r = check(await sb.rpc('delete_item', { p_kind: kind, p_id: String(id), p_password: password }));
+      const slots = { record: ['records'], health: ['health'], case: ['cases', 'progress'], subjects: ['subjects'] }[kind];
+      if (r === 'ok') await this.refresh(...slots, ...(this.isAdmin() ? ['history'] : []));
+      return r;
+    },
     async remove(kind, id) {
       const res = check(await sb.from(MAPS[kind].table).delete().eq('id', id).select('id'));
       if (!res.length) throw new Error('ไม่มีสิทธิ์ลบรายการนี้');
@@ -237,11 +244,6 @@
       for (let i = 0; i < without.length; i += 500) check(await sb.from('health_logs').insert(without.slice(i, i + 500)));
       return rows.length;
     },
-    async deleteCase(id) {
-      const res = check(await sb.from('counsel_cases').delete().eq('id', id).select('id'));
-      if (!res.length) throw new Error('ลบเคสได้เฉพาะผู้ดูแลระบบ');
-      await this.refresh('cases', 'progress');
-    },
 
     /* ---- subject teachers (current term) ---- */
     async importSubjects(rows, replace) {
@@ -249,11 +251,6 @@
       if (replace) check(await sb.from('teacher_subjects').delete().eq('year', year).eq('term', term));
       const out = rows.map((r) => ({ year, term, grade: r.grade, room: r.room, subject_code: r.code, subject_name: r.subject || '', staff_email: r.email.toLowerCase(), staff_name: r.staffName || '' }));
       for (let i = 0; i < out.length; i += 500) check(await sb.from('teacher_subjects').upsert(out.slice(i, i + 500), { onConflict: 'year,term,grade,room,subject_code,staff_email', ignoreDuplicates: true }));
-      await this.refresh('subjects');
-    },
-    async clearSubjects() {
-      const { year, term } = this.s;
-      check(await sb.from('teacher_subjects').delete().eq('year', year).eq('term', term));
       await this.refresh('subjects');
     },
 
