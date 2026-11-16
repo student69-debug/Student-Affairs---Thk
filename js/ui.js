@@ -82,7 +82,7 @@
     const onKey = (e) => { if (e.key === 'Escape') close(); };
     document.addEventListener('keydown', onKey);
     root.querySelector('.scrim').addEventListener('mousedown', (e) => { if (e.target.hasAttribute('data-close')) close(); });
-    root.querySelectorAll('button[data-close]').forEach((b) => b.addEventListener('click', close));
+    root.querySelectorAll('button[data-close], a[data-close]').forEach((b) => b.addEventListener('click', close));
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       if (!form.checkValidity()) { form.reportValidity(); return; }

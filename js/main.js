@@ -90,6 +90,15 @@
     'registry-edit': (el) => Pages.studentDialog(el.dataset.id),
     'registry-status': (el) => Pages.statusDialog(el.dataset.id),
     'registry-delete': (el) => Pages.deleteDialog(el.dataset.id),
+    'registry-restore': (el) => {
+      const t = (Store.data.trash || []).find((x) => x.id === el.dataset.id);
+      if (!t) return;
+      UI.confirmDialog('กู้คืนนักเรียน', `กู้คืน <b>${UI.esc(t.name)}</b> <span class="mono">${UI.esc(t.id)}</span> ม.${t.grade}/${t.room} กลับเข้าทะเบียน?<br><span class="muted small">ข้อมูลเดิมทั้งหมดกลับมาเหมือนก่อนลบ · การกู้คืนถูกบันทึกในประวัติ</span>`, 'กู้คืน', async () => {
+        const r = await Store.restoreStudent(t.id);
+        UI.toast(r === 'ok' ? 'กู้คืนแล้ว · ' + t.name : r === 'exists' ? 'มีนักเรียนรหัสนี้อยู่ในทะเบียนแล้ว — กู้คืนไม่ได้' : 'ไม่พบรายการนี้ (อาจครบ 30 วันแล้ว)');
+        render();
+      });
+    },
     'user-delete': (el) => {
       const u = (Store.data.users || []).find((x) => x.id === el.dataset.id);
       if (!u) return;

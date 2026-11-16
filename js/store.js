@@ -123,11 +123,30 @@
     async revokeKey(id) { check(await sb.rpc('admin_revoke_app_key', { p_client_id: id })); },
     // admin only, with the admin's own password (checked in the database); every attempt is logged in
     // registry_history. Students with data in any app are refused (move out / graduate instead).
+    // moves the student to the 30-day bin (admin, or grade head for own grades); the photo stays until the bin is emptied
     async deleteStudent(id, password) {
-      const r = check(await sb.rpc('admin_delete_student', { p_id: id, p_password: password }));
-      if (r === 'ok') { try { await sb.storage.from('student-photos').remove([id + '.jpg']); } catch (e) { /* no photo */ } }
+      const r = check(await sb.rpc('delete_student', { p_id: id, p_password: password }));
       await this.refresh(...(r === 'ok' ? ['students', 'history'] : ['history']));
+      if (r === 'ok') await this.loadTrash();
       return r;
+    },
+    async loadTrash() {
+      this.data.trash = (check(await sb.rpc('student_trash_list')) || []).map((r) => ({ id: r.id, name: r.name, grade: r.grade, room: r.room, deletedAt: r.deleted_at, by: r.deleted_by_name || '', purgeAt: r.purge_at }));
+      return this.data.trash;
+    },
+    async restoreStudent(id) {
+      const r = check(await sb.rpc('restore_student', { p_id: id }));
+      if (r === 'ok') await this.refresh('students', 'history');
+      await this.loadTrash();
+      return r;
+    },
+    // admin: remove photos of students whose 30 days are over (the nightly job only queues them)
+    async purgePhotos() {
+      const paths = check(await sb.rpc('admin_photo_purge_queue')) || [];
+      if (!paths.length) return 0;
+      try { await sb.storage.from('student-photos').remove(paths); } catch (e) { return 0; }
+      check(await sb.rpc('admin_photo_purged', { p_paths: paths }));
+      return paths.length;
     },
     async apiLog(clientId) { return check(await sb.rpc('admin_api_log', { p_client_id: clientId, p_limit: 100 })); },
 
@@ -171,6 +190,9 @@
       }
       const lists = await Promise.all(kinds.map(fetchAll));
       kinds.forEach((k, i) => setSlot(k, lists[i]));
+      this.data.trash = [];
+      if (this.isAdmin() || this.profile.role === 'grade_head') { try { await this.loadTrash(); } catch (e) { /* bin not available */ } }
+      if (this.isAdmin()) this.purgePhotos().catch(() => {});
     },
     async refresh(...kinds) { const lists = await Promise.all(kinds.map(fetchAll)); kinds.forEach((k, i) => setSlot(k, lists[i])); },
 

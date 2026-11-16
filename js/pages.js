@@ -280,9 +280,18 @@
     const admin = Store.isAdmin(), grades = regGrades();
     if (!grades.length) return { title: 'ทะเบียนนักเรียน', html: `<div class="card lock-box">${icon('lock', 'i28')}<h3>เฉพาะผู้ดูแลระบบและหัวหน้าระดับ</h3><p class="muted" style="margin:0">ทะเบียนนักเรียน (ข้อมูลกลาง) แก้ไขได้เฉพาะผู้ดูแลระบบ และหัวหน้า/รองหัวหน้าระดับ (เฉพาะระดับชั้นที่ดูแล)${Store.user().role === 'grade_head' ? '<br>บัญชีของคุณยังไม่ได้กำหนดระดับชั้น — แจ้งผู้ดูแลระบบ' : ''}</p></div>` };
     const tab = q.tab || 'list';
-    const tabs = `<div class="tabs">${[['list', 'รายชื่อนักเรียน'], ['history', 'ประวัติการเปลี่ยนแปลง']].map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/registry?tab=${k}">${l}</button>`).join('')}</div>`;
+    const trash = D().trash || [];
+    const tabs = `<div class="tabs">${[['list', 'รายชื่อนักเรียน'], ['history', 'ประวัติการเปลี่ยนแปลง'], ['trash', `ที่ลบไว้ (30 วัน)${trash.length ? ' · ' + trash.length : ''}`]].map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/registry?tab=${k}">${l}</button>`).join('')}</div>`;
     const actions = (admin ? `<button class="btn secondary" data-action="registry-import">${icon('file-up')}นำเข้าจาก Excel</button><button class="btn secondary" data-action="registry-promote">${icon('arrow-up-circle')}เลื่อนชั้น</button>` : '') + `<button class="btn primary" data-action="registry-edit">${icon('user-plus')}เพิ่มนักเรียน</button>`;
-    const scopeNote = admin ? '' : `<div class="notice">${icon('shield-check', 'i16')}<span>คุณเพิ่มและแก้ไขได้เฉพาะนักเรียน ${grades.map((g) => 'ม.' + g).join(', ')} (ระดับชั้นที่ดูแล) · ลบนักเรียน นำเข้า และเลื่อนชั้น ทำได้เฉพาะผู้ดูแลระบบ</span></div>`;
+    const scopeNote = admin ? '' : `<div class="notice">${icon('shield-check', 'i16')}<span>คุณเพิ่ม แก้ไข และลบได้เฉพาะนักเรียน ${grades.map((g) => 'ม.' + g).join(', ')} (ระดับชั้นที่ดูแล) · นำเข้าและเลื่อนชั้น ทำได้เฉพาะผู้ดูแลระบบ</span></div>`;
+    if (tab === 'trash') {
+      const daysLeft = (d) => Math.max(0, Math.ceil((new Date(d) - Date.now()) / 864e5));
+      return { title: 'ทะเบียนนักเรียน (ข้อมูลกลาง)', actions, html: tabs + `<div class="notice">${icon('archive-restore', 'i16')}<span>นักเรียนที่ถูกลบจะเก็บไว้ที่นี่ <b>30 วัน</b> กู้คืนได้ระหว่างนี้ เมื่อครบกำหนด ระบบจะลบถาวรอัตโนมัติ (ทุกคืนเวลา 02:15 น.) · ทุกการลบและกู้คืนถูกบันทึกในประวัติ</span></div>
+        <div class="card"><div class="card-head"><h3>ที่ลบไว้</h3><span class="muted small">${admin ? 'ทุกระดับชั้น' : 'เฉพาะระดับชั้นที่ดูแล'}</span></div>
+        ${trash.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชั้น</th><th>ลบโดย</th><th>ลบเมื่อ</th><th>ลบถาวร</th><th></th></tr></thead><tbody>${trash.map((t) => { const n = daysLeft(t.purgeAt);
+          return `<tr><td class="mono">${esc(t.id)}</td><td>${esc(t.name)}</td><td>ม.${t.grade}/${t.room}</td><td>${esc(t.by || '—')}</td><td>${fmtDate(t.deletedAt, true)}</td><td>${fmtDate(t.purgeAt)} <span class="badge ${n <= 3 ? 'b-danger' : n <= 7 ? 'b-warning' : 'b-neutral'}">เหลือ ${n} วัน</span></td>
+          <td style="text-align:right"><button class="btn secondary sm" data-action="registry-restore" data-id="${esc(t.id)}">${icon('rotate-ccw', 'i16')}กู้คืน</button></td></tr>`; }).join('')}</tbody></table></div>` : empty('ไม่มีนักเรียนที่ถูกลบ', 'archive')}</div>` };
+    }
     if (tab === 'history') {
       const h = D().history.filter((x) => !isStaffEvent(x));
       return { title: 'ทะเบียนนักเรียน (ข้อมูลกลาง)', actions, html: tabs + `<div class="card"><div class="card-head"><h3>ประวัติการเปลี่ยนแปลง · นักเรียน</h3><span class="muted small">ใคร ทำอะไร เมื่อไร${admin ? ' · ประวัติของครูอยู่ที่ <a href="#/teachers?tab=history">ทะเบียนครู</a>' : ' · เฉพาะนักเรียนในระดับชั้นที่ดูแล'}</span></div>
@@ -303,7 +312,7 @@
             .sort((a, b) => a.grade - b.grade || a.room - b.room || a.no - b.no);
           document.getElementById('rg-table').innerHTML = `<table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชื่อเล่น</th><th>ชั้น</th><th class="num">เลขที่</th><th>ครูที่ปรึกษา</th><th>สถานะ</th><th></th></tr></thead><tbody>
             ${list.slice(0, 300).map((s) => `<tr><td class="mono">${s.id}</td><td><a href="#/student/${s.id}">${esc(fullName(s))}</a></td><td>${esc(s.nick)}</td><td>${klass(s)}</td><td class="num">${s.no}</td><td>${esc(s.advisor)}</td><td>${statusBadge(s.status)}</td>
-            <td style="text-align:right;white-space:nowrap"><button class="icon-btn" title="แก้ไข" data-action="registry-edit" data-id="${s.id}">${icon('pencil', 'i16')}</button><button class="icon-btn" title="เปลี่ยนสถานะ" data-action="registry-status" data-id="${s.id}">${icon('user-cog', 'i16')}</button>${admin ? `<button class="icon-btn" title="ลบ (เฉพาะรายการที่เพิ่มผิด)" data-action="registry-delete" data-id="${s.id}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="8">${empty('ไม่พบข้อมูล')}</td></tr>`}</tbody></table>${list.length > 300 ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง 300 จาก ${list.length.toLocaleString()} คน — พิมพ์ค้นหาหรือเลือกชั้น/สถานะเพื่อกรอง</div>` : `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">ทั้งหมด ${list.length.toLocaleString()} คน</div>`}`;
+            <td style="text-align:right;white-space:nowrap"><button class="icon-btn" title="แก้ไข" data-action="registry-edit" data-id="${s.id}">${icon('pencil', 'i16')}</button><button class="icon-btn" title="เปลี่ยนสถานะ" data-action="registry-status" data-id="${s.id}">${icon('user-cog', 'i16')}</button><button class="icon-btn" title="ลบ (เก็บไว้ 30 วันก่อนลบถาวร)" data-action="registry-delete" data-id="${s.id}">${icon('trash-2', 'i16')}</button></td></tr>`).join('') || `<tr><td colspan="8">${empty('ไม่พบข้อมูล')}</td></tr>`}</tbody></table>${list.length > 300 ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง 300 จาก ${list.length.toLocaleString()} คน — พิมพ์ค้นหาหรือเลือกชั้น/สถานะเพื่อกรอง</div>` : `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">ทั้งหมด ${list.length.toLocaleString()} คน</div>`}`;
           UI.refreshIcons();
         };
         ['rg-q', 'rg-grade', 'rg-status'].forEach((i) => document.getElementById(i).addEventListener('input', draw));
@@ -377,17 +386,27 @@
   function deleteDialog(id) {
     const s = Store.student(id);
     if (!s) return;
+    if (!regGrades().includes(Number(s.grade))) { UI.toast('ลบได้เฉพาะนักเรียนในระดับชั้นที่คุณดูแล'); return; }
+    const until = new Date(Date.now() + 30 * 864e5).toISOString();
     const who = `<b>${esc(fullName(s))}</b> <span class="mono">${esc(s.id)}</span> ${klass(s)}`;
     const blocked = () => UI.dialog({ title: 'ลบนักเรียนไม่ได้', size: 'sm', submitLabel: 'เปลี่ยนสถานะแทน',
       body: `<p style="margin:0">${who} มีข้อมูลในแอปแล้ว (บันทึกพฤติกรรม การดูแล การให้คำปรึกษา หรือสุขภาพ) จึงลบไม่ได้ เพื่อเก็บประวัติไว้</p><p class="muted" style="margin:8px 0 0">ถ้านักเรียนย้ายออกหรือจบแล้ว ให้เปลี่ยนสถานะแทน</p>`,
       onSubmit: () => { setTimeout(() => statusDialog(id), 0); } });
     UI.deleteDialog({ title: 'ลบนักเรียน', label: 'ลบนักเรียน',
-      text: `<p style="margin:0 0 10px">ลบ ${who} ออกจากทะเบียน?</p><div class="notice warn">${icon('info', 'i16')}<span>ใช้สำหรับรายการที่เพิ่มผิดหรือทดสอบเท่านั้น · ลบแล้วกู้คืนไม่ได้ · ถ้านักเรียนมีข้อมูลในแอปใดแล้ว ระบบจะไม่ยอมลบ</span></div>`,
+      text: `<p style="margin:0 0 10px">ลบ ${who} ออกจากทะเบียน?</p><div class="notice warn">${icon('info', 'i16')}<span><b>สิ่งที่จะเกิดขึ้น</b><br>· นักเรียนจะหายจากรายชื่อทันที แต่ระบบยัง<b>เก็บไว้ 30 วัน</b> (ถึง ${fmtDate(until)}) กู้คืนได้ที่แท็บ "ที่ลบไว้"<br>· ครบ 30 วันแล้วระบบ<b>ลบถาวร</b>อัตโนมัติ กู้คืนไม่ได้อีก<br>· การลบถูกบันทึกในประวัติพร้อมชื่อคุณ<br>· นักเรียนที่มีข้อมูลในแอปแล้ว ลบไม่ได้ ให้เปลี่ยนสถานะแทน</span></div>`,
       run: (pw) => Store.deleteStudent(id, pw),
       onDone: (r) => {
         if (r === 'has_data') { blocked(); return; }
-        UI.toast(r === 'ok' ? 'ลบแล้ว · ' + fullName(s) : 'ไม่พบนักเรียนรหัสนี้');
+        if (r !== 'ok') { UI.toast('ไม่พบนักเรียนรหัสนี้'); App.render(); return; }
+        UI.toast('ลบแล้ว · ' + fullName(s) + ' · เก็บไว้ 30 วัน');
         App.render();
+        UI.dialog({ title: 'ลบนักเรียนแล้ว · เก็บไว้ 30 วัน', size: 'sm',
+          body: `<div class="signup-done"><div class="notice">${icon('archive', 'i16')}<span>${who} ถูกย้ายไปที่ <b>ที่ลบไว้</b></span></div>
+            <ol><li>ระบบเก็บข้อมูลไว้ถึง <b>${fmtDate(until)}</b> (30 วัน)</li>
+            <li>ถ้าลบผิด กดแท็บ <b>ที่ลบไว้ (30 วัน)</b> แล้วกด <b>กู้คืน</b> ข้อมูลจะกลับมาเหมือนเดิม</li>
+            <li>ครบ 30 วันแล้ว ระบบลบถาวรอัตโนมัติ และกู้คืนไม่ได้อีก</li>
+            <li>การลบครั้งนี้ถูกบันทึกในประวัติพร้อมชื่อคุณแล้ว</li></ol></div>`,
+          footer: '<button type="button" class="btn ghost" data-close>ปิด</button><a class="btn primary" href="#/registry?tab=trash" data-close>ดูที่ลบไว้</a>' });
       } });
   }
 
