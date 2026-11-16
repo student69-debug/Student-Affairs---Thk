@@ -52,7 +52,7 @@
       .map((s) => ({ no: s.session_no, date: s.session_date || '', notes: [s.note_a, s.note_b, s.note_c, s.note_d], check: s.checklist || [] })),
   });
   const progressFrom = (r) => ({
-    caseId: r.case_id, studentId: r.student_id, openDate: r.open_date, plan: r.plan, nextAppt: r.next_appt || '', owner: r.owner_email || '',
+    caseId: r.case_id, studentId: r.student_id, openDate: r.open_date, plan: r.plan, nextAppt: r.next_appt || '', nextTime: (r.next_appt_time || '').slice(0, 5), owner: r.owner_email || '',
     ownerName: r.owner_name || '', sessions: r.sessions, lastSession: r.last_session || '', sessionDates: r.session_dates || [], closed: r.closed,
   });
   const CUSTOM = {

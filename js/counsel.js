@@ -45,7 +45,7 @@
     }
     const p = progress(sid), o = p.find((x) => !x.closed);
     return { big: o ? '<span style="font-size:18px">อยู่ในความดูแล</span>' : '<span class="muted" style="font-size:18px">—</span>', label: 'การดูแลของงานแนะแนว', badge: '',
-      rows: [['พบครูแนะแนว', p.reduce((a, x) => a + x.sessions, 0) + ' ครั้ง'], ['นัดถัดไป', o && o.nextAppt ? fmtDate(o.nextAppt) : '—']] };
+      rows: [['พบครูแนะแนว', p.reduce((a, x) => a + x.sessions, 0) + ' ครั้ง'], ['นัดถัดไป', o && o.nextAppt ? apptText(o) : '—']] };
   }
 
   function events(sid) {
@@ -64,7 +64,7 @@
   function progressTable(list, showStudent) {
     if (!list.length) return empty('ไม่ได้อยู่ในความดูแลของงานแนะแนว', 'messages-square');
     return `<div class="tbl-wrap"><table class="tbl"><thead><tr>${showStudent ? '<th>นักเรียน</th>' : ''}<th>เปิดเคส</th><th>แผน</th><th class="num">พบแล้ว</th><th>ครั้งล่าสุด</th><th>นัดถัดไป</th><th>ผู้รับผิดชอบ</th></tr></thead><tbody>
-      ${list.map((p) => `<tr>${showStudent ? `<td>${sLink(p.studentId)}</td>` : ''}<td>${fmtDate(p.openDate)}</td><td>${planBadge(p.plan)}</td><td class="num">${p.sessions}</td><td>${p.lastSession ? fmtDate(p.lastSession) : '—'}</td><td>${p.nextAppt && !p.closed ? fmtDate(p.nextAppt) : '—'}</td><td>${esc(p.ownerName || '—')}</td></tr>`).join('')}
+      ${list.map((p) => `<tr>${showStudent ? `<td>${sLink(p.studentId)}</td>` : ''}<td>${fmtDate(p.openDate)}</td><td>${planBadge(p.plan)}</td><td class="num">${p.sessions}</td><td>${p.lastSession ? fmtDate(p.lastSession) : '—'}</td><td>${p.nextAppt && !p.closed ? apptText(p) : '—'}</td><td>${esc(p.ownerName || '—')}</td></tr>`).join('')}
       </tbody></table></div>
       <p class="muted small" style="margin:0;padding:10px 20px">${icon('lock', 'i16')} ประเภทปัญหา ความรุนแรง และบันทึกการพูดคุย เห็นเฉพาะครูแนะแนวและผู้ดูแลระบบ</p>`;
   }
