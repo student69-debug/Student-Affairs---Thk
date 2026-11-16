@@ -138,7 +138,7 @@
   function casesList(q) {
     return `<div class="card"><div class="toolbar no-print">
         <input class="input grow" id="cf-q" placeholder="ค้นหาชื่อ / รหัสนักเรียน" value="${esc(q.q || '')}">
-        <select class="select" id="cf-status"><option value="open">ยังเปิดอยู่</option><option value="closed">ยุติแล้ว</option><option value="">ทั้งหมด</option></select>
+        <select class="select" id="cf-status"><option value="">ทั้งหมด</option><option value="open">ยังเปิดอยู่</option><option value="closed">ยุติแล้ว</option></select>
         <select class="select" id="cf-sev"><option value="">ทุกระดับความรุนแรง</option>${SEV.map((s) => `<option>${s}</option>`).join('')}</select>
         <select class="select" id="cf-k"><option value="">ทุกประเภทปัญหา</option>${KTYPES.map(([k, l]) => `<option value="${k}">${k} ${esc(l)}</option>`).join('')}</select>
         <select class="select" id="cf-owner"><option value="">ทุกผู้รับผิดชอบ</option><option value="${esc(Store.user().email)}">เคสของฉัน</option>${(D().counsellors || []).filter((c) => c.email !== Store.user().email).map((c) => `<option value="${esc(c.email)}">${esc(c.name)}</option>`).join('')}</select>
