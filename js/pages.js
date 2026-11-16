@@ -274,32 +274,36 @@
       } };
   }
 
+  // admin: every grade · grade head: add / edit students only in the grades they look after (enforced by row level security)
+  const regGrades = () => (Store.isAdmin() ? [1, 2, 3, 4, 5, 6] : Store.user().role === 'grade_head' ? Store.myGrades().map(Number) : []);
   function registry(q) {
-    if (!Store.isAdmin()) return { title: 'ทะเบียนนักเรียน', html: `<div class="card lock-box">${icon('lock', 'i28')}<h3>เฉพาะผู้ดูแลระบบ</h3><p class="muted" style="margin:0">ทะเบียนนักเรียน (ข้อมูลกลาง) แก้ไขได้เฉพาะผู้ดูแลระบบ<br>แอปอื่นอ่านข้อมูลผ่านรหัสนักเรียนเท่านั้น</p><a class="btn secondary" href="#/settings?tab=users">ไปที่ผู้ใช้และสิทธิ์</a></div>` };
+    const admin = Store.isAdmin(), grades = regGrades();
+    if (!grades.length) return { title: 'ทะเบียนนักเรียน', html: `<div class="card lock-box">${icon('lock', 'i28')}<h3>เฉพาะผู้ดูแลระบบและหัวหน้าระดับ</h3><p class="muted" style="margin:0">ทะเบียนนักเรียน (ข้อมูลกลาง) แก้ไขได้เฉพาะผู้ดูแลระบบ และหัวหน้า/รองหัวหน้าระดับ (เฉพาะระดับชั้นที่ดูแล)${Store.user().role === 'grade_head' ? '<br>บัญชีของคุณยังไม่ได้กำหนดระดับชั้น — แจ้งผู้ดูแลระบบ' : ''}</p></div>` };
     const tab = q.tab || 'list';
     const tabs = `<div class="tabs">${[['list', 'รายชื่อนักเรียน'], ['history', 'ประวัติการเปลี่ยนแปลง']].map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/registry?tab=${k}">${l}</button>`).join('')}</div>`;
-    const actions = `<button class="btn secondary" data-action="registry-import">${icon('file-up')}นำเข้าจาก Excel</button><button class="btn secondary" data-action="registry-promote">${icon('arrow-up-circle')}เลื่อนชั้น</button><button class="btn primary" data-action="registry-edit">${icon('user-plus')}เพิ่มนักเรียน</button>`;
+    const actions = (admin ? `<button class="btn secondary" data-action="registry-import">${icon('file-up')}นำเข้าจาก Excel</button><button class="btn secondary" data-action="registry-promote">${icon('arrow-up-circle')}เลื่อนชั้น</button>` : '') + `<button class="btn primary" data-action="registry-edit">${icon('user-plus')}เพิ่มนักเรียน</button>`;
+    const scopeNote = admin ? '' : `<div class="notice">${icon('shield-check', 'i16')}<span>คุณเพิ่มและแก้ไขได้เฉพาะนักเรียน ${grades.map((g) => 'ม.' + g).join(', ')} (ระดับชั้นที่ดูแล) · ลบนักเรียน นำเข้า และเลื่อนชั้น ทำได้เฉพาะผู้ดูแลระบบ</span></div>`;
     if (tab === 'history') {
       const h = D().history.filter((x) => !isStaffEvent(x));
-      return { title: 'ทะเบียนนักเรียน (ข้อมูลกลาง)', actions, html: tabs + `<div class="card"><div class="card-head"><h3>ประวัติการเปลี่ยนแปลง · นักเรียน</h3><span class="muted small">ใคร ทำอะไร เมื่อไร · ประวัติของครูอยู่ที่ <a href="#/teachers?tab=history">ทะเบียนครู</a></span></div>
+      return { title: 'ทะเบียนนักเรียน (ข้อมูลกลาง)', actions, html: tabs + `<div class="card"><div class="card-head"><h3>ประวัติการเปลี่ยนแปลง · นักเรียน</h3><span class="muted small">ใคร ทำอะไร เมื่อไร${admin ? ' · ประวัติของครูอยู่ที่ <a href="#/teachers?tab=history">ทะเบียนครู</a>' : ' · เฉพาะนักเรียนในระดับชั้นที่ดูแล'}</span></div>
         ${h.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>เมื่อ</th><th>ผู้แก้ไข</th><th>นักเรียน</th><th>การกระทำ</th><th>รายละเอียด</th></tr></thead><tbody>${h.map((x) => `<tr><td>${fmtDate(x.at, true)}</td><td>${esc(x.by)}</td><td>${x.studentId ? Apps.sLink(x.studentId) : '—'}</td><td>${histBadge(x)}</td><td>${esc(x.detail)}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีประวัติของนักเรียน')}</div>` };
     }
     return { title: 'ทะเบียนนักเรียน (ข้อมูลกลาง)', actions, html: tabs + `
-      <div class="notice">${icon('database', 'i16')}<span>ฐานข้อมูลกลางเก็บเฉพาะทะเบียนนักเรียน ไม่เก็บคะแนนหรือบันทึกใด ๆ · ย้ายออก/จบ ไม่ลบข้อมูล เพื่อเก็บประวัติ</span></div>
+      ${scopeNote}<div class="notice">${icon('database', 'i16')}<span>ฐานข้อมูลกลางเก็บเฉพาะทะเบียนนักเรียน ไม่เก็บคะแนนหรือบันทึกใด ๆ · ย้ายออก/จบ ไม่ลบข้อมูล เพื่อเก็บประวัติ</span></div>
       <div class="card"><div class="toolbar">
         <input class="input grow" id="rg-q" placeholder="ค้นหารหัส / ชื่อ">
-        <select class="select" id="rg-grade"><option value="">ทุกชั้น</option>${[1, 2, 3, 4, 5, 6].map((g) => `<option value="${g}">ม.${g}</option>`).join('')}</select>
+        <select class="select" id="rg-grade"><option value="">${admin ? 'ทุกชั้น' : 'ทุกระดับที่ดูแล'}</option>${grades.map((g) => `<option value="${g}">ม.${g}</option>`).join('')}</select>
         <select class="select" id="rg-status"><option value="">ทุกสถานะ</option>${Object.entries(UI.STATUS).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join('')}</select>
-        <button class="btn ghost sm" data-action="registry-export">${icon('download', 'i16')}ส่งออก CSV</button></div>
+        ${admin ? `<button class="btn ghost sm" data-action="registry-export">${icon('download', 'i16')}ส่งออก CSV</button>` : ''}</div>
         <div class="tbl-wrap" id="rg-table"></div></div>`,
       after() {
         const draw = () => {
           const t = document.getElementById('rg-q').value.trim().toLowerCase(), g = document.getElementById('rg-grade').value, st = document.getElementById('rg-status').value;
-          const list = D().students.filter((s) => (!g || String(s.grade) === g) && (!st || s.status === st) && (!t || [s.id, fullName(s), s.nick].some((x) => x.toLowerCase().includes(t))))
+          const list = D().students.filter((s) => grades.includes(Number(s.grade)) && (!g || String(s.grade) === g) && (!st || s.status === st) && (!t || [s.id, fullName(s), s.nick].some((x) => x.toLowerCase().includes(t))))
             .sort((a, b) => a.grade - b.grade || a.room - b.room || a.no - b.no);
           document.getElementById('rg-table').innerHTML = `<table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชื่อเล่น</th><th>ชั้น</th><th class="num">เลขที่</th><th>ครูที่ปรึกษา</th><th>สถานะ</th><th></th></tr></thead><tbody>
             ${list.slice(0, 300).map((s) => `<tr><td class="mono">${s.id}</td><td><a href="#/student/${s.id}">${esc(fullName(s))}</a></td><td>${esc(s.nick)}</td><td>${klass(s)}</td><td class="num">${s.no}</td><td>${esc(s.advisor)}</td><td>${statusBadge(s.status)}</td>
-            <td style="text-align:right;white-space:nowrap"><button class="icon-btn" title="แก้ไข" data-action="registry-edit" data-id="${s.id}">${icon('pencil', 'i16')}</button><button class="icon-btn" title="เปลี่ยนสถานะ" data-action="registry-status" data-id="${s.id}">${icon('user-cog', 'i16')}</button><button class="icon-btn" title="ลบ (เฉพาะรายการที่เพิ่มผิด)" data-action="registry-delete" data-id="${s.id}">${icon('trash-2', 'i16')}</button></td></tr>`).join('') || `<tr><td colspan="8">${empty('ไม่พบข้อมูล')}</td></tr>`}</tbody></table>${list.length > 300 ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง 300 จาก ${list.length.toLocaleString()} คน — พิมพ์ค้นหาหรือเลือกชั้น/สถานะเพื่อกรอง</div>` : `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">ทั้งหมด ${list.length.toLocaleString()} คน</div>`}`;
+            <td style="text-align:right;white-space:nowrap"><button class="icon-btn" title="แก้ไข" data-action="registry-edit" data-id="${s.id}">${icon('pencil', 'i16')}</button><button class="icon-btn" title="เปลี่ยนสถานะ" data-action="registry-status" data-id="${s.id}">${icon('user-cog', 'i16')}</button>${admin ? `<button class="icon-btn" title="ลบ (เฉพาะรายการที่เพิ่มผิด)" data-action="registry-delete" data-id="${s.id}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="8">${empty('ไม่พบข้อมูล')}</td></tr>`}</tbody></table>${list.length > 300 ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง 300 จาก ${list.length.toLocaleString()} คน — พิมพ์ค้นหาหรือเลือกชั้น/สถานะเพื่อกรอง</div>` : `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">ทั้งหมด ${list.length.toLocaleString()} คน</div>`}`;
           UI.refreshIcons();
         };
         ['rg-q', 'rg-grade', 'rg-status'].forEach((i) => document.getElementById(i).addEventListener('input', draw));
@@ -309,6 +313,8 @@
 
   function studentDialog(id) {
     const s = id ? Store.student(id) : null;
+    const grades = regGrades();
+    if (!grades.length || (s && !grades.includes(Number(s.grade)))) { UI.toast('แก้ไขได้เฉพาะนักเรียนในระดับชั้นที่คุณดูแล'); return; }
     const v = (k, d = '') => esc(s ? s[k] : d);
     const sel = (name, opts, cur) => `<select class="select" name="${name}">${opts.map((o) => `<option ${String(o) === String(cur) ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
     const d = UI.dialog({ title: s ? 'แก้ไขข้อมูลนักเรียน' : 'เพิ่มนักเรียนใหม่', submitLabel: 'บันทึก',
@@ -319,7 +325,7 @@
         <div class="field"><label>ชื่อเล่น</label><input class="input" name="nick" value="${v('nick')}"></div>
         <div class="field"><label>ชื่อ <span class="req">*</span></label><input class="input" name="first" required value="${v('first')}"></div>
         <div class="field"><label>นามสกุล <span class="req">*</span></label><input class="input" name="last" required value="${v('last')}"></div>
-        <div class="field"><label>ชั้น / ห้อง</label><div style="display:flex;gap:8px">${sel('grade', [1, 2, 3, 4, 5, 6], s ? s.grade : 1)}${sel('room', Array.from({ length: 30 }, (_, i) => i + 1), s ? s.room : 1)}</div></div>
+        <div class="field"><label>ชั้น / ห้อง</label><div style="display:flex;gap:8px">${sel('grade', grades, s ? s.grade : grades[0])}${sel('room', Array.from({ length: 30 }, (_, i) => i + 1), s ? s.room : 1)}</div></div>
         <div class="field"><label>เลขที่</label><input class="input mono" type="number" min="1" name="no" value="${v('no', 1)}"></div>
         <div class="field full"><label>ครูที่ปรึกษา</label><input class="input" name="advisor" value="${v('advisor')}"></div>
         <div class="field"><label>ผู้ปกครอง</label><input class="input" name="guardian" value="${v('guardian')}"></div>
@@ -328,6 +334,7 @@
         <div class="field full"><label>รูปถ่าย</label><input class="input" type="file" name="photoFile" accept="image/*" style="padding-top:6px"></div></div>`,
       onSubmit: (val, form) => {
         if (!s && Store.student(val.id)) { UI.toast('รหัสนักเรียนนี้มีอยู่แล้ว'); return false; }
+        if (!grades.includes(Number(val.grade))) { UI.toast('เลือกได้เฉพาะระดับชั้นที่คุณดูแล'); return false; }
         const obj = { cid: val.cid, prefix: val.prefix, first: val.first.trim(), last: val.last.trim(), nick: val.nick.trim(), grade: Number(val.grade), room: Number(val.room), no: Number(val.no) || 1, advisor: val.advisor.trim(), guardian: val.guardian.trim(), guardianPhone: val.guardianPhone.trim(), address: val.address.trim() };
         const commit = async (photo) => {
           if (photo) obj.photoPath = await Store.uploadPhoto(s ? s.id : val.id, photo);
@@ -351,6 +358,7 @@
 
   function statusDialog(id) {
     const s = Store.student(id);
+    if (!s || !regGrades().includes(Number(s.grade))) { UI.toast('แก้ไขได้เฉพาะนักเรียนในระดับชั้นที่คุณดูแล'); return; }
     UI.dialog({ title: 'เปลี่ยนสถานะนักเรียน', size: 'sm',
       body: `<div><b>${esc(fullName(s))}</b> <span class="muted">${klass(s)}</span></div>
         <div class="field"><label>สถานะใหม่</label><select class="select" name="status">${Object.entries(UI.STATUS).map(([k, v]) => `<option value="${k}" ${k === s.status ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></div>

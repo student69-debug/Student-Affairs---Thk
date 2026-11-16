@@ -163,6 +163,7 @@
       this.data.gradeStaff = [];
       this.data.subjects = [];
       const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'incidents', 'incidentPeople', 'cases', 'progress', 'counsellors', 'screenings', 'visits', 'needs', 'referrals', 'health'];
+      if (!this.isAdmin() && this.profile.role === 'grade_head') kinds.push('history'); // own grades only (row level security)
       if (this.isAdmin()) {
         kinds.push('history', 'gradeStaff', 'subjects');
         const { count } = await sb.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'parent');
