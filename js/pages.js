@@ -257,7 +257,7 @@
     const sel = (name, opts, cur) => `<select class="select" name="${name}">${opts.map((o) => `<option ${String(o) === String(cur) ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
     const d = UI.dialog({ title: s ? 'แก้ไขข้อมูลนักเรียน' : 'เพิ่มนักเรียนใหม่', submitLabel: 'บันทึก',
       body: `<div class="form-grid">
-        <div class="field"><label>รหัสนักเรียน <span class="req">*</span></label><input class="input mono" name="id" required pattern="[0-9]{4,10}" value="${v('id')}" ${s ? 'readonly style="background:var(--ink-50)"' : ''}><span class="help">คีย์หลัก ใช้เชื่อมทุกแอป${s ? ' — แก้ไขไม่ได้' : ''}</span></div>
+        <div class="field"><label>รหัสนักเรียน <span class="req">*</span></label><input class="input mono" name="id" required pattern="[0-9]{5}" maxlength="5" inputmode="numeric" title="รหัสนักเรียน 5 หลัก" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,5)" value="${v('id')}" ${s ? 'readonly style="background:var(--ink-50)"' : ''}><span class="help">ตัวเลข 5 หลัก · คีย์หลัก ใช้เชื่อมทุกแอป${s ? ' — แก้ไขไม่ได้' : ''}</span></div>
         <div class="field"><label>เลขประจำตัวประชาชน <span class="req">*</span></label><input class="input mono" name="cid" required pattern="[0-9]{13}" maxlength="13" value="${v('cid')}"><span class="help">13 หลัก</span></div>
         <div class="field"><label>คำนำหน้า</label>${sel('prefix', ['ด.ช.', 'ด.ญ.', 'นาย', 'นางสาว'], s ? s.prefix : 'ด.ช.')}</div>
         <div class="field"><label>ชื่อเล่น</label><input class="input" name="nick" value="${v('nick')}"></div>

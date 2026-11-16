@@ -233,7 +233,7 @@
       <div class="first-steps-plain muted small">ใช้ <b>รหัสนักเรียน</b> และ <b>เลขประจำตัวประชาชน 13 หลักของนักเรียน</b> เข้าได้ทุกครั้ง ไม่ต้องตั้งรหัสผ่าน</div>
       ${msg ? `<div class="notice">${icon('info', 'i16')}<span>${esc(msg)}</span></div>` : ''}
       <div id="login-err"></div>
-      <div class="field"><label>รหัสนักเรียน <span class="req">*</span></label><input class="input mono" name="studentId" required inputmode="numeric" pattern="[0-9]{3,10}" autocomplete="username"></div>
+      <div class="field"><label>รหัสนักเรียน <span class="req">*</span></label><input class="input mono" name="studentId" required inputmode="numeric" pattern="[0-9]{5}" maxlength="5" title="รหัสนักเรียน 5 หลัก" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,5)" autocomplete="username"></div>
       <div class="field"><label>เลขประจำตัวประชาชนของนักเรียน <span class="req">*</span></label><input class="input mono" type="password" name="cid" required inputmode="numeric" maxlength="17" autocomplete="current-password" placeholder="13 หลัก">
         <label class="small muted" style="display:flex;gap:6px;align-items:center;margin-top:6px;cursor:pointer"><input type="checkbox" id="cid-show"> แสดงตัวเลข</label></div>
       <button class="btn primary" type="submit">เข้าสู่ระบบ</button>
@@ -248,7 +248,7 @@
       const btn = form.querySelector('button[type=submit]');
       btn.disabled = true; btn.textContent = 'กำลังเข้าสู่ระบบ…';
       try {
-        await Store.parentSignIn(v.studentId.trim(), v.cid.replace(/[s-]/g, ''));
+        await Store.parentSignIn(v.studentId.trim(), v.cid.replace(/[\s-]/g, ''));
         boot();
       } catch (err) {
         btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
