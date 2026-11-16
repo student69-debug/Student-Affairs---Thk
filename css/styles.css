@@ -417,3 +417,7 @@ details.card>summary::-webkit-details-marker{display:none}
 .bsearch-row .field.grow{flex:1;min-width:220px}
 .bsearch-row .btn{height:40px}
 @media (max-width:640px){.bsearch-row .field,.bsearch-row .btn{width:100%}}
+.seg{display:inline-flex;gap:4px;padding:4px;background:var(--ink-100, #eef0f4);border-radius:10px;flex-wrap:wrap}
+.seg button{border:0;background:none;padding:8px 14px;border-radius:8px;font:inherit;font-size:14px;color:var(--ink-600, #4a5163);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.seg button.on{background:var(--white);color:var(--navy-800);font-weight:600;box-shadow:0 1px 3px rgba(8,33,51,.15)}
+.seg .n{font-size:12px;background:var(--navy-50);color:var(--navy-700);border-radius:999px;padding:1px 8px}
