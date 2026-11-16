@@ -89,15 +89,17 @@
       const data = Object.fromEntries(new FormData(form).entries());
       const btn = form.querySelector('button[type=submit]');
       let res;
+      const seq = toastSeq;
+      const done = () => { close(); setTimeout(() => { if (toastSeq === seq) toast(submitLabel + 'เรียบร้อยแล้ว'); }, 400); };
       try { res = onSubmit && onSubmit(data, form); } catch (err) { toast('บันทึกไม่สำเร็จ: ' + err.message); return; }
       if (res && typeof res.then === 'function') {
         if (btn) { btn.disabled = true; btn.dataset.label = btn.textContent; btn.textContent = 'กำลังบันทึก…'; }
-        res.then((r) => { if (r !== false) close(); })
+        res.then((r) => { if (r !== false) done(); })
           .catch((err) => toast('บันทึกไม่สำเร็จ: ' + err.message))
           .finally(() => { if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = btn.dataset.label; } });
         return;
       }
-      if (res !== false) close();
+      if (res !== false) done();
     });
     refreshIcons();
     const first = form.querySelector('input:not([type=hidden]),select,textarea');
@@ -127,15 +129,25 @@
     dialog({ title, size: 'sm', body: `<p style="margin:0">${text}</p>`, submitLabel: label, submitClass: danger ? 'accent' : 'primary', onSubmit: onYes });
   }
 
-  function toast(msg) {
+  // every save / delete / sign-up tells the user what happened. kind: 'ok' | 'error' | 'info' (guessed from the text when omitted)
+  let toastSeq = 0;
+  const ERR_RE = /ไม่สำเร็จ|ไม่ได้|ไม่ถูกต้อง|ไม่พบ|ผิด|ยังไม่|ไม่ครบ|เกินไป|ไม่อนุญาต|ล้มเหลว|error|failed/i;
+  function toast(msg, kind) {
+    toastSeq++;
+    kind = kind || (ERR_RE.test(msg) ? 'error' : 'ok');
     const box = document.getElementById('toasts');
     const el = document.createElement('div');
-    el.className = 'toast';
-    el.innerHTML = icon('circle-check') + '<span>' + esc(msg) + '</span>';
+    el.className = 'toast ' + kind;
+    el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    el.innerHTML = icon(kind === 'error' ? 'circle-alert' : kind === 'info' ? 'info' : 'circle-check') + '<span>' + esc(msg) + '</span><button type="button" class="toast-x" aria-label="ปิด">' + icon('x', 'i16') + '</button>';
     box.appendChild(el);
+    while (box.children.length > 3) box.firstChild.remove();
     refreshIcons();
-    setTimeout(() => el.remove(), 3800);
+    const bye = () => { el.classList.add('out'); setTimeout(() => el.remove(), 200); };
+    el.querySelector('.toast-x').addEventListener('click', bye);
+    setTimeout(bye, kind === 'error' ? 8000 : 5000);
   }
+  const toastCount = () => toastSeq;
 
   function refreshIcons() { if (window.lucide) window.lucide.createIcons(); }
 

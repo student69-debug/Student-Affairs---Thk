@@ -142,11 +142,9 @@
           ${list.slice(0, LIMIT).map(({ s, sc }) => { const lv = scoreLevel(sc); return `<tr class="clickable" data-action="go" data-href="#/student/${s.id}"><td class="mono">${s.id}</td><td>${esc(fullName(s))}</td><td>${klass(s)}</td><td>${meter(sc)}</td><td><span class="badge ${lv.cls}">${lv.label}</span></td><td class="num">${this.records(s.id).length}</td></tr>`; }).join('')}
           </tbody></table></div>${more(list.length, 'คน (เรียงจากคะแนนน้อยสุด)')}</div>`;
       } else if (tab === 'records') {
-        const rec = this.records();
-        body = `<div class="card"><div class="card-head"><h3>รายการบันทึกทั้งหมด · ภาคเรียน ${Store.termKey()}</h3><span class="muted small">${rec.length} รายการ</span></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>วันที่</th><th>นักเรียน</th><th>รายการ</th><th class="num">คะแนน</th><th>ผู้บันทึก</th><th></th></tr></thead><tbody>
-          ${rec.slice(0, LIMIT).map((r) => `<tr><td>${fmtDate(r.at, true)}</td><td>${sLink(r.studentId)}</td><td>${esc(r.title)}${r.note ? `<div class="muted small">${esc(r.note)}</div>` : ''}${this.incidentLine(r)}</td><td class="num ${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${signed(r.points)}</td><td>${esc(r.by)}</td>
-          <td>${Store.isAdmin() || r.byUser === Store.user().id ? `<button class="icon-btn" title="ลบรายการ" data-action="behavior-del" data-id="${r.id}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="6">${empty('ยังไม่มีบันทึก')}</td></tr>`}
-          </tbody></table></div>${more(rec.length, 'รายการล่าสุด')}</div>`;
+        return { title: this.name, actions: `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>`,
+          html: tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + this.recordsSearch(q),
+          after: () => this.bindRecordsSearch() };
       } else if (tab === 'rules') {
         const rules = D().behavior.rules;
         body = `<div class="card"><div class="card-head"><h3>ตารางพฤติกรรมและคะแนนมาตรฐาน</h3><button class="btn secondary sm" data-action="behavior-rule">${icon('plus', 'i16')}เพิ่มพฤติกรรม</button></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>พฤติกรรม</th><th>ประเภท</th><th class="num">คะแนน</th><th></th></tr></thead><tbody>
@@ -169,6 +167,63 @@
       }
       return { title: this.name, actions: `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>`,
         html: tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + body };
+    },
+    // รายการบันทึก: กรองตามประเภทพฤติกรรม ภาคเรียน ชั้น ช่วงวันที่ และชื่อ/รหัส — ดูได้ทั้งรายรายการและสรุปรายคน
+    recordsSearch(q) {
+      const all = D().behavior.records, cur = Store.termKey();
+      const count = {}; all.forEach((r) => { count[r.title] = (count[r.title] || 0) + 1; });
+      const titles = Object.keys(count).sort((x, y) => count[y] - count[x] || x.localeCompare(y, 'th'));
+      const terms = [...new Set(all.map((r) => r.term).filter(Boolean))].sort().reverse();
+      if (!terms.includes(cur)) terms.unshift(cur);
+      const grades = [...new Set(Store.activeStudents().map((s) => s.grade))].sort((x, y) => String(x).localeCompare(String(y), 'th', { numeric: true }));
+      return `<div class="card"><div class="toolbar no-print bf-bar">
+          <input class="input grow" id="bf-q" placeholder="ค้นหาชื่อ / รหัสนักเรียน" value="${esc(q.q || '')}">
+          <select class="select" id="bf-title"><option value="">ทุกประเภทพฤติกรรม</option>${titles.map((x) => `<option value="${esc(x)}" ${q.type === x ? 'selected' : ''}>${esc(x)} (${count[x]})</option>`).join('')}</select>
+          <select class="select" id="bf-term"><option value="">ทุกภาคเรียน (ย้อนหลังทั้งหมด)</option>${terms.map((x) => `<option value="${esc(x)}" ${x === cur ? 'selected' : ''}>ภาคเรียน ${esc(x)}${x === cur ? ' (ปัจจุบัน)' : ''}</option>`).join('')}</select>
+          <select class="select" id="bf-grade"><option value="">ทุกระดับชั้น</option>${grades.map((g) => `<option value="${esc(g)}">${esc(g)}</option>`).join('')}</select>
+          <span class="bf-dates"><input class="input" type="date" id="bf-from" title="ตั้งแต่วันที่" aria-label="ตั้งแต่วันที่"><span class="muted">–</span><input class="input" type="date" id="bf-to" title="ถึงวันที่" aria-label="ถึงวันที่"></span>
+          <select class="select" id="bf-view"><option value="list">แสดงรายรายการ</option><option value="people">สรุปรายคน</option></select>
+        </div><div id="bf-out"></div></div>`;
+    },
+    bindRecordsSearch() {
+      const $ = (id) => document.getElementById(id);
+      if (!$('bf-out')) return;
+      const draw = () => {
+        const tq = $('bf-q').value.trim().toLowerCase(), title = $('bf-title').value, term = $('bf-term').value, grade = $('bf-grade').value, from = $('bf-from').value, to = $('bf-to').value, view = $('bf-view').value;
+        const rec = D().behavior.records.filter((r) => {
+          if (title && r.title !== title) return false;
+          if (term && r.term !== term) return false;
+          const day = String(r.at || '').slice(0, 10);
+          if (from && day < from) return false;
+          if (to && day > to) return false;
+          if (grade || tq) {
+            const s = Store.student(r.studentId);
+            if (grade && (!s || String(s.grade) !== grade)) return false;
+            if (tq && !(String(r.studentId).includes(tq) || (s && fullName(s).toLowerCase().includes(tq)))) return false;
+          }
+          return true;
+        }).sort(byDate);
+        const people = new Map();
+        rec.forEach((r) => { const p = people.get(r.studentId) || { id: r.studentId, n: 0, pts: 0, last: r.at }; p.n++; p.pts += Number(r.points) || 0; if (r.at > p.last) p.last = r.at; people.set(r.studentId, p); });
+        const head = `<div class="card-body bf-sum"><b>${rec.length.toLocaleString()}</b> รายการ · <b>${people.size.toLocaleString()}</b> คน${title ? ` · ${esc(title)}` : ''}${term ? ` · ภาคเรียน ${esc(term)}` : ' · ทุกภาคเรียน'}</div>`;
+        let body;
+        if (!rec.length) body = empty('ไม่พบรายการตามเงื่อนไขที่เลือก', 'search-x');
+        else if (view === 'people') {
+          const ppl = [...people.values()].sort((x, y) => y.n - x.n || x.pts - y.pts);
+          body = `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชั้น</th><th class="num">จำนวนครั้ง</th><th class="num">คะแนนรวม</th><th>ล่าสุด</th></tr></thead><tbody>
+            ${ppl.slice(0, LIMIT).map((p) => { const s = Store.student(p.id); return `<tr class="clickable" data-action="go" data-href="#/student/${esc(p.id)}"><td class="mono">${esc(p.id)}</td><td>${s ? esc(fullName(s)) : '—'}</td><td>${s ? klass(s) : ''}</td><td class="num">${p.n}</td><td class="num ${p.pts >= 0 ? 'pts-pos' : 'pts-neg'}">${signed(p.pts)}</td><td>${fmtDate(p.last)}</td></tr>`; }).join('')}
+            </tbody></table></div>${more(ppl.length, 'คน')}`;
+        } else {
+          body = `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>วันที่</th><th>นักเรียน</th><th>รายการ</th><th class="num">คะแนน</th><th>ผู้บันทึก</th><th></th></tr></thead><tbody>
+            ${rec.slice(0, LIMIT).map((r) => `<tr><td>${fmtDate(r.at, true)}</td><td>${sLink(r.studentId)}</td><td>${esc(r.title)}${r.note ? `<div class="muted small">${esc(r.note)}</div>` : ''}${this.incidentLine(r)}</td><td class="num ${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${signed(r.points)}</td><td>${esc(r.by)}</td>
+            <td>${Store.isAdmin() || r.byUser === Store.user().id ? `<button class="icon-btn" title="ลบรายการ" data-action="behavior-del" data-id="${r.id}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}
+            </tbody></table></div>${more(rec.length, 'รายการล่าสุด')}`;
+        }
+        $('bf-out').innerHTML = head + body;
+        UI.refreshIcons();
+      };
+      ['bf-q', 'bf-title', 'bf-term', 'bf-grade', 'bf-from', 'bf-to', 'bf-view'].forEach((id) => $(id).addEventListener('input', draw));
+      draw();
     },
     ruleDialog(id) {
       const r = D().behavior.rules.find((x) => x.id === id);

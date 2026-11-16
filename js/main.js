@@ -320,7 +320,17 @@
       try {
         if (up) {
           const res = await Store.signUp(v.name.trim(), v.email.trim(), v.password);
-          if (!res.session) { loginScreen('in', 'สมัครเรียบร้อย — กรุณายืนยันอีเมลจากลิงก์ที่ส่งไป แล้วเข้าสู่ระบบ'); return; }
+          if (!res.session) {
+            loginScreen('in', 'สมัครเรียบร้อย — กรุณาเปิดอีเมลแล้วกดลิงก์ยืนยัน จากนั้นเข้าสู่ระบบที่นี่');
+            UI.dialog({ title: 'สมัครเรียบร้อยแล้ว · ขั้นต่อไปตรวจอีเมล', size: 'sm',
+              body: `<div class="signup-done"><div class="notice">${icon('mail-check', 'i16')}<span>ระบบส่งอีเมลยืนยันไปที่ <span class="mail">${UI.esc(v.email.trim())}</span></span></div>
+                <ol><li>เปิดกล่องจดหมายของอีเมลนี้ (ถ้าไม่เจอ ให้ดูในโฟลเดอร์ <b>สแปม / จดหมายขยะ</b> หรือแท็บ <b>โปรโมชัน</b>)</li>
+                <li>เปิดอีเมลเรื่อง <b>ยืนยันอีเมล</b> แล้วกดลิงก์ยืนยันในอีเมล</li>
+                <li>กลับมาที่หน้านี้ แล้ว <b>เข้าสู่ระบบ</b> ด้วยอีเมลและรหัสผ่านที่เพิ่งตั้ง</li>
+                <li>รอผู้ดูแลระบบอนุมัติสิทธิ์ แล้วจะเข้าใช้งานได้</li></ol></div>`,
+              footer: '<button type="button" class="btn primary" data-close>เข้าใจแล้ว</button>' });
+            return;
+          }
         } else {
           await Store.signIn(v.email.trim(), v.password);
         }
