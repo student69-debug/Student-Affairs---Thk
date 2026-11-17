@@ -237,8 +237,29 @@
   const histBadge = (x) => `<span class="badge ${/ไม่สำเร็จ/.test(x.action) ? 'b-warning' : /^ลบ/.test(x.action) ? 'b-danger' : /อนุมัติ|สมัคร/.test(x.action) ? 'b-success' : /เปลี่ยน|กำหนด/.test(x.action) ? 'b-info' : 'b-neutral'}">${esc(x.action)}</span>`;
 
   // ทะเบียนครู: รายชื่อบุคลากร บทบาท ห้อง/ระดับชั้น แอป + ประวัติการเปลี่ยนแปลงของบัญชี
+  // grade heads: read-only list of the staff in their own grades (from grade_staff_view())
+  function teachersOfMyGrades(q) {
+    const grades = Store.myGrades().map(Number);
+    if (!grades.length) return { title: 'ทะเบียนครู', html: `<div class="card lock-box">${icon('lock', 'i28')}<h3>ยังไม่ได้กำหนดระดับชั้น</h3><p class="muted" style="margin:0">บัญชีของคุณยังไม่ได้กำหนดระดับชั้นที่ดูแล — แจ้งผู้ดูแลระบบ</p></div>` };
+    const staff = D().myStaff || [];
+    const place = (u) => [...u.grades.map((g) => `<span class="badge b-navy">ระดับ ม.${g}</span>`), ...u.rooms.map((r) => `<span class="badge b-info">ม.${r.grade}/${r.room}</span>`)].join('') || '<span class="muted small">—</span>';
+    return { title: 'ทะเบียนครู', html: `<div class="notice">${icon('shield-check', 'i16')}<span>แสดงเฉพาะบุคลากรของระดับชั้นที่คุณดูแล (${grades.map((g) => 'ม.' + g).join(', ')}) ตามที่ผู้ดูแลระบบกำหนด · ดูได้อย่างเดียว การเปลี่ยนบทบาท ห้อง หรือระดับชั้น ทำได้เฉพาะผู้ดูแลระบบ</span></div>
+      <div class="card"><div class="toolbar"><input class="input grow" id="tf-q" placeholder="ค้นหาชื่อ / อีเมล" value="${esc(q.q || '')}"></div><div id="tf-out"></div></div>`,
+      after: () => {
+        const draw = () => {
+          const t = document.getElementById('tf-q').value.trim().toLowerCase();
+          const list = staff.filter((u) => !t || (u.name || '').toLowerCase().includes(t) || (u.email || '').toLowerCase().includes(t));
+          document.getElementById('tf-out').innerHTML = `<div class="card-body muted small" style="padding:10px 20px;border-bottom:1px solid var(--ink-200)">${list.length} คน</div>` + (list.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ชื่อ</th><th>บทบาท</th><th>ระดับชั้น / ห้องที่ปรึกษา</th></tr></thead><tbody>${list.map((u) => `<tr><td>${esc(u.name)} ${u.id === Store.user().id ? '<span class="badge b-navy">คุณ</span>' : ''}<div class="muted small">${esc(u.email || '')}</div></td><td>${esc(ROLES[u.role] || u.role)}</td><td><div class="chips">${place(u)}</div></td></tr>`).join('')}</tbody></table></div>` : empty('ไม่พบบุคลากรตามเงื่อนไข', 'search-x'));
+          UI.refreshIcons();
+        };
+        document.getElementById('tf-q').addEventListener('input', draw);
+        draw();
+      } };
+  }
+
   function teachers(q) {
-    if (!Store.isAdmin()) return { title: 'ทะเบียนครู', html: `<div class="card lock-box">${icon('lock', 'i28')}<h3>เฉพาะผู้ดูแลระบบ</h3><p class="muted" style="margin:0">ทะเบียนครูและการกำหนดสิทธิ์ ดูและแก้ไขได้เฉพาะผู้ดูแลระบบ</p></div>` };
+    if (!Store.isAdmin() && Store.user().role === 'grade_head') return teachersOfMyGrades(q);
+    if (!Store.isAdmin()) return { title: 'ทะเบียนครู', html: `<div class="card lock-box">${icon('lock', 'i28')}<h3>เฉพาะผู้ดูแลระบบและหัวหน้าระดับ</h3><p class="muted" style="margin:0">ทะเบียนครูดูได้เฉพาะผู้ดูแลระบบ และหัวหน้า/รองหัวหน้าระดับ (เฉพาะระดับชั้นที่ดูแล)</p></div>` };
     const tab = q.tab === 'history' ? 'history' : 'list';
     const tabs = `<div class="tabs">${[['list', 'รายชื่อครู'], ['history', 'ประวัติการเปลี่ยนแปลง']].map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/teachers?tab=${k}">${l}</button>`).join('')}</div>`;
     const actions = `<button class="btn secondary" data-action="room-auto">${icon('wand-sparkles')}จับคู่ห้อง / ระดับชั้นอัตโนมัติ</button>`;

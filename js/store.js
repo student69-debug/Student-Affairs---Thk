@@ -192,6 +192,9 @@
       kinds.forEach((k, i) => setSlot(k, lists[i]));
       this.data.trash = [];
       // 30-day bins: one per app (+ the student registry); who may use each is set per role in Settings
+      // grade heads: read-only teacher registry of the grades they look after
+      this.data.myStaff = [];
+      if (this.profile.role === 'grade_head') { try { await this.loadMyStaff(); } catch (e) { /* not available */ } }
       if (this.binOk('registry')) { try { await this.loadTrash(); } catch (e) { /* bin not available */ } }
       this.data.appTrash = {};
       for (const app of Object.keys(this.s.restoreRoles || {})) {
@@ -251,6 +254,10 @@
       if (r === 'ok') await this.refresh(app === 'behavior' ? 'records' : 'health', ...(this.isAdmin() ? ['history'] : []));
       await this.loadAppTrash(app);
       return r;
+    },
+    async loadMyStaff() {
+      this.data.myStaff = (check(await sb.rpc('grade_staff_view')) || []).map((r) => ({ id: r.id, name: r.name, email: r.email, role: r.role, rooms: r.rooms || [], grades: r.grades || [] }));
+      return this.data.myStaff;
     },
     async restoreCase(id) {
       const r = check(await sb.rpc('restore_case', { p_id: id }));
