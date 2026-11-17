@@ -301,15 +301,22 @@
       ${msg ? `<div class="notice">${icon('info', 'i16')}<span>${esc(msg)}</span></div>` : ''}
       <div id="login-err"></div>
       <div class="field"><label>รหัสนักเรียน <span class="req">*</span></label><input class="input mono" name="studentId" required inputmode="numeric" pattern="[0-9]{5}" maxlength="5" title="รหัสนักเรียน 5 หลัก" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,5)" autocomplete="username"></div>
-      <div class="field"><label>เลขประจำตัวประชาชนของนักเรียน <span class="req">*</span></label><input class="input mono" type="password" name="cid" required inputmode="numeric" maxlength="17" autocomplete="current-password" placeholder="13 หลัก">
-        <label class="small muted" style="display:flex;gap:6px;align-items:center;margin-top:6px;cursor:pointer"><input type="checkbox" id="cid-show"> แสดงตัวเลข</label></div>
+      <div class="field"><label>เลขประจำตัวประชาชนของนักเรียน <span class="req">*</span></label><input class="input mono" type="password" name="cid" required inputmode="numeric" pattern="[0-9A-Za-z]{13}" maxlength="13" title="เลขประจำตัวประชาชน 13 หลัก" autocomplete="current-password" placeholder="13 หลัก">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><label class="small muted" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="cid-show"> แสดงตัวเลข</label><span class="small muted" id="cid-count">0/13 หลัก</span></div></div>
       <button class="btn primary" type="submit">เข้าสู่ระบบ</button>
     </form>`);
     const form = document.getElementById('login-form');
     bindTabs(form);
     form.querySelector('#cid-show').addEventListener('change', (e) => { form.cid.type = e.target.checked ? 'text' : 'password'; });
+    // keep exactly what the server accepts: 13 letters/digits, spaces and dashes dropped (pasted "1-2345-…" still works)
+    const cidCount = form.querySelector('#cid-count');
+    const cleanCid = () => { form.cid.value = form.cid.value.replace(/[^0-9A-Za-z]/g, '').slice(0, 13); const n = form.cid.value.length; cidCount.textContent = n + '/13 หลัก'; cidCount.style.color = n === 13 ? 'var(--green-700, #15803d)' : ''; };
+    form.cid.addEventListener('input', cleanCid);
+    form.cid.addEventListener('paste', (e) => { const t = (e.clipboardData || window.clipboardData).getData('text'); if (t) { e.preventDefault(); form.cid.value = t; cleanCid(); } });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      cleanCid();
+      if (form.cid.value.length !== 13) { document.getElementById('login-err').innerHTML = `<div class="notice danger">${icon('alert-circle', 'i16')}<span>เลขประจำตัวประชาชนต้องมี 13 หลัก (ตอนนี้ ${form.cid.value.length} หลัก)</span></div>`; UI.refreshIcons(); form.cid.focus(); return; }
       if (!form.checkValidity()) { form.reportValidity(); return; }
       const v = Object.fromEntries(new FormData(form).entries());
       const btn = form.querySelector('button[type=submit]');
