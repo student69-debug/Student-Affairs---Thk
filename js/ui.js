@@ -70,9 +70,9 @@
   /* Dialog */
   function dialog({ title, body, submitLabel = 'บันทึก', submitClass = 'primary', accent = false, size = '', onSubmit, cancelLabel = 'ยกเลิก', footer }) {
     const root = document.getElementById('dialog-root');
-    root.innerHTML = `<div class="scrim" data-close>
-      <form class="dialog ${accent ? 'accent' : ''} ${size}" role="dialog" aria-modal="true" aria-label="${esc(title)}" novalidate>
-        <div class="dialog-head"><h3>${esc(title)}</h3><button type="button" class="icon-btn" data-close aria-label="ปิด">${icon('x')}</button></div>
+    root.innerHTML = `<div class="scrim" data-close role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+      <form class="dialog ${accent ? 'accent' : ''} ${size}" novalidate>
+        <div class="dialog-head"><h2 id="dialog-title">${esc(title)}</h2><button type="button" class="icon-btn" data-close aria-label="ปิด">${icon('x')}</button></div>
         <div class="dialog-body">${body}</div>
         <div class="dialog-foot">${footer ?? `<button type="button" class="btn ghost" data-close>${esc(cancelLabel)}</button>
           ${onSubmit ? `<button type="submit" class="btn ${submitClass}">${esc(submitLabel)}</button>` : ''}`}</div>
@@ -224,5 +224,32 @@
     return rows.filter((r) => r.some((x) => x.trim()));
   }
 
-  window.UI = { esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, parseStudent, parseMyStudent, dialog, confirmDialog, deleteDialog, toast, refreshIcons, hydratePhotos, shrinkImage, readSheet, download, parseCSV };
+  // accessibility pass, run after every change to the page:
+  // · link each .field <label> to its control (labels in the markup have no for=)
+  // · controls still without a name take their title / placeholder
+  // · empty table headers (action columns) get screen-reader text
+  // · tables that scroll sideways can be reached and scrolled with the keyboard
+  let a11yN = 0;
+  function a11y(root = document.body) {
+    root.querySelectorAll('input:not([type=hidden]),select,textarea').forEach((el) => {
+      if ((el.labels && el.labels.length) || el.hasAttribute('aria-label') || el.hasAttribute('aria-labelledby')) return;
+      const f = el.closest('.field');
+      const lab = f && [...f.children].find((c) => c.tagName === 'LABEL' && !c.htmlFor && !c.querySelector('input,select,textarea'));
+      if (lab && !(lab.control)) { if (!el.id) el.id = 'fld-' + (++a11yN); lab.htmlFor = el.id; return; }
+      const name = el.getAttribute('title') || el.getAttribute('placeholder');
+      if (name) el.setAttribute('aria-label', name);
+    });
+    root.querySelectorAll('th').forEach((th) => { if (!th.textContent.trim()) th.innerHTML = '<span class="sr-only">จัดการ</span>'; });
+    root.querySelectorAll('.tbl-wrap').forEach((w) => {
+      if (w.scrollWidth > w.clientWidth + 1) {
+        if (!w.hasAttribute('tabindex')) { w.tabIndex = 0; w.setAttribute('role', 'region'); w.setAttribute('aria-label', 'ตาราง · เลื่อนซ้าย–ขวาได้'); }
+      } else if (w.getAttribute('role') === 'region') { w.removeAttribute('tabindex'); w.removeAttribute('role'); w.removeAttribute('aria-label'); }
+    });
+  }
+  let a11yQueued = false;
+  const queueA11y = () => { if (a11yQueued) return; a11yQueued = true; setTimeout(() => { a11yQueued = false; try { a11y(); } catch (e) { /* never block the page */ } }, 0); };
+  new MutationObserver(queueA11y).observe(document.body, { childList: true, subtree: true });
+  window.addEventListener('resize', queueA11y);
+
+  window.UI = { a11y, esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, parseStudent, parseMyStudent, dialog, confirmDialog, deleteDialog, toast, refreshIcons, hydratePhotos, shrinkImage, readSheet, download, parseCSV };
 })();

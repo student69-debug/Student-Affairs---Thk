@@ -52,7 +52,7 @@
     document.getElementById('nav').innerHTML = navHTML(path);
     document.getElementById('page-title').textContent = page.title;
     document.title = page.title + ' · Student Affairs – Thk';
-    const head = page.actions ? `<div class="page-head no-print"><div><h2>${esc(page.title)}</h2></div><div class="actions">${page.actions}</div></div>` : '';
+    const head = page.actions ? `<div class="page-head no-print"><div><h2>${esc(page.title)}</h2></div><div class="actions">${page.actions}</div></div>` : `<h2 class="sr-only">${esc(page.title)}</h2>`;
     document.getElementById('content').innerHTML = head + page.html;
     const u = Store.user();
     document.getElementById('user-name').innerHTML = `<b>${esc(u.name)}</b><span>${esc(Pages.ROLES[u.role] || '')}</span>`;
@@ -265,7 +265,7 @@
   /* ---------- Sign-in ---------- */
   const gateEl = document.getElementById('gate');
   function gate(html, light = false) {
-    gateEl.innerHTML = html;
+    gateEl.innerHTML = '<h1 class="sr-only">ระบบกิจการนักเรียน · Student Affairs – Thk</h1>' + html;
     gateEl.classList.toggle('light', light);
     gateEl.hidden = false;
     document.querySelector('.shell').hidden = true;

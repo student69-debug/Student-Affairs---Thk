@@ -17,7 +17,7 @@
       <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
         <div class="card"><div class="card-head"><h3>กุญแจ API ของระบบอื่น</h3><button class="btn primary sm" data-action="api-issue">${icon('key-round', 'i16')}ออกกุญแจใหม่</button></div>
           <div id="api-keys">${empty('กำลังโหลด…', 'loader')}</div></div>
-        <div class="card"><div class="card-head"><h3>ประวัติการเรียกใช้ล่าสุด</h3><select class="select" id="api-log-filter" style="height:32px;width:auto"><option value="">ทุกระบบ</option></select></div>
+        <div class="card"><div class="card-head"><h3>ประวัติการเรียกใช้ล่าสุด</h3><select class="select" id="api-log-filter" aria-label="กรองตามระบบ" style="height:32px;width:auto"><option value="">ทุกระบบ</option></select></div>
           <div id="api-log">${empty('กำลังโหลด…', 'loader')}</div></div>
       </div>
       <div class="card"><div class="card-head"><h3>วิธีเชื่อมต่อ</h3></div><div class="card-body" style="display:flex;flex-direction:column;gap:12px;font-size:14px">

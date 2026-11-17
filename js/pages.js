@@ -226,7 +226,7 @@
     if (!list.length) return empty('ไม่พบครูตามเงื่อนไข', 'search-x');
     return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ชื่อ</th><th>บทบาท</th><th>สิทธิ์</th><th>ห้องที่ปรึกษา</th><th>แอปที่ใช้ได้</th>${admin ? '<th></th>' : ''}</tr></thead><tbody>
         ${list.map((u) => `<tr><td>${esc(u.name)} ${u.id === Store.user().id ? '<span class="badge b-navy">คุณ</span>' : ''}<div class="muted small">${esc(u.email || '')}</div></td>
-          <td>${admin && u.id !== Store.user().id ? `<select class="select" style="height:32px;width:auto" data-user-role="${u.id}">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${k === u.role ? 'selected' : ''}>${v}</option>`).join('')}</select>` : ROLES[u.role]}</td>
+          <td>${admin && u.id !== Store.user().id ? `<select class="select" style="height:32px;width:auto" data-user-role="${u.id}" aria-label="บทบาทของ ${esc(u.name)}">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${k === u.role ? 'selected' : ''}>${v}</option>`).join('')}</select>` : ROLES[u.role]}</td>
           <td class="muted small">${u.role === 'admin' ? 'ทะเบียนกลาง · ตั้งค่า · ทุกแอป · เนื้อหาลับ' : u.role === 'counselor' ? 'ทุกแอป · เนื้อหาลับของการให้คำปรึกษา' : u.role === 'teacher' ? 'ค้นหา/บันทึกพฤติกรรมได้ทุกคน · รายละเอียดเฉพาะห้องที่ปรึกษา' : u.role === 'grade_head' ? 'ค้นหา/บันทึกพฤติกรรมได้ทุกคน · รายละเอียดทุกห้องในระดับชั้นที่ดูแล (ไม่เห็นเนื้อหาลับ)' : u.role === 'inspector' ? 'ดู/บันทึกพฤติกรรมได้ทั้งโรงเรียน · รายละเอียดอื่นเฉพาะห้องที่ปรึกษา (ถ้ามี)' : 'ยังเข้าถึงข้อมูลไม่ได้'}</td>
           <td>${u.role === 'admin' || u.role === 'counselor' ? '<span class="muted small">ทุกห้อง</span>' : u.role === 'grade_head' ? `<div class="chips">${Store.gradesOf(u.id).map((g) => `<span class="badge b-navy">ระดับ ม.${g}</span>`).join('') || '<span class="badge b-warning">ยังไม่กำหนดระดับ</span>'}${admin ? `<button class="icon-btn" title="กำหนดระดับชั้น" data-action="grade-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : u.role === 'teacher' || u.role === 'inspector' ? `<div class="chips">${Store.roomsOf(u.id).map((t) => `<span class="badge b-info">ม.${t.grade}/${t.room}</span>`).join('') || (u.role === 'inspector' ? '<span class="muted small">ไม่มี (ไม่บังคับ)</span>' : '<span class="badge b-warning">ยังไม่กำหนด</span>')}${admin ? `<button class="icon-btn" title="กำหนดห้องที่ปรึกษา" data-action="room-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : '—'}</td>
           <td>${appsCell(u, admin)}</td>${admin ? `<td style="text-align:right">${u.id !== Store.user().id ? `<button class="icon-btn danger" title="ลบผู้ใช้ออกจากระบบ" aria-label="ลบผู้ใช้ ${esc(u.name)}" data-action="user-delete" data-id="${u.id}">${icon('user-x', 'i16')}</button>` : ''}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
@@ -259,7 +259,7 @@
       </div>
       <div class="card"><div class="toolbar">
         <input class="input grow" id="tf-q" placeholder="ค้นหาชื่อ / อีเมล" value="${esc(q.q || '')}">
-        <select class="select" id="tf-role"><option value="">ทุกบทบาท</option>${roleOpts.map(([k, l]) => `<option value="${k}" ${q.role === k ? 'selected' : ''}>${esc(l)} (${count(k)})</option>`).join('')}</select>
+        <select class="select" id="tf-role" aria-label="บทบาท"><option value="">ทุกบทบาท</option>${roleOpts.map(([k, l]) => `<option value="${k}" ${q.role === k ? 'selected' : ''}>${esc(l)} (${count(k)})</option>`).join('')}</select>
       </div><div id="tf-out"></div>
       <div class="card-body muted small" style="border-top:1px solid var(--ink-200)">${icon('user-plus', 'i16')} เพิ่มครู: ให้ครูกด "สมัครใช้งาน" ที่หน้าเข้าสู่ระบบ แล้วเลือกบทบาทให้ในตารางนี้ · ทุกการเปลี่ยนแปลงถูกบันทึกในแท็บประวัติ</div></div>`,
       after: () => {
@@ -303,8 +303,8 @@
       ${scopeNote}<div class="notice">${icon('database', 'i16')}<span>ฐานข้อมูลกลางเก็บเฉพาะทะเบียนนักเรียน ไม่เก็บคะแนนหรือบันทึกใด ๆ · ย้ายออก/จบ ไม่ลบข้อมูล เพื่อเก็บประวัติ</span></div>
       <div class="card"><div class="toolbar">
         <input class="input grow" id="rg-q" placeholder="ค้นหารหัส / ชื่อ">
-        <select class="select" id="rg-grade"><option value="">${admin ? 'ทุกชั้น' : 'ทุกระดับที่ดูแล'}</option>${grades.map((g) => `<option value="${g}">ม.${g}</option>`).join('')}</select>
-        <select class="select" id="rg-status"><option value="">ทุกสถานะ</option>${Object.entries(UI.STATUS).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join('')}</select>
+        <select class="select" id="rg-grade" aria-label="ระดับชั้น"><option value="">${admin ? 'ทุกชั้น' : 'ทุกระดับที่ดูแล'}</option>${grades.map((g) => `<option value="${g}">ม.${g}</option>`).join('')}</select>
+        <select class="select" id="rg-status" aria-label="สถานะ"><option value="">ทุกสถานะ</option>${Object.entries(UI.STATUS).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join('')}</select>
         ${admin ? `<button class="btn ghost sm" data-action="registry-export">${icon('download', 'i16')}ส่งออก CSV</button>` : ''}</div>
         <div class="tbl-wrap" id="rg-table"></div></div>`,
       after() {
@@ -336,7 +336,7 @@
         <div class="field"><label>ชื่อเล่น</label><input class="input" name="nick" value="${v('nick')}"></div>
         <div class="field"><label>ชื่อ <span class="req">*</span></label><input class="input" name="first" required value="${v('first')}"></div>
         <div class="field"><label>นามสกุล <span class="req">*</span></label><input class="input" name="last" required value="${v('last')}"></div>
-        <div class="field"><label>ชั้น / ห้อง</label><div style="display:flex;gap:8px">${sel('grade', grades, s ? s.grade : grades[0])}${sel('room', Array.from({ length: 30 }, (_, i) => i + 1), s ? s.room : 1)}</div></div>
+        <div class="field"><label>ชั้น / ห้อง</label><div style="display:flex;gap:8px">${sel('grade', grades, s ? s.grade : grades[0])}${sel('room', Array.from({ length: 30 }, (_, i) => i + 1), s ? s.room : 1).replace('<select', '<select aria-label="ห้อง"')}</div></div>
         <div class="field"><label>เลขที่</label><input class="input mono" type="number" min="1" name="no" value="${v('no', 1)}"></div>
         <div class="field full"><label>ครูที่ปรึกษา</label><input class="input" name="advisor" value="${v('advisor')}"></div>
         <div class="field"><label>ผู้ปกครอง</label><input class="input" name="guardian" value="${v('guardian')}"></div>
@@ -486,7 +486,7 @@
       ${rows.map((x) => `<tr>${perStudent ? `<td>${Apps.sLink(x.k)}</td>` : `<td><a href="#/reports?grade=${x.list[0].grade}&room=${x.list[0].room}">${x.k}</a></td><td class="num">${x.n}</td>`}
       ${cols.map(([c]) => `<td class="num">${c === 'avg' && perStudent ? meter(x.avg) : c === 'visit' && perStudent ? (x.visit ? 'แล้ว' : '—') : x[c]}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="9">${empty('ไม่มีข้อมูล')}</td></tr>`}</tbody></table>`;
     window.__report = { cols, rows, perStudent };
-    const sel = (name, opts, cur, all) => `<select class="select" data-report="${name}"><option value="">${all}</option>${opts.map((o) => `<option value="${o}" ${String(o) === cur ? 'selected' : ''}>${name === 'grade' ? 'ม.' : 'ห้อง '}${o}</option>`).join('')}</select>`;
+    const sel = (name, opts, cur, all) => `<select class="select" data-report="${name}" aria-label="${name === 'grade' ? 'ระดับชั้น' : 'ห้อง'}"><option value="">${all}</option>${opts.map((o) => `<option value="${o}" ${String(o) === cur ? 'selected' : ''}>${name === 'grade' ? 'ม.' : 'ห้อง '}${o}</option>`).join('')}</select>`;
     return { title: 'รายงาน', actions: `<button class="btn secondary" data-action="report-export">${icon('download')}ส่งออก CSV</button><button class="btn primary" data-action="print">${icon('printer')}พิมพ์รายงาน</button>`, html: `
       <div class="print-only"><h2>รายงานกลุ่มบริหารกิจการนักเรียน</h2><p class="muted">ภาคเรียนที่ ${Store.s.term}/${Store.s.year} · ${g ? 'ม.' + g : 'ทุกชั้น'}${r ? '/' + r : ''}</p></div>
       <div class="card"><div class="toolbar no-print"><span class="muted">${icon('filter', 'i16')}</span>${sel('grade', [1, 2, 3, 4, 5, 6], g, 'ทุกชั้น')}${sel('room', Array.from({ length: Math.max(2, ...Store.myStudents().filter((s) => !g || String(s.grade) === g).map((s) => s.room)) }, (_, i) => i + 1), r, 'ทุกห้อง')}

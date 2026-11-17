@@ -226,11 +226,11 @@
       if (!terms.includes(cur)) terms.unshift(cur);
       return `<div class="card"><div class="toolbar no-print bf-bar">
           <input class="input grow" id="bf-q" placeholder="ค้นหาชื่อ / รหัสนักเรียน" value="${esc(q.q || '')}">
-          <select class="select" id="bf-title">${this.typeOptions(q.type || '')}</select>
-          <select class="select" id="bf-term"><option value="">ทุกภาคเรียน (ย้อนหลังทั้งหมด)</option>${terms.map((x) => `<option value="${esc(x)}" ${x === cur && !dated ? 'selected' : ''}>ภาคเรียน ${esc(x)}${x === cur ? ' (ปัจจุบัน)' : ''}</option>`).join('')}</select>
-          <select class="select" id="bf-grade">${this.gradeOptions(q.grade || '')}</select>
+          <select class="select" id="bf-title" aria-label="ประเภทพฤติกรรม">${this.typeOptions(q.type || '')}</select>
+          <select class="select" id="bf-term" aria-label="ภาคเรียน"><option value="">ทุกภาคเรียน (ย้อนหลังทั้งหมด)</option>${terms.map((x) => `<option value="${esc(x)}" ${x === cur && !dated ? 'selected' : ''}>ภาคเรียน ${esc(x)}${x === cur ? ' (ปัจจุบัน)' : ''}</option>`).join('')}</select>
+          <select class="select" id="bf-grade" aria-label="ระดับชั้น">${this.gradeOptions(q.grade || '')}</select>
           <span class="bf-dates"><input class="input" type="date" id="bf-from" title="ตั้งแต่วันที่" aria-label="ตั้งแต่วันที่" value="${esc(q.from || '')}"><span class="muted">–</span><input class="input" type="date" id="bf-to" title="ถึงวันที่" aria-label="ถึงวันที่" value="${esc(q.to || '')}"></span>
-          <select class="select" id="bf-view"><option value="list">แสดงรายรายการ</option><option value="people" ${q.view === 'people' ? 'selected' : ''}>สรุปรายคน</option></select>
+          <select class="select" id="bf-view" aria-label="รูปแบบการแสดง"><option value="list">แสดงรายรายการ</option><option value="people" ${q.view === 'people' ? 'selected' : ''}>สรุปรายคน</option></select>
         </div><div id="bf-out"></div></div>`;
     },
     bindRecordsSearch() {
