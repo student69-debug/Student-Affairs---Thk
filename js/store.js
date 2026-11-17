@@ -199,7 +199,6 @@
       // 30-day bins: one per app (+ the student registry); who may use each is set per role in Settings
       // grade heads: read-only teacher registry of the grades they look after
       this.data.myStaff = [];
-      if (this.profile.role === 'grade_head') { try { await this.loadMyStaff(); } catch (e) { /* not available */ } }
       if (this.binOk('registry')) { try { await this.loadTrash(); } catch (e) { /* bin not available */ } }
       this.data.appTrash = {};
       for (const app of Object.keys(this.s.restoreRoles || {})) {
