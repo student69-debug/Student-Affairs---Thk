@@ -63,6 +63,53 @@
   }
   const terms = () => { const t = [...new Set(all().map((x) => x.term).filter(Boolean))].sort().reverse(); if (!t.includes(Store.termKey())) t.unshift(Store.termKey()); return t; };
 
+  const MAX_PHOTOS = 5;
+  const pickerHtml = (existing = [], canRemove = false) => `<div class="field full"><label>รูปถ่าย <span class="muted small" style="font-weight:400">(ไม่เกิน ${MAX_PHOTOS} รูป · ถ่ายจากมือถือได้)</span></label>
+      <div class="ph-grid" data-ph-grid>${existing.map((p) => `<div class="ph-item" data-path="${esc(p)}"><img alt="รูปประกอบ" data-ev="${esc(p)}">${canRemove ? `<button type="button" class="ph-x" title="เอารูปออก" aria-label="เอารูปออก" data-ph-remove>${icon('x', 'i16')}</button>` : ''}</div>`).join('')}</div>
+      <div class="actions" style="margin-top:6px">
+        <label class="btn secondary sm" style="cursor:pointer">${icon('camera', 'i16')}ถ่ายรูป<input type="file" accept="image/*" capture="environment" data-ph-input hidden></label>
+        <label class="btn ghost sm" style="cursor:pointer">${icon('image-plus', 'i16')}เลือกรูปจากเครื่อง<input type="file" accept="image/*" multiple data-ph-input hidden></label></div>
+      <span class="help">ระบบย่อรูปก่อนส่ง · รูปเก็บแบบส่วนตัว เห็นเฉพาะคนที่เห็นบันทึกนี้ · หลีกเลี่ยงการถ่ายใบหน้านักเรียน ถ่ายเฉพาะของกลาง/สถานที่</span></div>`;
+  // returns { files: new File[], removed: existing paths taken out }
+  function bindPicker(form) {
+    const grid = form.querySelector('[data-ph-grid]');
+    const files = [], removed = [];
+    const count = () => grid.querySelectorAll('.ph-item').length;
+    form.querySelectorAll('[data-ph-input]').forEach((inp) => inp.addEventListener('change', () => {
+      for (const f of inp.files) {
+        if (!/^image\//.test(f.type)) continue;
+        if (count() >= MAX_PHOTOS) { toast(`ใส่รูปได้ไม่เกิน ${MAX_PHOTOS} รูป`); break; }
+        files.push(f);
+        const div = document.createElement('div');
+        div.className = 'ph-item'; div.dataset.new = String(files.length - 1);
+        div.innerHTML = `<img alt="รูปใหม่" src="${URL.createObjectURL(f)}"><button type="button" class="ph-x" title="เอารูปออก" aria-label="เอารูปออก" data-ph-remove>${icon('x', 'i16')}</button>`;
+        grid.appendChild(div);
+      }
+      inp.value = '';
+      UI.refreshIcons();
+    }));
+    grid.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-ph-remove]');
+      if (!b) return;
+      const item = b.closest('.ph-item');
+      if (item.dataset.new != null) files[Number(item.dataset.new)] = null; else removed.push(item.dataset.path);
+      item.remove();
+    });
+    hydrate(grid);
+    return { files: () => files.filter(Boolean), removed };
+  }
+  // fill <img data-ev="path"> with signed links
+  async function hydrate(root) {
+    const imgs = [...root.querySelectorAll('img[data-ev]')];
+    if (!imgs.length) return;
+    try { const urls = await Store.evidenceUrls(imgs.map((i) => i.dataset.ev)); imgs.forEach((i) => { const u = urls.get(i.dataset.ev); if (u) i.src = u; }); } catch (e) { /* no access */ }
+  }
+  async function uploadAll(caseId, files) {
+    const paths = [];
+    for (const f of files) paths.push(await Store.uploadEvidence(caseId, await UI.shrinkImage(f, 1600, 0.8)));
+    return paths;
+  }
+
   const app = {
     id: 'drugs', name: 'บุหรี่ / สารเสพติด', short: 'สารเสพติด', icon: 'cigarette-off', rule: 'rule-red',
     list(sid) { return (sid ? all().filter((x) => x.studentId === sid) : all()).slice().sort(byDate); },
@@ -80,7 +127,7 @@
       if (!list.length) return empty('ยังไม่มีบันทึก', 'cigarette-off');
       return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>วันที่</th>${withStudent ? '<th>นักเรียน</th>' : ''}<th>สาร / พฤติกรรม</th><th>กลุ่ม</th><th class="num">คะแนน</th><th>การดำเนินการ</th><th>สถานะ</th><th>ผู้บันทึก</th><th></th></tr></thead><tbody>
         ${list.slice(0, 300).map((x) => `<tr><td>${fmtDate(x.at, true)}</td>${withStudent ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${what(x)}${x.place || x.foundBy ? `<div class="muted small">${esc([x.foundBy, x.place].filter(Boolean).join(' · '))}</div>` : ''}</td>
-          <td>${lvBadge(x.level)}</td><td class="num ${x.points ? 'pts-neg' : ''}">${x.points ? signed(x.points) : '—'}</td>
+          <td>${lvBadge(x.level)}${(x.photos || []).length ? `<div><button class="btn ghost sm" style="padding:0 6px;height:26px" data-action="drug-photos" data-id="${x.id}" title="ดูรูปถ่าย">${icon('camera', 'i16')}${x.photos.length}</button></div>` : ''}</td><td class="num ${x.points ? 'pts-neg' : ''}">${x.points ? signed(x.points) : '—'}</td>
           <td class="small">${x.actions.map(esc).join(', ') || '—'}${x.followUp ? `<div class="muted">ติดตาม: ${esc(x.followUp)}</div>` : ''}</td><td>${stBadge(x.status)}</td><td>${esc(x.by)}</td>
           <td style="text-align:right;white-space:nowrap">${canEdit(x) ? `<button class="icon-btn" title="ติดตาม / แก้ไข" data-action="drug-edit" data-id="${x.id}">${icon('pencil', 'i16')}</button>` : ''}${canDel(x) ? `<button class="icon-btn" title="ลบ (เก็บไว้ 30 วัน)" data-action="drug-del" data-id="${x.id}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}
         </tbody></table></div>${list.length > 300 ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง 300 จาก ${list.length.toLocaleString()} รายการ — ใช้ตัวกรองเพื่อดูเพิ่ม</div>` : ''}`;
@@ -102,8 +149,9 @@
           <div class="field"><label>ตัดคะแนนความประพฤติ</label><input class="input mono" type="number" name="points" max="0" min="-100" step="1"><span class="help">ตามเกณฑ์ของโรงเรียน · 0 = ไม่ตัด · แก้ได้ตามดุลยพินิจ</span></div>
           <div class="field"><label>สถานที่</label><input class="input" name="place" placeholder="เช่น ห้องน้ำอาคาร 3"></div>
           <div class="field"><label>ของกลาง</label><input class="input" name="items" placeholder="เช่น บุหรี่ไฟฟ้า 1 เครื่อง"></div>
-          <div class="field full"><label>การดำเนินการ</label><div class="checks" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px 16px">${ACTIONS.map((a) => `<label><input type="checkbox" name="actions" value="${esc(a)}"> ${esc(a)}</label>`).join('')}</div></div>
+          <div class="field full"><label>การดำเนินการ</label><div class="checks" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(200px,100%),1fr));gap:6px 16px">${ACTIONS.map((a) => `<label><input type="checkbox" name="actions" value="${esc(a)}"> ${esc(a)}</label>`).join('')}</div></div>
           <div class="field"><label>สถานะ</label><select class="select" name="status">${Object.entries(STATUS).map(([k, [l]]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select></div>
+          ${pickerHtml()}
           <div class="field full"><label>รายละเอียด (ตามข้อเท็จจริง)</label><textarea class="textarea" name="note" placeholder="เกิดอะไรขึ้น ใครอยู่ด้วย นักเรียนให้ข้อมูลว่าอย่างไร"></textarea></div></div>
           <div class="notice">${icon('shield-check', 'i16')}<span><b>ข้อมูลลับ</b> — รายละเอียดเห็นเฉพาะผู้ดูแลระบบ ครูแนะแนว สารวัตร หัวหน้าระดับ และครูที่ปรึกษาของนักเรียน · ถ้าตัดคะแนน ในแอปพฤติกรรมจะแสดงเพียง "ฝ่าฝืนระเบียบเรื่องบุหรี่ / สารเสพติด" · ผู้เสพคือผู้ป่วย: เน้นช่วยเหลือ ส่งต่อบำบัด และไม่ให้ออกจากโรงเรียนเพราะเหตุนี้</span></div>`,
         onSubmit: async (v, form) => {
@@ -111,12 +159,19 @@
           if (!id) { toast('ไม่พบรหัสนักเรียน กรุณาเลือกจากรายการ'); return false; }
           const actions = [...form.querySelectorAll('input[name=actions]:checked')].map((c) => c.value);
           const points = Math.min(0, Math.max(-100, Math.round(Number(v.points) || 0)));
-          await Store.saveDrug({ student_id: id, at: new Date(v.at || Date.now()).toISOString(), category: v.category, substance: v.substance.trim(), act: v.act,
+          const newFiles = picker.files();
+          const caseId = await Store.saveDrug({ student_id: id, at: new Date(v.at || Date.now()).toISOString(), category: v.category, substance: v.substance.trim(), act: v.act,
             found_by: v.foundBy, place: v.place.trim(), items: v.items.trim(), level: v.level, actions, points, status: v.status, note: v.note.trim() });
-          toast(`บันทึกแล้ว · ${fullName(Store.student(id))}${points ? ' · ตัดคะแนน ' + Math.abs(points) : ''}`);
+          let photoNote = '';
+          if (newFiles.length) {
+            try { const paths = await uploadAll(caseId, newFiles); await Store.updateDrug(caseId, { photos: paths }); photoNote = ` · รูป ${paths.length} รูป`; }
+            catch (e) { setTimeout(() => toast('บันทึกเหตุการณ์แล้ว แต่ส่งรูปไม่สำเร็จ: ' + e.message + ' — เพิ่มรูปได้ที่ปุ่มแก้ไข'), 600); }
+          }
+          toast(`บันทึกแล้ว · ${fullName(Store.student(id))}${points ? ' · ตัดคะแนน ' + Math.abs(points) : ''}${photoNote}`);
           App.render();
         } });
       const f = d.form;
+      const picker = bindPicker(f);
       const sync = () => {
         const cat = f.category.value, act = f.querySelector('input[name=act]:checked').value;
         f.querySelector('#dl-drug-sub').innerHTML = CATS[cat].items.map((x) => `<option value="${esc(x)}"></option>`).join('');
@@ -136,22 +191,36 @@
     openEdit(id) {
       const x = all().find((r) => r.id === id);
       if (!x) return;
-      dialog({ title: 'ติดตาม / แก้ไขบันทึก',
+      const d = dialog({ title: 'ติดตาม / แก้ไขบันทึก',
         body: `<div class="notice">${icon('info', 'i16')}<span>${sLink(x.studentId)} · ${what(x)} · ${fmtDate(x.at, true)}${x.points ? ` · ตัดคะแนน ${Math.abs(x.points)} (แก้คะแนนได้ที่แอปพฤติกรรม)` : ''}</span></div>
           <div class="form-grid">
           <div class="field"><label>กลุ่ม (ตามการคัดกรอง)</label><select class="select" name="level">${Object.entries(LEVELS).map(([k, [l]]) => `<option value="${k}" ${k === x.level ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
           <div class="field"><label>สถานะ</label><select class="select" name="status">${Object.entries(STATUS).map(([k, [l]]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
-          <div class="field full"><label>การดำเนินการ</label><div class="checks" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px 16px">${ACTIONS.concat(x.actions.filter((a) => !ACTIONS.includes(a))).map((a) => `<label><input type="checkbox" name="actions" value="${esc(a)}" ${x.actions.includes(a) ? 'checked' : ''}> ${esc(a)}</label>`).join('')}</div></div>
+          <div class="field full"><label>การดำเนินการ</label><div class="checks" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(200px,100%),1fr));gap:6px 16px">${ACTIONS.concat(x.actions.filter((a) => !ACTIONS.includes(a))).map((a) => `<label><input type="checkbox" name="actions" value="${esc(a)}" ${x.actions.includes(a) ? 'checked' : ''}> ${esc(a)}</label>`).join('')}</div></div>
           <div class="field full"><label>ของกลาง</label><input class="input" name="items" value="${esc(x.items)}"></div>
+          ${pickerHtml(x.photos || [], canDel(x))}
           <div class="field full"><label>ผลการติดตาม / บำบัด</label><textarea class="textarea" name="followUp" placeholder="เช่น พบผู้ปกครอง 20 พ.ย. · ส่งบำบัดที่ รพ. · ผลตรวจซ้ำเป็นลบ">${esc(x.followUp)}</textarea></div>
           <div class="field full"><label>รายละเอียด</label><textarea class="textarea" name="note">${esc(x.note)}</textarea></div></div>`,
         onSubmit: async (v, form) => {
           const actions = [...form.querySelectorAll('input[name=actions]:checked')].map((c) => c.value);
-          await Store.updateDrug(x.id, { level: v.level, status: v.status, actions, items: v.items.trim(), follow_up: v.followUp.trim(), note: v.note.trim() });
-          toast('บันทึกการติดตามแล้ว'); App.render();
+          const added = await uploadAll(x.id, picker.files());
+          const photos = (x.photos || []).filter((p) => !picker.removed.includes(p)).concat(added);
+          await Store.updateDrug(x.id, { level: v.level, status: v.status, actions, items: v.items.trim(), follow_up: v.followUp.trim(), note: v.note.trim(), photos });
+          if (picker.removed.length) { try { await Store.removeEvidence(picker.removed); } catch (e) { /* file stays; no longer listed */ } }
+          toast('บันทึกการติดตามแล้ว' + (added.length ? ` · เพิ่มรูป ${added.length} รูป` : '')); App.render();
         } });
+      const picker = bindPicker(d.form);
     },
 
+    openPhotos(id) {
+      const x = all().find((r) => r.id === id);
+      if (!x) return;
+      const d = dialog({ title: 'รูปถ่ายประกอบ', footer: '<button type="button" class="btn ghost" data-close>ปิด</button>',
+        body: `<div class="muted small">${sLink(x.studentId)} · ${what(x)} · ${fmtDate(x.at, true)}</div>
+          <div class="ph-view">${(x.photos || []).map((p) => `<a target="_blank" rel="noopener" data-ev-link="${esc(p)}"><img alt="รูปประกอบ" data-ev="${esc(p)}"></a>`).join('')}</div>
+          <div class="muted small">กดที่รูปเพื่อเปิดขนาดเต็ม · ลิงก์ใช้ได้ 1 ชั่วโมง · ห้ามส่งต่อ</div>` });
+      hydrate(d.form).then(() => d.form.querySelectorAll('[data-ev-link]').forEach((a) => { const u = Store._evUrls.get(a.dataset.evLink); if (u) a.href = u; }));
+    },
     page(q) {
       const tab = q.tab || 'overview', base = '#/apps/drugs';
       const tabs = Apps.tabsBar([['overview', 'ภาพรวม'], ['records', 'รายการบันทึก'], ['report', 'รายงาน'], ['points', 'เกณฑ์ตัดคะแนน'], ['guide', 'แนวปฏิบัติ']], tab, base);

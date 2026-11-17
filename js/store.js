@@ -20,7 +20,7 @@
     visits: { table: 'care_visits', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['by', 'by_name'], ['note', 'note'], ['photo', 'photo']] },
     needs: { table: 'care_needs', order: 'id', cols: [['id', 'id'], ['studentId', 'student_id'], ['kind', 'kind'], ['text', 'text']] },
     referrals: { table: 'care_referrals', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['type', 'type'], ['to', 'to'], ['note', 'note']] },
-    drugs: { table: 'drug_cases', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['term', 'term'], ['category', 'category'], ['substance', 'substance'], ['act', 'act'], ['foundBy', 'found_by'], ['place', 'place'], ['items', 'items'], ['level', 'level'], ['actions', 'actions'], ['points', 'points'], ['recordId', 'behavior_record_id'], ['status', 'status'], ['followUp', 'follow_up'], ['note', 'note'], ['by', 'by_name'], ['byUser', 'by_user'], ['updatedAt', 'updated_at']] },
+    drugs: { table: 'drug_cases', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['term', 'term'], ['category', 'category'], ['substance', 'substance'], ['act', 'act'], ['foundBy', 'found_by'], ['place', 'place'], ['items', 'items'], ['level', 'level'], ['actions', 'actions'], ['points', 'points'], ['recordId', 'behavior_record_id'], ['status', 'status'], ['followUp', 'follow_up'], ['note', 'note'], ['photos', 'photos'], ['by', 'by_name'], ['byUser', 'by_user'], ['updatedAt', 'updated_at']] },
     users: { table: 'profiles', order: 'created_at', cols: [['id', 'id'], ['name', 'name'], ['email', 'email'], ['role', 'role'], ['apps', 'app_access']] },
   };
   const fromRow = (kind, r) => { const o = {}; MAPS[kind].cols.forEach(([a, b]) => { o[a] = r[b] ?? (b === 'next_at' || b === 'student_id' ? '' : r[b]); }); return o; };
@@ -145,7 +145,11 @@
     async purgePhotos() {
       const paths = check(await sb.rpc('admin_photo_purge_queue')) || [];
       if (!paths.length) return 0;
-      try { await sb.storage.from('student-photos').remove(paths); } catch (e) { return 0; }
+      const ev = paths.filter((p) => p.startsWith('drug-evidence/')), st = paths.filter((p) => !p.startsWith('drug-evidence/'));
+      try {
+        if (st.length) await sb.storage.from('student-photos').remove(st);
+        if (ev.length) await sb.storage.from('drug-evidence').remove(ev.map((p) => p.slice('drug-evidence/'.length)));
+      } catch (e) { return 0; }
       check(await sb.rpc('admin_photo_purged', { p_paths: paths }));
       return paths.length;
     },
@@ -258,6 +262,19 @@
     },
     /* ---- บุหรี่ / สารเสพติด: writes go through functions (a deduction also lands in behaviour records) ---- */
     async saveDrug(p) { const id = check(await sb.rpc('drug_save', { p })); await this.refresh('drugs', 'records'); return id; },
+    // evidence photos: private bucket drug-evidence, <case id>/<name>.jpg, short-lived signed links
+    _evUrls: new Map(),
+    async evidenceUrls(paths) {
+      const need = [...new Set(paths)].filter((p) => p && !this._evUrls.has(p));
+      if (need.length) { const { data } = await sb.storage.from('drug-evidence').createSignedUrls(need, 3600); (data || []).forEach((d) => { if (d.signedUrl) this._evUrls.set(d.path, d.signedUrl); }); }
+      return this._evUrls;
+    },
+    async uploadEvidence(caseId, blob) {
+      const path = `${caseId}/${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}.jpg`;
+      check(await sb.storage.from('drug-evidence').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '3600' }));
+      return path;
+    },
+    async removeEvidence(paths) { if (paths.length) check(await sb.storage.from('drug-evidence').remove(paths)); paths.forEach((p) => this._evUrls.delete(p)); },
     async updateDrug(id, p) { const r = check(await sb.rpc('drug_update', { p_id: id, p })); await this.refresh('drugs'); return r; },
     async loadMyStaff() {
       this.data.myStaff = (check(await sb.rpc('grade_staff_view')) || []).map((r) => ({ id: r.id, name: r.name, email: r.email, role: r.role, rooms: r.rooms || [], grades: r.grades || [] }));

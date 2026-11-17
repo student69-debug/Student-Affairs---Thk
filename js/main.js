@@ -82,6 +82,7 @@
       onDone: (r) => { UI.toast(r === 'ok' ? 'ลบรายการแล้ว · เก็บไว้ 30 วัน ที่แท็บ "ที่ลบไว้" ของแอปคะแนนพฤติกรรม' : 'ไม่พบรายการนี้'); render(); } }),
     'drug-record': (el) => Apps.get('drugs').openRecord(S(el)),
     'drug-edit': (el) => Apps.get('drugs').openEdit(el.dataset.id),
+    'drug-photos': (el) => Apps.get('drugs').openPhotos(el.dataset.id),
     'drug-del': (el) => UI.deleteDialog({ title: 'ลบบันทึกบุหรี่ / สารเสพติด', text: `<p style="margin:0 0 10px">ต้องการลบบันทึกนี้ใช่หรือไม่?</p><div class="notice warn">${UI.icon('info', 'i16')}<span>· รายการจะหายทันที รวมถึงการตัดคะแนนที่มากับบันทึกนี้ (คะแนนจะถูกคำนวณใหม่)<br>· ระบบ<b>เก็บไว้ 30 วัน</b> กู้คืนได้ที่แท็บ "ที่ลบไว้ (30 วัน)" ของแอปนี้ (คืนทั้งบันทึกและคะแนน)<br>· ครบ 30 วันแล้วลบถาวร · การลบถูกบันทึกพร้อมชื่อคุณ</span></div>`, label: 'ลบรายการ',
       run: (pw) => Store.deleteItem('drug', el.dataset.id, pw),
       onDone: (r) => { UI.toast(r === 'ok' ? 'ลบแล้ว · เก็บไว้ 30 วัน ที่แท็บ "ที่ลบไว้" ของแอปบุหรี่ / สารเสพติด' : 'ไม่พบรายการนี้'); render(); } }),
