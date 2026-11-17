@@ -80,6 +80,11 @@
     'behavior-del': (el) => UI.deleteDialog({ title: 'ลบรายการบันทึก', text: `<p style="margin:0 0 10px">ต้องการลบรายการบันทึกพฤติกรรมนี้ใช่หรือไม่?</p><div class="notice warn">${UI.icon('info', 'i16')}<span>· รายการจะหายทันที และคะแนนจะถูกคำนวณใหม่<br>· ระบบ<b>เก็บไว้ 30 วัน</b> กู้คืนได้ที่แท็บ "ที่ลบไว้ (30 วัน)" ของแอปนี้<br>· ครบ 30 วันแล้วลบถาวร · การลบถูกบันทึกพร้อมชื่อคุณ</span></div>`, label: 'ลบรายการ',
       run: (pw) => Store.deleteItem('record', el.dataset.id, pw),
       onDone: (r) => { UI.toast(r === 'ok' ? 'ลบรายการแล้ว · เก็บไว้ 30 วัน ที่แท็บ "ที่ลบไว้" ของแอปคะแนนพฤติกรรม' : 'ไม่พบรายการนี้'); render(); } }),
+    'drug-record': (el) => Apps.get('drugs').openRecord(S(el)),
+    'drug-edit': (el) => Apps.get('drugs').openEdit(el.dataset.id),
+    'drug-del': (el) => UI.deleteDialog({ title: 'ลบบันทึกบุหรี่ / สารเสพติด', text: `<p style="margin:0 0 10px">ต้องการลบบันทึกนี้ใช่หรือไม่?</p><div class="notice warn">${UI.icon('info', 'i16')}<span>· รายการจะหายทันที รวมถึงการตัดคะแนนที่มากับบันทึกนี้ (คะแนนจะถูกคำนวณใหม่)<br>· ระบบ<b>เก็บไว้ 30 วัน</b> กู้คืนได้ที่แท็บ "ที่ลบไว้ (30 วัน)" ของแอปนี้ (คืนทั้งบันทึกและคะแนน)<br>· ครบ 30 วันแล้วลบถาวร · การลบถูกบันทึกพร้อมชื่อคุณ</span></div>`, label: 'ลบรายการ',
+      run: (pw) => Store.deleteItem('drug', el.dataset.id, pw),
+      onDone: (r) => { UI.toast(r === 'ok' ? 'ลบแล้ว · เก็บไว้ 30 วัน ที่แท็บ "ที่ลบไว้" ของแอปบุหรี่ / สารเสพติด' : 'ไม่พบรายการนี้'); render(); } }),
     'counsel-record': (el) => Apps.get('counsel').openRecord(S(el)),
     'care-screen': (el) => Apps.get('care').openScreen(S(el)),
     'care-visit': (el) => Apps.get('care').openVisit(S(el)),
@@ -97,7 +102,7 @@
       const t = ((Store.data.appTrash || {})[app] || []).find((x) => x.id === el.dataset.id);
       if (!t) return;
       const st = Store.student(t.studentId);
-      UI.confirmDialog('กู้คืนรายการ', `กู้คืน <b>${UI.esc(t.label)}</b> ของ <b>${UI.esc(st ? UI.fullName(st) : t.studentId)}</b>${t.itemAt ? ' · บันทึกเมื่อ ' + UI.fmtDate(t.itemAt) : ''}?<br><span class="muted small">รายการกลับมาเหมือนก่อนลบ (ชื่อผู้บันทึกเดิม)${app === 'behavior' ? ' และคะแนนจะถูกคำนวณใหม่' : ''} · การกู้คืนถูกบันทึกในประวัติ</span>`, 'กู้คืน', async () => {
+      UI.confirmDialog('กู้คืนรายการ', `กู้คืน <b>${UI.esc(t.label)}</b> ของ <b>${UI.esc(st ? UI.fullName(st) : t.studentId)}</b>${t.itemAt ? ' · บันทึกเมื่อ ' + UI.fmtDate(t.itemAt) : ''}?<br><span class="muted small">รายการกลับมาเหมือนก่อนลบ (ชื่อผู้บันทึกเดิม)${app === 'behavior' || app === 'drugs' ? ' และคะแนนจะถูกคำนวณใหม่' : ''} · การกู้คืนถูกบันทึกในประวัติ</span>`, 'กู้คืน', async () => {
         const r = await Store.restoreItem(t.id, app);
         UI.toast(r === 'ok' ? 'กู้คืนแล้ว · ' + t.label : r === 'exists' ? 'มีรายการนี้อยู่แล้ว — กู้คืนไม่ได้' : r === 'no_student' ? 'ไม่พบนักเรียนคนนี้ในทะเบียน — กู้คืนนักเรียนก่อน' : 'ไม่พบรายการนี้ (อาจครบ 30 วันแล้ว)');
         render();
