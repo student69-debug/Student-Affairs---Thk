@@ -6,11 +6,12 @@
     const is = (p) => (p === '' ? path === '' : path === p || path.startsWith(p + '/'));
     const link = (href, ic, label, active, extra = '') => `<a href="#/${href}" class="${active ? 'active' : ''} ${extra}">${icon(ic)}<span>${esc(label)}</span>${extra.includes('locked') ? `<span class="lock">${icon('lock', 'i16')}</span>` : ''}</a>`;
     const admin = Store.isAdmin();
+    // the two registries are shown only to admins and grade heads (grade heads: their own grades)
+    const reg = admin || Store.user().role === 'grade_head';
     return `
       ${link('', 'layout-dashboard', 'หน้าแรก', is(''))}
       ${link('search', 'search', 'ค้นหานักเรียน', is('search') || is('student'))}
-      ${link('registry', 'database', 'ทะเบียนนักเรียน', is('registry'), admin || Store.user().role === 'grade_head' ? '' : 'locked')}
-      ${link('teachers', 'contact-round', 'ทะเบียนครู', is('teachers'), admin || Store.user().role === 'grade_head' ? '' : 'locked')}
+      ${reg ? link('registry', 'database', 'ทะเบียนนักเรียน', is('registry')) + link('teachers', 'contact-round', 'ทะเบียนครู', is('teachers')) : ''}
       <div class="nav-label">แอปพลิเคชัน</div>
       ${Apps.enabled().map((a) => link('apps/' + a.id, a.icon, a.name, is('apps/' + a.id), 'sub')).join('')}
       ${admin ? `<div class="nav-label">ระบบ</div>
