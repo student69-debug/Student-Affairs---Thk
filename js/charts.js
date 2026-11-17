@@ -54,5 +54,38 @@
     return vbars(months, { unit, color });
   }
 
-  window.Charts = { GRADES, pct, vbars, stack, progressRows, hbars, chartCard, dash, byGrade, topCounts, weekly, monthly };
+  // donut for one total split into a few parts: parts = [{ l, c, v }]; legend beside it shows count + %
+  function donut(parts, { center = 'ทั้งหมด', unit = 'รายการ' } = {}) {
+    const total = parts.reduce((a, p) => a + p.v, 0), R = 52, C = 2 * Math.PI * R, gap = parts.filter((p) => p.v).length > 1 ? 2 : 0;
+    let off = 0;
+    const segs = total ? parts.filter((p) => p.v).map((p) => { const len = (p.v / total) * C; const s = `<circle class="seg" cx="70" cy="70" r="${R}" stroke="${p.c}" stroke-width="16" style="stroke-dasharray:${Math.max(0.5, len - gap).toFixed(2)} ${C.toFixed(2)};stroke-dashoffset:${(-off).toFixed(2)}"><title>${esc(p.l)}: ${p.v.toLocaleString()} ${unit} (${pct(p.v, total)}%)</title></circle>`; off += len; return s; }).join('') : '';
+    return `<div class="donut-wrap"><svg class="donut" viewBox="0 0 140 140" role="img" aria-label="${esc(center)} ${total} ${unit}: ${parts.map((p) => `${esc(p.l)} ${p.v}`).join(', ')}">
+      <circle class="track" cx="70" cy="70" r="${R}" stroke-width="16"></circle><g transform="rotate(-90 70 70)">${segs}</g>
+      <text class="d-n" x="70" y="74">${total.toLocaleString()}</text><text class="d-l" x="70" y="92">${esc(center)}</text></svg>
+      <div class="donut-legend">${parts.map((p) => `<span><i style="background:${p.c}"></i>${esc(p.l)}<b>${p.v.toLocaleString()}<em>${pct(p.v, total)}%</em></b></span>`).join('')}</div></div>`;
+  }
+
+  // motion: stagger cards and bars, count numbers up from 0 (skipped when the viewer asked for reduced motion)
+  function countUp(el) {
+    const node = [...el.childNodes].find((n) => n.nodeType === 3 && /\d/.test(n.nodeValue));
+    const m = node && node.nodeValue.match(/^(\s*)([\d,]+)([\s\S]*)$/);
+    if (!m) return;
+    const target = Number(m[2].replace(/,/g, ''));
+    if (!target || target > 1e7) return;
+    const t0 = performance.now(), dur = 900;
+    const step = (t) => { const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3); if (!node.isConnected) return; node.nodeValue = m[1] + Math.round(target * e).toLocaleString() + m[3]; if (p < 1) requestAnimationFrame(step); };
+    node.nodeValue = m[1] + '0' + m[3];
+    requestAnimationFrame(step);
+    // background tabs pause animation frames: always land on the real number
+    setTimeout(() => { if (node.isConnected) node.nodeValue = m[1] + target.toLocaleString() + m[3]; }, dur + 150);
+  }
+  function animate(root) {
+    if (!root) return;
+    root.querySelectorAll('.card.stat, .bsearch, .dash-head, .chart-card').forEach((el, i) => el.style.setProperty('--ci', Math.min(i, 12)));
+    root.querySelectorAll('.chart-card').forEach((c) => c.querySelectorAll('.vb, .hs-row, .hr-row, .donut .seg').forEach((b, j) => b.style.setProperty('--bi', Math.min(j, 12))));
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    root.querySelectorAll('.stat .val, .chart-card .vb-val, .chart-card .hs-n, .chart-card .ch-legend b, .donut-legend b, .donut .d-n').forEach(countUp);
+  }
+
+  window.Charts = { GRADES, pct, vbars, stack, progressRows, hbars, donut, chartCard, dash, byGrade, topCounts, weekly, monthly, animate };
 })();

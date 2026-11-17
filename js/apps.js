@@ -236,6 +236,7 @@
       const perGrade = C.byGrade(students, (l) => { const g = new Set(l.map((s) => s.id)); return { v: neg.filter((r) => g.has(r.studentId)).length }; });
       return C.dash('สรุปภาพรวม', `${esc(Store.user().role === 'inspector' || Store.seesAll() ? 'นักเรียนทั้งโรงเรียน' : Store.myScopeText() || 'นักเรียนในความดูแล')} · ภาคเรียน ${esc(term)} · บันทึก ${cur.length.toLocaleString()} รายการ`, [
         C.chartCard('ระดับคะแนนพฤติกรรม', `เฝ้าระวังต่ำกว่า ${Store.s.warnBelow} · เสี่ยงสูงต่ำกว่า ${Store.s.alertBelow}`, C.stack(lv, [{ k: 'ok', l: 'ปกติ', c: 'var(--green-600)' }, { k: 'watch', l: 'เฝ้าระวัง', c: 'var(--amber-500)' }, { k: 'high', l: 'เสี่ยงสูง', c: 'var(--red-700)' }])),
+        C.chartCard('สัดส่วนนักเรียนตามระดับคะแนน', `${students.length.toLocaleString()} คน`, C.donut([['ok', 'ปกติ', 'var(--green-600)'], ['watch', 'เฝ้าระวัง', 'var(--amber-500)'], ['high', 'เสี่ยงสูง', 'var(--red-700)']].map(([k, l, c]) => ({ l, c, v: lv.reduce((a, r) => a + r.v[k], 0) })), { center: 'คน', unit: 'คน' })),
         C.chartCard('การบันทึก 8 สัปดาห์ล่าสุด', 'จำนวนรายการต่อสัปดาห์', C.weekly(rec, (r) => r.at, [{ k: 'neg', l: 'หักคะแนน', c: 'var(--red-600)', test: (r) => Number(r.points) < 0 }, { k: 'pos', l: 'เพิ่มคะแนน', c: 'var(--green-600)' }]), '#/apps/behavior?tab=records'),
         C.chartCard('พฤติกรรมที่ถูกหักคะแนนบ่อย', `ภาคเรียน ${esc(term)} · 8 อันดับแรก`, C.hbars(C.topCounts(neg.map((r) => r.title)), { color: 'var(--red-600)', empty: 'ภาคเรียนนี้ยังไม่มีการหักคะแนน' }), '#/apps/behavior?tab=records'),
         C.chartCard('การหักคะแนนแยกตามระดับชั้น', `ภาคเรียน ${esc(term)} · จำนวนรายการ`, C.vbars(perGrade, { unit: 'รายการ', color: 'var(--red-600)' })),
@@ -367,7 +368,7 @@
         C.chartCard('การเยี่ยมบ้าน', `เยี่ยมแล้ว ${done.toLocaleString()} จาก ${st.length.toLocaleString()} คน (${C.pct(done, st.length)}%)`, C.progressRows(vis), '#/apps/care?tab=visit'),
         C.chartCard('บันทึกสุขภาพ 8 สัปดาห์ล่าสุด', `จำนวนครั้งต่อสัปดาห์ · ส่งต่อ ${health.filter((x) => x.referred).length} ครั้ง (ทั้งหมด)`, C.weekly(health, (x) => x.date + 'T10:00:00', [{ k: 'ref', l: 'ส่งต่อ', c: 'var(--amber-500)', test: (x) => x.referred }, { k: 'n', l: 'ดูแลที่ห้องพยาบาล', c: 'var(--blue-600)' }], 'ครั้ง'), '#/apps/care?tab=health'),
         C.chartCard('อาการที่พบบ่อย', '90 วันล่าสุด · 8 อันดับแรก', C.hbars(C.topCounts(health.filter((x) => x.date >= d90).map((x) => x.symptom)), { unit: 'ครั้ง', color: 'var(--blue-600)', empty: 'ยังไม่มีบันทึกสุขภาพใน 90 วัน' }), '#/apps/care?tab=health'),
-        C.chartCard('การส่งต่อ', 'ทั้งหมด แยกภายใน / ภายนอก', C.stack(C.byGrade(st, (l) => { const g = new Set(l.map((s) => s.id)); const v = { internal: 0, external: 0 }; ref.forEach((r) => { if (g.has(r.studentId)) v[r.type === 'internal' ? 'internal' : 'external']++; }); return { v }; }), [{ k: 'internal', l: 'ภายใน', c: 'var(--blue-600)' }, { k: 'external', l: 'ภายนอก', c: 'var(--amber-500)' }], 'ครั้ง'), '#/apps/care?tab=referral'),
+        C.chartCard('การส่งต่อ', 'ทั้งหมด แยกภายใน / ภายนอก', C.donut([{ l: 'ส่งต่อภายใน', c: 'var(--blue-600)', v: ref.filter((r) => r.type === 'internal').length }, { l: 'ส่งต่อภายนอก', c: 'var(--amber-500)', v: ref.filter((r) => r.type !== 'internal').length }], { center: 'ครั้ง', unit: 'ครั้ง' }), '#/apps/care?tab=referral'),
       ]);
     },
     studentTab(sid) {

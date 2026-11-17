@@ -257,7 +257,7 @@
         C.chartCard('กลุ่มล่าสุดของนักเรียน', 'แยกตามระดับชั้น (คนละ 1 กลุ่ม)', st.length ? C.stack(rows, LV.map(([k, l, c]) => ({ k, l, c }))) : '<div class="muted small" style="padding:8px 0">ภาคเรียนนี้ยังไม่มีบันทึก</div>', '#/apps/drugs?tab=report'),
         C.chartCard('แยกตามประเภท', `ภาคเรียน ${esc(term)} · จำนวนรายการ`, C.hbars(Object.entries(CATS).map(([k, c]) => ({ k: c.label, v: cur.filter((x) => x.category === k).length })), { color: 'var(--red-600)' }), '#/apps/drugs?tab=records'),
         C.chartCard('การบันทึก 8 สัปดาห์ล่าสุด', 'จำนวนรายการต่อสัปดาห์ (ทุกภาคเรียน)', C.weekly(all(), (x) => x.at, [{ k: 'n', l: 'บันทึก', c: 'var(--red-600)' }]), '#/apps/drugs?tab=records&term=all'),
-        C.chartCard('สถานะการดำเนินการ', `ภาคเรียน ${esc(term)}`, C.stack(stRow, status.map(([k, l, c]) => ({ k, l, c })), 'รายการ'), '#/apps/drugs?tab=records&status=active'),
+        C.chartCard('สถานะการดำเนินการ', `ภาคเรียน ${esc(term)}`, C.donut(status.map(([k, l, c]) => ({ l, c, v: stRow[0].v[k] })), { center: 'รายการ' }), '#/apps/drugs?tab=records&status=active'),
       ]);
     },
     scopeText() {

@@ -57,13 +57,16 @@
     document.getElementById('page-title').textContent = page.title;
     document.title = page.title + ' · Student Affairs – Thk';
     const head = page.actions ? `<div class="page-head no-print"><div><h2>${esc(page.title)}</h2></div><div class="actions">${page.actions}</div></div>` : `<h2 class="sr-only">${esc(page.title)}</h2>`;
-    document.getElementById('content').innerHTML = head + page.html;
+    const contentEl = document.getElementById('content');
+    contentEl.classList.toggle('anim', !samePage);  // charts animate when another page/app opens, not on refresh of the same page
+    contentEl.innerHTML = head + page.html;
     const u = Store.user();
     document.getElementById('user-name').innerHTML = `<b>${esc(u.name)}</b><span>${esc(Pages.ROLES[u.role] || '')}</span>`;
     document.getElementById('user-avatar').textContent = u.name.replace(/^ครู/, '').slice(0, 1);
     document.querySelector('.shell').classList.remove('nav-open');
     UI.refreshIcons();
     if (page.after) page.after();
+    if (!samePage && window.Charts) Charts.animate(contentEl);
     UI.hydratePhotos(document.getElementById('content'));
     window.scrollTo(0, window.__keepScroll);
     const target = q.go && document.getElementById(q.go);

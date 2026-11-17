@@ -150,6 +150,7 @@
     return C.dash('สรุปภาพรวม', `เคสทั้งหมด ${all.length.toLocaleString()} · ยังเปิด ${o.length.toLocaleString()} · ยุติแล้ว ${(all.length - o.length).toLocaleString()}`, [
       C.chartCard('เคสเปิดใหม่ 6 เดือนล่าสุด', 'นับตามวันที่เปิดเคส', C.monthly(all, (c) => c.openDate, { unit: 'เคส', color: 'var(--blue-600)' }), '#/apps/counsel?tab=cases'),
       C.chartCard('การให้คำปรึกษา 6 เดือนล่าสุด', 'จำนวนครั้งต่อเดือน (ทุกเคส)', C.monthly(sessions, (d) => d, { unit: 'ครั้ง', color: 'var(--navy-700)' })),
+      C.chartCard('เคสที่ยังเปิด', 'แยกตามความรุนแรง', C.donut(SEV.map((x, i) => ({ l: x, c: ['var(--green-600)', 'var(--amber-500)', 'var(--red-700)'][i], v: o.filter((c) => c.severity === x).length })), { center: 'เคส', unit: 'เคส' }), '#/apps/counsel?tab=cases'),
       C.chartCard('ความรุนแรงของเคสที่ยังเปิด', 'แยกตามระดับชั้น', C.stack(sev, [{ k: SEV[0], l: SEV[0], c: 'var(--green-600)' }, { k: SEV[1], l: SEV[1], c: 'var(--amber-500)' }, { k: SEV[2], l: SEV[2], c: 'var(--red-700)' }], 'เคส'), '#/apps/counsel?tab=cases'),
     ]);
   }

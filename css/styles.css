@@ -436,3 +436,31 @@ details.card>summary::-webkit-details-marker{display:none}
 .seg button{border:0;background:none;padding:8px 14px;border-radius:8px;font:inherit;font-size:14px;color:var(--ink-600, #4a5163);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .seg button.on{background:var(--white);color:var(--navy-800);font-weight:600;box-shadow:0 1px 3px rgba(8,33,51,.15)}
 .seg .n{font-size:12px;background:var(--navy-50);color:var(--navy-700);border-radius:999px;padding:1px 8px}
+
+/* ---- chart motion (17 Nov 2026): plays when you open a page, not when the same page refreshes ---- */
+@keyframes ch-up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes ch-growY{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes ch-growX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes ch-fade{from{opacity:0}to{opacity:1}}
+@keyframes ch-donut{from{stroke-dasharray:0 400}}
+.anim .chart-card,.anim .card.stat,.anim .dash-head,.anim .bsearch{animation:ch-up .5s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--ci,0) * 70ms)}
+.anim .vb > i,.anim .vb-stack{transform-origin:bottom;animation:ch-growY .8s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--ci,0) * 70ms + 150ms + var(--bi,0) * 45ms)}
+.anim .vb-val,.anim .vb-lbl{animation:ch-fade .6s ease both;animation-delay:calc(var(--ci,0) * 70ms + 350ms + var(--bi,0) * 45ms)}
+.anim .hs-bar i,.anim .hs-bar.prog i{transform-origin:left;animation:ch-growX .9s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--ci,0) * 70ms + 200ms + var(--bi,0) * 50ms)}
+.anim .donut .seg{animation:ch-donut 1s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--ci,0) * 70ms + 200ms + var(--bi,0) * 120ms)}
+.vb > i,.vb-stack,.hs-bar i{will-change:transform}
+/* donut: svg ring + legend beside it */
+.donut-wrap{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.donut{width:150px;height:150px;flex-shrink:0}
+.donut .track{fill:none;stroke:var(--ink-100)}
+.donut .seg{fill:none;stroke-linecap:butt;transition:stroke-width .15s}
+.donut .seg:hover{stroke-width:20}
+.donut text{font-family:var(--font-display);fill:var(--ink-900);text-anchor:middle}
+.donut .d-n{font-size:26px;font-weight:600}
+.donut .d-l{font-size:11px;fill:var(--ink-500)}
+.donut-legend{display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--ink-700);min-width:150px;flex:1}
+.donut-legend span{display:grid;grid-template-columns:10px 1fr auto;gap:8px;align-items:center}
+.donut-legend i{width:10px;height:10px;border-radius:3px}
+.donut-legend b{font-variant-numeric:tabular-nums;color:var(--ink-900)}
+.donut-legend em{font-style:normal;color:var(--ink-500);font-size:12px;margin-left:4px}
+@media (prefers-reduced-motion:reduce){.anim *{animation:none!important}}
