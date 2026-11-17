@@ -13,9 +13,9 @@
       ${link('teachers', 'contact-round', 'ทะเบียนครู', is('teachers'), admin ? '' : 'locked')}
       <div class="nav-label">แอปพลิเคชัน</div>
       ${Apps.enabled().map((a) => link('apps/' + a.id, a.icon, a.name, is('apps/' + a.id), 'sub')).join('')}
-      <div class="nav-label">ระบบ</div>
+      ${admin ? `<div class="nav-label">ระบบ</div>
       ${link('reports', 'file-bar-chart', 'รายงาน', is('reports'))}
-      ${link('settings', 'settings', 'ตั้งค่า', is('settings'))}`;
+      ${link('settings', 'settings', 'ตั้งค่า', is('settings'))}` : ''}`;
   }
 
   function parse() {
@@ -31,6 +31,8 @@
     if (parts[0] === 'student') return Pages.student(decodeURIComponent(parts[1] || ''), q);
     if (parts[0] === 'registry') return Pages.registry(q);
     if (parts[0] === 'teachers') return Pages.teachers(q);
+    // the ระบบ section (reports, settings) is for admins only
+    if ((parts[0] === 'reports' || parts[0] === 'settings') && !Store.isAdmin()) return { title: parts[0] === 'reports' ? 'รายงาน' : 'ตั้งค่า', html: `<div class="card">${UI.empty('หน้านี้สำหรับผู้ดูแลระบบเท่านั้น', 'lock')}</div>` };
     if (parts[0] === 'reports') return Pages.reports(q);
     if (parts[0] === 'settings') return Pages.settings(q);
     if (parts[0] === 'apps') {
