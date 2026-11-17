@@ -90,6 +90,16 @@
     'registry-edit': (el) => Pages.studentDialog(el.dataset.id),
     'registry-status': (el) => Pages.statusDialog(el.dataset.id),
     'registry-delete': (el) => Pages.deleteDialog(el.dataset.id),
+    'case-restore': (el) => {
+      const t = (Store.data.caseTrash || []).find((x) => x.id === el.dataset.id);
+      if (!t) return;
+      const st = Store.student(t.studentId);
+      UI.confirmDialog('กู้คืนเคส', `กู้คืนเคสของ <b>${UI.esc(st ? UI.fullName(st) : t.studentId)}</b> <span class="mono">${UI.esc(t.studentId)}</span> · เปิดเคส ${UI.fmtDate(t.openDate)} · ${t.sessions} ครั้ง?<br><span class="muted small">เคสและบันทึกทุกครั้งกลับมาเหมือนก่อนลบ · การกู้คืนถูกบันทึกในประวัติ</span>`, 'กู้คืน', async () => {
+        const r = await Store.restoreCase(t.id);
+        UI.toast(r === 'ok' ? 'กู้คืนเคสแล้ว' : r === 'exists' ? 'มีเคสนี้อยู่แล้ว (อาจนำเข้าซ้ำ) — กู้คืนไม่ได้' : r === 'no_student' ? 'ไม่พบนักเรียนคนนี้ในทะเบียน — กู้คืนนักเรียนก่อน' : 'ไม่พบรายการนี้ (อาจครบ 30 วันแล้ว)');
+        render();
+      });
+    },
     'registry-restore': (el) => {
       const t = (Store.data.trash || []).find((x) => x.id === el.dataset.id);
       if (!t) return;

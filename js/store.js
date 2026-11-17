@@ -192,6 +192,8 @@
       kinds.forEach((k, i) => setSlot(k, lists[i]));
       this.data.trash = [];
       if (this.isAdmin() || this.profile.role === 'grade_head') { try { await this.loadTrash(); } catch (e) { /* bin not available */ } }
+      this.data.caseTrash = [];
+      if (this.seesAll() && this.appOk('counsel')) { try { await this.loadCaseTrash(); } catch (e) { /* bin not available */ } }
       if (this.isAdmin()) this.purgePhotos().catch(() => {});
     },
     async refresh(...kinds) { const lists = await Promise.all(kinds.map(fetchAll)); kinds.forEach((k, i) => setSlot(k, lists[i])); },
@@ -223,6 +225,18 @@
       const r = check(await sb.rpc('delete_item', { p_kind: kind, p_id: String(id), p_password: password }));
       const slots = { record: ['records'], health: ['health'], case: ['cases', 'progress'], subjects: ['subjects'] }[kind];
       if (r === 'ok') await this.refresh(...slots, ...(this.isAdmin() ? ['history'] : []));
+      if (r === 'ok' && kind === 'case') await this.loadCaseTrash();
+      return r;
+    },
+    // deleted counselling cases, kept 30 days (counsellors and admins)
+    async loadCaseTrash() {
+      this.data.caseTrash = (check(await sb.rpc('case_trash_list')) || []).map((r) => ({ id: r.id, studentId: r.student_id, openDate: r.open_date, sessions: r.sessions_n, deletedAt: r.deleted_at, by: r.deleted_by_name || '', purgeAt: r.purge_at }));
+      return this.data.caseTrash;
+    },
+    async restoreCase(id) {
+      const r = check(await sb.rpc('restore_case', { p_id: id }));
+      if (r === 'ok') await this.refresh('cases', 'progress', ...(this.isAdmin() ? ['history'] : []));
+      await this.loadCaseTrash();
       return r;
     },
     async remove(kind, id) {

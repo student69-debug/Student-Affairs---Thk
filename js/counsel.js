@@ -101,12 +101,13 @@
     if (q.case) return editorPage(q);
     const tab = q.tab || 'overview';
     const base = '#/apps/counsel';
-    const tabs = `<div class="tabs no-print">${[['overview', 'ภาพรวม'], ['cases', 'เคสทั้งหมด'], ['io', 'นำเข้า / ส่งออก'], ['guide', 'คู่มือ']].map(([k, l]) => `<button data-action="go" data-href="${base}?tab=${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+    const tabs = `<div class="tabs no-print">${[['overview', 'ภาพรวม'], ['cases', 'เคสทั้งหมด'], ['io', 'นำเข้า / ส่งออก'], ['trash', `ที่ลบไว้ (30 วัน)${(D().caseTrash || []).length ? ' · ' + D().caseTrash.length : ''}`], ['guide', 'คู่มือ']].map(([k, l]) => `<button data-action="go" data-href="${base}?tab=${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('')}</div>`;
     const actions = `<button class="btn primary" data-action="go" data-href="#/apps/counsel?case=new">${icon('folder-plus')}เปิดเคสใหม่</button>`;
     let html = '';
     if (tab === 'overview') html = overview();
     else if (tab === 'cases') return { title: 'ให้คำปรึกษา', actions, html: tabs + casesList(q), after: bindCasesFilter };
     else if (tab === 'io') return { title: 'ให้คำปรึกษา', actions, html: tabs + ioPage(), after: bindIo };
+    else if (tab === 'trash') html = trashPage();
     else html = guide();
     return { title: 'ให้คำปรึกษา', actions, html: tabs + html };
   }
@@ -133,6 +134,17 @@
           ${kcount.map(([k, l, n]) => `<div class="kbar" title="${esc(l)}"><span class="k">${k}</span><span class="l">${esc(l)}</span><span class="bar"><i style="width:${(n / kmax) * 100}%"></i></span><span class="n">${n}</span></div>`).join('')}</div></div>
       </div>
       <div class="card"><div class="card-head"><h3>เคสที่ต้องดูแลใกล้ชิด</h3><span class="muted small">ความรุนแรง เฝ้าระวัง / ควรพบผู้เชี่ยวชาญ</span></div>${caseTable(close)}</div>`;
+  }
+
+  // เคสที่ลบไว้ 30 วัน (กู้คืนได้)
+  function trashPage() {
+    const list = D().caseTrash || [];
+    const daysLeft = (d) => Math.max(0, Math.ceil((new Date(d) - Date.now()) / 864e5));
+    return `<div class="notice">${icon('archive-restore', 'i16')}<span>เคสที่ถูกลบจะเก็บไว้ที่นี่ <b>30 วัน</b> พร้อมบันทึกทุกครั้ง กู้คืนได้ระหว่างนี้ เมื่อครบกำหนด ระบบจะลบถาวรอัตโนมัติ (ทุกคืนเวลา 02:20 น.) · ทุกการลบและกู้คืนถูกบันทึกในประวัติ</span></div>
+      <div class="card"><div class="card-head"><h3>เคสที่ลบไว้</h3><span class="muted small">${list.length} เคส</span></div>
+      ${list.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>นักเรียน</th><th>เปิดเคส</th><th>บันทึก</th><th>ลบโดย</th><th>ลบเมื่อ</th><th>ลบถาวร</th><th></th></tr></thead><tbody>${list.map((t) => { const n = daysLeft(t.purgeAt);
+        return `<tr><td>${sLink(t.studentId)} <span class="mono muted small">${esc(t.studentId)}</span></td><td>${fmtDate(t.openDate)}</td><td>${t.sessions} ครั้ง</td><td>${esc(t.by || '—')}</td><td>${fmtDate(t.deletedAt, true)}</td><td>${fmtDate(t.purgeAt)} <span class="badge ${n <= 3 ? 'b-danger' : n <= 7 ? 'b-warning' : 'b-neutral'}">เหลือ ${n} วัน</span></td>
+        <td style="text-align:right"><button class="btn secondary sm" data-action="case-restore" data-id="${esc(t.id)}">${icon('rotate-ccw', 'i16')}กู้คืน</button></td></tr>`; }).join('')}</tbody></table></div>` : empty('ไม่มีเคสที่ถูกลบ', 'archive')}</div>`;
   }
 
   function casesList(q) {
@@ -202,7 +214,7 @@
           ${c.sessions.length > 1 ? `<button type="button" class="btn ghost" data-case="pop">${icon('minus', 'i16')}ลบบันทึกครั้งที่ ${c.sessions.length}</button>` : ''}
         </div>
         <div class="actions">
-          ${existing && Store.isAdmin() ? `<button type="button" class="btn danger" data-case="delete">${icon('trash-2', 'i16')}ลบเคส</button>` : ''}
+          ${existing && (Store.isAdmin() || Store.appOk('counsel')) ? `<button type="button" class="btn danger" data-case="delete" title="ลบเคสที่บันทึกซ้ำ/ผิด (เก็บไว้ 30 วัน)">${icon('trash-2', 'i16')}ลบเคส</button>` : ''}
           <button type="button" class="btn ghost" data-case="cancel">ยกเลิก</button>
           <button type="submit" class="btn primary">${icon('save', 'i16')}บันทึกเคส</button>
         </div></div>
@@ -238,9 +250,26 @@
       } else if (act === 'cancel') {
         draft = null; history.back();
       } else if (act === 'delete') {
-        UI.deleteDialog({ title: 'ลบเคส', label: 'ลบเคส', text: 'ลบเคสนี้พร้อมบันทึกการให้คำปรึกษาทั้งหมด และกู้คืนไม่ได้ — ถ้าต้องการปิดเคส ให้เปลี่ยนแผนเป็น "ยุติให้คำปรึกษา" แทน',
-          run: (pw) => Store.deleteItem('case', draft.id, pw),
-          onDone: (r) => { draft = null; toast(r === 'ok' ? 'ลบเคสแล้ว' : 'ไม่พบเคสนี้'); location.hash = '#/apps/counsel?tab=cases'; } });
+        const id = draft.id, st = Store.student(draft.studentId);
+        const until = new Date(Date.now() + 30 * 864e5).toISOString();
+        const who = `<b>${esc(fullName(st))}</b> <span class="mono">${esc(draft.studentId)}</span> · เปิดเคส ${fmtDate(draft.openDate)} · ${draft.sessions.length} ครั้ง`;
+        UI.deleteDialog({ title: 'ลบเคส', label: 'ลบเคส',
+          text: `<p style="margin:0 0 10px">ลบเคสของ ${who}</p>
+            <div class="notice warn">${icon('info', 'i16')}<span><b>สิ่งที่จะเกิดขึ้น</b><br>· เคสนี้และบันทึกการให้คำปรึกษาทุกครั้งจะหายจากรายการทันที แต่ระบบยัง<b>เก็บไว้ 30 วัน</b> (ถึง ${fmtDate(until)}) กู้คืนได้ที่แท็บ "ที่ลบไว้"<br>· ครบ 30 วันแล้วระบบ<b>ลบถาวร</b>อัตโนมัติ กู้คืนไม่ได้อีก<br>· การลบถูกบันทึกในประวัติพร้อมชื่อคุณ<br>· ใช้สำหรับเคสที่บันทึกซ้ำหรือบันทึกผิด ถ้าแค่ต้องการปิดเคส ให้เปลี่ยนแผนเป็น "ยุติให้คำปรึกษา" แทน</span></div>`,
+          run: (pw) => Store.deleteItem('case', id, pw),
+          onDone: (r) => {
+            draft = null;
+            if (r !== 'ok') { toast('ไม่พบเคสนี้ (อาจถูกลบไปแล้ว)'); location.hash = '#/apps/counsel?tab=cases'; return; }
+            toast('ลบเคสแล้ว · เก็บไว้ 30 วัน');
+            location.hash = '#/apps/counsel?tab=cases';
+            setTimeout(() => dialog({ title: 'ลบเคสแล้ว · เก็บไว้ 30 วัน', size: 'sm',
+              body: `<div class="signup-done"><div class="notice">${icon('archive', 'i16')}<span>เคสของ ${who} ถูกย้ายไปที่ <b>ที่ลบไว้</b></span></div>
+                <ol><li>ระบบเก็บเคสและบันทึกทุกครั้งไว้ถึง <b>${fmtDate(until)}</b> (30 วัน)</li>
+                <li>ถ้าลบผิด กดแท็บ <b>ที่ลบไว้ (30 วัน)</b> แล้วกด <b>กู้คืน</b> เคสจะกลับมาครบเหมือนเดิม</li>
+                <li>ครบ 30 วันแล้ว ระบบลบถาวรอัตโนมัติ และกู้คืนไม่ได้อีก</li>
+                <li>การลบครั้งนี้ถูกบันทึกในประวัติพร้อมชื่อคุณแล้ว</li></ol></div>`,
+              footer: '<button type="button" class="btn ghost" data-close>ปิด</button><a class="btn primary" href="#/apps/counsel?tab=trash" data-close>ดูที่ลบไว้</a>' }), 50);
+          } });
       }
     });
     form.addEventListener('submit', async (e) => {
