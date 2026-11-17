@@ -464,3 +464,8 @@ details.card>summary::-webkit-details-marker{display:none}
 .donut-legend b{font-variant-numeric:tabular-nums;color:var(--ink-900)}
 .donut-legend em{font-style:normal;color:var(--ink-500);font-size:12px;margin-left:4px}
 @media (prefers-reduced-motion:reduce){.anim *{animation:none!important}}
+/* new-version bar (js/version.js) */
+.update-bar{position:fixed;left:16px;right:16px;bottom:16px;margin:0 auto;max-width:560px;z-index:1000;display:flex;gap:12px;align-items:center;background:#fff;color:var(--ink-900,#1a1f36);padding:10px 10px 10px 16px;border-radius:var(--radius-md,10px);border-left:6px solid var(--red-700,#C70E14);box-shadow:0 10px 30px rgba(8,33,51,.35);font-size:15px;font-weight:500;animation:drop .26s var(--ease-out,ease-out)}
+.update-bar>span{flex:1;line-height:1.45}
+.update-bar .btn{flex:none}
+@media print{.update-bar{display:none}}
