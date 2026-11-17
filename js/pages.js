@@ -27,27 +27,7 @@
   /* ---------------- หน้าแรก ---------------- */
 
   /* ---------------- แดชบอร์ด (หน้าแรก) — ข้อมูลตามสิทธิ์ของผู้ใช้ ---------------- */
-  const GRADES = [1, 2, 3, 4, 5, 6];
-  const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
-  // vertical bars, one series; every bar labelled (few bars) and has a hover title
-  function vbars(items, { unit = '', color = 'var(--navy-700)' } = {}) {
-    const max = Math.max(1, ...items.map((x) => x.v));
-    return `<div class="vbars" style="--n:${items.length}">${items.map((x) => `<div class="vb" title="${esc(x.k)}: ${x.v.toLocaleString()} ${unit}">
-      <span class="vb-val">${x.v.toLocaleString()}</span><i style="height:${x.v ? Math.max(3, (x.v / max) * 100) : 0}%;background:${color}"></i><span class="vb-lbl">${esc(x.k)}</span></div>`).join('')}</div>`;
-  }
-  // 100% stacked horizontal bar per row + one shared legend (labels + counts, never colour alone)
-  function stack(rows, parts, unit = 'คน') {
-    const legend = `<div class="ch-legend">${parts.map((p) => {
-      const tot = rows.reduce((a, r) => a + (r.v[p.k] || 0), 0);
-      return `<span><i style="background:${p.c}"></i>${p.l} <b>${tot.toLocaleString()}</b></span>`; }).join('')}</div>`;
-    return legend + `<div class="hstack">${rows.map((r) => { const n = parts.reduce((a, p) => a + (r.v[p.k] || 0), 0);
-      return `<div class="hs-row"><span class="hs-lbl">${esc(r.k)}</span><div class="hs-bar">${n ? parts.filter((p) => r.v[p.k]).map((p) => `<i style="flex:${r.v[p.k]};background:${p.c}" title="${esc(r.k)} · ${p.l}: ${r.v[p.k]} ${unit} (${pct(r.v[p.k], n)}%)"></i>`).join('') : '<em>ไม่มีข้อมูล</em>'}</div><span class="hs-n">${n.toLocaleString()}</span></div>`; }).join('')}</div>`;
-  }
-  // progress bar per row (e.g. home visits done / students)
-  function progressRows(rows) {
-    return `<div class="hstack">${rows.map((r) => `<div class="hs-row"><span class="hs-lbl">${esc(r.k)}</span><div class="hs-bar prog" title="${esc(r.k)}: ${r.a.toLocaleString()} จาก ${r.b.toLocaleString()} คน"><i style="width:${pct(r.a, r.b)}%"></i></div><span class="hs-n">${pct(r.a, r.b)}%</span></div>`).join('')}</div>`;
-  }
-  const chartCard = (title, sub, body, link) => `<div class="card chart-card"><div class="card-head"><div><h3>${title}</h3>${sub ? `<div class="muted small">${sub}</div>` : ''}</div>${link ? `<a class="small" href="${link}">ดูรายละเอียด</a>` : ''}</div><div class="card-body">${body}</div></div>`;
+  const { GRADES, pct, vbars, stack, progressRows, chartCard } = window.Charts;
 
   function dashboard(act) {
     if (!act.length) return '';

@@ -406,6 +406,10 @@ details.card>summary::-webkit-details-marker{display:none}
 .hs-bar em{font-size:12px;color:var(--ink-400);font-style:normal;padding-left:6px;line-height:14px}
 .hs-bar.prog{background:var(--ink-100)}
 .hs-bar.prog i{background:var(--navy-600);border-radius:4px}
+.hrank{display:flex;flex-direction:column;gap:10px}
+.hr-lbl{font-size:13px;color:var(--ink-700);margin-bottom:3px;overflow-wrap:anywhere}
+.hr-line{display:grid;grid-template-columns:minmax(0,1fr) 48px;gap:10px;align-items:center;font-size:13px}
+.app-dash{margin-top:4px}
 .chart-card .card-head > a{white-space:nowrap;flex-shrink:0}
 .chart-card .card-head{align-items:flex-start;gap:12px}
 .pw-rules{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:3px;font-size:13px;color:var(--ink-500)}

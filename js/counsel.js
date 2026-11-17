@@ -137,7 +137,21 @@
         <div class="card"><div class="card-head"><h3>จำนวนเคสตามประเภทปัญหา</h3><span class="muted small">เคสที่ยังเปิด</span></div><div class="card-body kbars">
           ${kcount.map(([k, l, n]) => `<div class="kbar" title="${esc(l)}"><span class="k">${k}</span><span class="l">${esc(l)}</span><span class="bar"><i style="width:${(n / kmax) * 100}%"></i></span><span class="n">${n}</span></div>`).join('')}</div></div>
       </div>
+      ${dashHtml(all)}
       <div class="card"><div class="card-head"><h3>เคสที่ต้องดูแลใกล้ชิด</h3><span class="muted small">ความรุนแรง เฝ้าระวัง / ควรพบผู้เชี่ยวชาญ</span></div>${caseTable(close)}</div>`;
+  }
+
+  // สรุปภาพรวมของแอป (ครูแนะแนว / ผู้ดูแลระบบ)
+  function dashHtml(all) {
+    const C = window.Charts, o = open(all);
+    const studentsOf = (list) => list.map((c) => Store.student(c.studentId)).filter(Boolean);
+    const sev = C.byGrade([...new Map(studentsOf(o).map((s) => [s.id, s])).values()], (l) => { const g = new Set(l.map((s) => s.id)); const v = {}; SEV.forEach((x) => { v[x] = 0; }); o.forEach((c) => { if (g.has(c.studentId) && v[c.severity] !== undefined) v[c.severity]++; }); return { v }; });
+    const sessions = all.flatMap((c) => (c.sessions || []).map((s) => s.date)).filter(Boolean);
+    return C.dash('สรุปภาพรวม', `เคสทั้งหมด ${all.length.toLocaleString()} · ยังเปิด ${o.length.toLocaleString()} · ยุติแล้ว ${(all.length - o.length).toLocaleString()}`, [
+      C.chartCard('เคสเปิดใหม่ 6 เดือนล่าสุด', 'นับตามวันที่เปิดเคส', C.monthly(all, (c) => c.openDate, { unit: 'เคส', color: 'var(--blue-600)' }), '#/apps/counsel?tab=cases'),
+      C.chartCard('การให้คำปรึกษา 6 เดือนล่าสุด', 'จำนวนครั้งต่อเดือน (ทุกเคส)', C.monthly(sessions, (d) => d, { unit: 'ครั้ง', color: 'var(--navy-700)' })),
+      C.chartCard('ความรุนแรงของเคสที่ยังเปิด', 'แยกตามระดับชั้น', C.stack(sev, [{ k: SEV[0], l: SEV[0], c: 'var(--green-600)' }, { k: SEV[1], l: SEV[1], c: 'var(--amber-500)' }, { k: SEV[2], l: SEV[2], c: 'var(--red-700)' }], 'เคส'), '#/apps/counsel?tab=cases'),
+    ]);
   }
 
   // เคสที่ลบไว้ 30 วัน (กู้คืนได้)

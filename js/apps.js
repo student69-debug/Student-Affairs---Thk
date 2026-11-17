@@ -182,6 +182,7 @@
           <div class="card"><div class="card-head"><h3>คะแนนคงเหลือรายคน (น้อยไปมาก)</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชั้น</th><th>คะแนน</th><th>สถานะ</th><th class="num">รายการ</th></tr></thead><tbody>
           ${list.slice(0, LIMIT).map(({ s, sc }) => { const lv = scoreLevel(sc); return `<tr class="clickable" data-action="go" data-href="#/student/${s.id}"><td class="mono">${s.id}</td><td>${esc(fullName(s))}</td><td>${klass(s)}</td><td>${meter(sc)}</td><td><span class="badge ${lv.cls}">${lv.label}</span></td><td class="num">${this.records(s.id).length}</td></tr>`; }).join('')}
           </tbody></table></div>${more(list.length, 'คน (เรียงจากคะแนนน้อยสุด)')}</div>`;
+        body = body.replace('<div class="card"><div class="card-head"><h3>คะแนนคงเหลือรายคน', this.dashHtml(list.map((x) => x.s)) + '<div class="card"><div class="card-head"><h3>คะแนนคงเหลือรายคน');
       } else if (tab === 'records') {
         return { title: this.name, actions: `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>`,
           html: tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + this.recordsSearch(q),
@@ -226,6 +227,20 @@
     },
     gradeOptions(selected = '') { return gradeOpts(selected); },
     // การ์ดค้นหาบนหน้าแรก → เปิดผลในแท็บรายการบันทึก (สรุปรายคน)
+    // สรุปภาพรวมของแอป (ตามสิทธิ์ผู้ใช้)
+    dashHtml(students) {
+      const C = window.Charts, term = Store.termKey(), ids = new Set(students.map((s) => s.id));
+      const rec = this.records().filter((r) => ids.has(r.studentId)), cur = rec.filter((r) => r.term === term);
+      const neg = cur.filter((r) => Number(r.points) < 0);
+      const lv = C.byGrade(students, (l) => { const v = { ok: 0, watch: 0, high: 0 }; l.forEach((s) => { v[scoreLevel(this.score(s.id)).key]++; }); return { v }; });
+      const perGrade = C.byGrade(students, (l) => { const g = new Set(l.map((s) => s.id)); return { v: neg.filter((r) => g.has(r.studentId)).length }; });
+      return C.dash('สรุปภาพรวม', `${esc(Store.user().role === 'inspector' || Store.seesAll() ? 'นักเรียนทั้งโรงเรียน' : Store.myScopeText() || 'นักเรียนในความดูแล')} · ภาคเรียน ${esc(term)} · บันทึก ${cur.length.toLocaleString()} รายการ`, [
+        C.chartCard('ระดับคะแนนพฤติกรรม', `เฝ้าระวังต่ำกว่า ${Store.s.warnBelow} · เสี่ยงสูงต่ำกว่า ${Store.s.alertBelow}`, C.stack(lv, [{ k: 'ok', l: 'ปกติ', c: 'var(--green-600)' }, { k: 'watch', l: 'เฝ้าระวัง', c: 'var(--amber-500)' }, { k: 'high', l: 'เสี่ยงสูง', c: 'var(--red-700)' }])),
+        C.chartCard('การบันทึก 8 สัปดาห์ล่าสุด', 'จำนวนรายการต่อสัปดาห์', C.weekly(rec, (r) => r.at, [{ k: 'neg', l: 'หักคะแนน', c: 'var(--red-600)', test: (r) => Number(r.points) < 0 }, { k: 'pos', l: 'เพิ่มคะแนน', c: 'var(--green-600)' }]), '#/apps/behavior?tab=records'),
+        C.chartCard('พฤติกรรมที่ถูกหักคะแนนบ่อย', `ภาคเรียน ${esc(term)} · 8 อันดับแรก`, C.hbars(C.topCounts(neg.map((r) => r.title)), { color: 'var(--red-600)', empty: 'ภาคเรียนนี้ยังไม่มีการหักคะแนน' }), '#/apps/behavior?tab=records'),
+        C.chartCard('การหักคะแนนแยกตามระดับชั้น', `ภาคเรียน ${esc(term)} · จำนวนรายการ`, C.vbars(perGrade, { unit: 'รายการ', color: 'var(--red-600)' })),
+      ]);
+    },
     searchCard() {
       return searchCard({ id: 'behavior', title: 'ค้นหาประวัติพฤติกรรม', typeLabel: 'พฤติกรรม', typeHtml: this.typeOptions() });
     },
@@ -340,6 +355,21 @@
         referral: rf.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>ประเภท</th><th>ส่งต่อไปยัง</th><th>เหตุผล</th></tr></thead><tbody>${rf.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${x.type === 'internal' ? '<span class="badge b-info">ภายใน</span>' : '<span class="badge b-warning">ภายนอก</span>'}</td><td>${esc(x.to)}</td><td>${esc(x.note)}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีการส่งต่อ', 'share-2'),
       };
     },
+    dashHtml() {
+      const C = window.Charts, st = Store.myStudents(), ids = new Set(st.map((s) => s.id)), c = this.c();
+      const scr = C.byGrade(st, (l) => { const v = { normal: 0, risk: 0, problem: 0, none: 0 }; l.forEach((s) => { const x = this.latestScreen(s.id); v[x && v[x.result] !== undefined ? x.result : 'none']++; }); return { v }; });
+      const vis = C.byGrade(st, (l) => ({ a: l.filter((s) => this.latestVisit(s.id)).length, b: l.length }));
+      const done = vis.reduce((a, x) => a + x.a, 0);
+      const health = (c.health || []).filter((x) => ids.has(x.studentId)), ref = c.referrals.filter((x) => ids.has(x.studentId));
+      const d90 = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
+      return C.dash('สรุปภาพรวม', `${esc(Store.seesAll() ? 'นักเรียนทั้งโรงเรียน' : Store.myScopeText() || 'นักเรียนในความดูแล')} · ${st.length.toLocaleString()} คน`, [
+        C.chartCard('ผลคัดกรองล่าสุด', 'นับผลล่าสุดของแต่ละคน', C.stack(scr, [{ k: 'normal', l: 'ปกติ', c: 'var(--green-600)' }, { k: 'risk', l: 'เสี่ยง', c: 'var(--amber-500)' }, { k: 'problem', l: 'มีปัญหา', c: 'var(--red-700)' }, { k: 'none', l: 'ยังไม่คัดกรอง', c: 'var(--ink-200)' }]), '#/apps/care?tab=screen'),
+        C.chartCard('การเยี่ยมบ้าน', `เยี่ยมแล้ว ${done.toLocaleString()} จาก ${st.length.toLocaleString()} คน (${C.pct(done, st.length)}%)`, C.progressRows(vis), '#/apps/care?tab=visit'),
+        C.chartCard('บันทึกสุขภาพ 8 สัปดาห์ล่าสุด', `จำนวนครั้งต่อสัปดาห์ · ส่งต่อ ${health.filter((x) => x.referred).length} ครั้ง (ทั้งหมด)`, C.weekly(health, (x) => x.date + 'T10:00:00', [{ k: 'ref', l: 'ส่งต่อ', c: 'var(--amber-500)', test: (x) => x.referred }, { k: 'n', l: 'ดูแลที่ห้องพยาบาล', c: 'var(--blue-600)' }], 'ครั้ง'), '#/apps/care?tab=health'),
+        C.chartCard('อาการที่พบบ่อย', '90 วันล่าสุด · 8 อันดับแรก', C.hbars(C.topCounts(health.filter((x) => x.date >= d90).map((x) => x.symptom)), { unit: 'ครั้ง', color: 'var(--blue-600)', empty: 'ยังไม่มีบันทึกสุขภาพใน 90 วัน' }), '#/apps/care?tab=health'),
+        C.chartCard('การส่งต่อ', 'ทั้งหมด แยกภายใน / ภายนอก', C.stack(C.byGrade(st, (l) => { const g = new Set(l.map((s) => s.id)); const v = { internal: 0, external: 0 }; ref.forEach((r) => { if (g.has(r.studentId)) v[r.type === 'internal' ? 'internal' : 'external']++; }); return { v }; }), [{ k: 'internal', l: 'ภายใน', c: 'var(--blue-600)' }, { k: 'external', l: 'ภายนอก', c: 'var(--amber-500)' }], 'ครั้ง'), '#/apps/care?tab=referral'),
+      ]);
+    },
     studentTab(sid) {
       const t = this.tables(sid);
       const btn = (a, l) => `<button class="btn secondary sm" data-action="${a}" data-student="${sid}">${icon('plus', 'i16')}${l}</button>`;
@@ -405,19 +435,19 @@
         onSubmit: (v) => this.save('referrals', v.student, { type: v.type, at: new Date(v.at + 'T11:00').toISOString(), to: v.to.trim(), note: v.note.trim() }, 'บันทึกการส่งต่อแล้ว') });
     },
     page(q) {
-      const tab = q.tab || 'screen';
+      const tab = q.tab || 'overview';
       const flt = { grade: q.grade || '', from: q.from || '', to: q.to || '' }, filtered = !!(flt.grade || flt.from || flt.to);
       const t = this.tables(undefined, flt), n = this._n;
       const KINDS = [['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ']];
-      const add = { screen: ['care-screen', 'บันทึกผลคัดกรอง'], visit: ['care-visit', 'บันทึกเยี่ยมบ้าน'], health: ['care-health', 'บันทึกสุขภาพ'], needs: ['care-need', 'เพิ่มข้อมูล'], referral: ['care-referral', 'บันทึกการส่งต่อ'] }[tab === 'trash' ? 'health' : tab];
+      const add = { screen: ['care-screen', 'บันทึกผลคัดกรอง'], visit: ['care-visit', 'บันทึกเยี่ยมบ้าน'], health: ['care-health', 'บันทึกสุขภาพ'], needs: ['care-need', 'เพิ่มข้อมูล'], referral: ['care-referral', 'บันทึกการส่งต่อ'] }[tab === 'trash' || tab === 'overview' ? 'health' : tab];
       const latest = Store.myStudents().map((s) => this.latestScreen(s.id)).filter(Boolean);
       const cnt = (r) => latest.filter((x) => x.result === r).length;
       const titles = { screen: 'ผลคัดกรองทั้งหมด', visit: 'บันทึกเยี่ยมบ้าน', health: 'บันทึกสุขภาพ', needs: 'ความต้องการพิเศษ / สุขภาพ', referral: 'การส่งต่อ' };
       return { title: this.name, actions: `<button class="btn primary" data-action="${add[0]}">${icon('plus')}${add[1]}</button>`,
         html: `<div class="grid g3">${stat('smile', 'ปกติ', cnt('normal'), 'คน', 'green', 'ผลคัดกรองล่าสุด')}${stat('triangle-alert', 'เสี่ยง', cnt('risk'), 'คน', 'amber', 'ผลคัดกรองล่าสุด')}${stat('siren', 'มีปัญหา', cnt('problem'), 'คน', 'red', 'ผลคัดกรองล่าสุด')}</div>` +
-          tabsBar([['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ']], tab, '#/apps/care') +
+          tabsBar([['overview', 'ภาพรวม'], ['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ']], tab, '#/apps/care') +
           (tab === 'trash' ? trashView('care', 'บันทึกสุขภาพ') : searchCard({ id: 'care', title: 'ค้นหาบันทึกดูแลช่วยเหลือ', hint: 'ความต้องการพิเศษไม่มีวันที่ — กรองได้เฉพาะระดับชั้น', typeLabel: 'ประเภทบันทึก', typeHtml: optList(KINDS, tab), q: flt })
-            + `<div class="card"><div class="card-head"><h3>${titles[tab]}</h3>${filtered ? `<span class="muted small"><b>${(n[tab] || 0).toLocaleString()}</b> รายการ · ${[flt.grade && 'ม.' + esc(flt.grade), (flt.from || flt.to) && `${flt.from ? fmtDate(flt.from) : '…'} – ${flt.to ? fmtDate(flt.to) : '…'}`].filter(Boolean).join(' · ')} · <a href="#/apps/care?tab=${tab}">ล้างการค้นหา</a></span>` : ''}</div>${t[tab]}</div>`),
+            + (tab === 'overview' ? this.dashHtml() : `<div class="card"><div class="card-head"><h3>${titles[tab]}</h3>${filtered ? `<span class="muted small"><b>${(n[tab] || 0).toLocaleString()}</b> รายการ · ${[flt.grade && 'ม.' + esc(flt.grade), (flt.from || flt.to) && `${flt.from ? fmtDate(flt.from) : '…'} – ${flt.to ? fmtDate(flt.to) : '…'}`].filter(Boolean).join(' · ')} · <a href="#/apps/care?tab=${tab}">ล้างการค้นหา</a></span>` : ''}</div>${t[tab]}</div>`)),
         after: () => bindSearch('care', (v) => hashOf('#/apps/care', { tab: v.type, grade: v.grade, from: v.from, to: v.to })) };
     },
   };

@@ -235,19 +235,30 @@
       const t = Store.termKey(), cur = all().filter((x) => x.term === t);
       const lv = latestLevels(cur), cnt = (k) => [...lv.values()].filter((v) => v === k).length;
       const open = all().filter((x) => x.status !== 'closed').sort(byDate);
-      const byCat = Object.entries(CATS).map(([k, c]) => { const l = cur.filter((x) => x.category === k); return [c.label, l.length, new Set(l.map((x) => x.studentId)).size]; });
       return out(Apps.searchCard({ id: 'drugs', title: 'ค้นหาบันทึกบุหรี่ / สารเสพติด', typeLabel: 'ประเภท', typeHtml: '<option value="">ทุกประเภท</option>' + Apps.optList(Object.entries(CATS).map(([k, c]) => [k, c.label])) }) + `<div class="grid g4">
           ${Apps.stat('file-text', 'บันทึกภาคเรียนนี้', cur.length, 'รายการ', '', `${new Set(cur.map((x) => x.studentId)).size} คน · ภาคเรียน ${t}`)}
           ${Apps.stat('triangle-alert', 'กลุ่มเสี่ยง', cnt('risk'), 'คน', 'amber', 'กลุ่มล่าสุดของแต่ละคน')}
           ${Apps.stat('siren', 'กลุ่มเสพ / ติด', cnt('use') + cnt('addict'), 'คน', 'red', `เสพ ${cnt('use')} · ติด ${cnt('addict')}`)}
           ${Apps.stat('hourglass', 'ยังไม่ปิดเรื่อง', open.length, 'รายการ', 'amber', 'รอดำเนินการ / กำลังติดตาม', '#/apps/drugs?tab=records&status=active')}</div>
-        <div class="grid g-main">
-          <div class="card"><div class="card-head"><h3>ต้องติดตาม</h3><span class="muted small">ยังไม่ปิดเรื่อง · ทุกภาคเรียน</span></div>${this.table(open.slice(0, 20))}</div>
-          <div class="card"><div class="card-head"><h3>แยกตามประเภท</h3><span class="muted small">ภาคเรียน ${esc(t)}</span></div>
-            <div class="tbl-wrap"><table class="tbl"><thead><tr><th>ประเภท</th><th class="num">รายการ</th><th class="num">คน</th></tr></thead><tbody>
-            ${byCat.map(([l, n, p]) => `<tr><td>${esc(l)}</td><td class="num">${n}</td><td class="num">${p}</td></tr>`).join('')}</tbody></table></div></div></div>
+        ${this.dashHtml(cur, t)}
+        <div class="card"><div class="card-head"><h3>ต้องติดตาม</h3><span class="muted small">ยังไม่ปิดเรื่อง · ทุกภาคเรียน</span></div>${this.table(open.slice(0, 20))}</div>
         <div class="notice">${icon('shield-check', 'i16')}<span>${this.scopeText()}</span></div>`,
         () => Apps.bindSearch('drugs', (v) => Apps.hashOf('#/apps/drugs', { tab: 'records', term: v.from || v.to ? 'all' : '', grade: v.grade, cat: v.type, from: v.from, to: v.to })));
+    },
+    // สรุปภาพรวมของแอป: ภาคเรียนปัจจุบัน + 8 สัปดาห์ล่าสุด
+    dashHtml(cur, term) {
+      const C = window.Charts, lv = latestLevels(cur);
+      const st = [...lv.keys()].map((id) => Store.student(id)).filter(Boolean);
+      const LV = [['risk', 'กลุ่มเสี่ยง', 'var(--amber-500)'], ['use', 'กลุ่มเสพ', 'var(--red-500)'], ['addict', 'กลุ่มติด', 'var(--red-800)'], ['dealer', 'กลุ่มค้า', 'var(--navy-700)'], ['none', 'ยังไม่ประเมิน', 'var(--ink-300)']];
+      const rows = C.byGrade(st, (l) => { const v = {}; LV.forEach(([k]) => { v[k] = 0; }); l.forEach((s) => { const k = lv.get(s.id); if (v[k] !== undefined) v[k]++; }); return { v }; });
+      const status = [['open', 'รอดำเนินการ', 'var(--amber-500)'], ['follow', 'กำลังติดตาม', 'var(--blue-600)'], ['closed', 'ปิดเรื่อง', 'var(--green-600)']];
+      const stRow = [{ k: 'รวม', v: Object.fromEntries(status.map(([k]) => [k, cur.filter((x) => x.status === k).length])) }];
+      return C.dash('สรุปภาพรวม', `ภาคเรียน ${esc(term)} · ${cur.length.toLocaleString()} รายการ · ${st.length.toLocaleString()} คน`, [
+        C.chartCard('กลุ่มล่าสุดของนักเรียน', 'แยกตามระดับชั้น (คนละ 1 กลุ่ม)', st.length ? C.stack(rows, LV.map(([k, l, c]) => ({ k, l, c }))) : '<div class="muted small" style="padding:8px 0">ภาคเรียนนี้ยังไม่มีบันทึก</div>', '#/apps/drugs?tab=report'),
+        C.chartCard('แยกตามประเภท', `ภาคเรียน ${esc(term)} · จำนวนรายการ`, C.hbars(Object.entries(CATS).map(([k, c]) => ({ k: c.label, v: cur.filter((x) => x.category === k).length })), { color: 'var(--red-600)' }), '#/apps/drugs?tab=records'),
+        C.chartCard('การบันทึก 8 สัปดาห์ล่าสุด', 'จำนวนรายการต่อสัปดาห์ (ทุกภาคเรียน)', C.weekly(all(), (x) => x.at, [{ k: 'n', l: 'บันทึก', c: 'var(--red-600)' }]), '#/apps/drugs?tab=records&term=all'),
+        C.chartCard('สถานะการดำเนินการ', `ภาคเรียน ${esc(term)}`, C.stack(stRow, status.map(([k, l, c]) => ({ k, l, c })), 'รายการ'), '#/apps/drugs?tab=records&status=active'),
+      ]);
     },
     scopeText() {
       const r = Store.user().role;
