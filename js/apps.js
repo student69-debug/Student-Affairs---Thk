@@ -14,15 +14,16 @@
   const trashCount = (app) => ((Store.data.appTrash || {})[app] || []).length;
   const trashLabel = (app) => `ที่ลบไว้ (30 วัน)${trashCount(app) ? ' · ' + trashCount(app) : ''}`;
   function trashView(app, what) {
+    if (!Store.binOk(app)) return `<div class="notice">${icon('lock', 'i16')}<span>บทบาทของคุณไม่มีสิทธิ์ดูและกู้คืนข้อมูลของแอปนี้ที่ลบไว้ — ผู้ดูแลระบบเปิดสิทธิ์ได้ที่ ตั้งค่า → จัดการแอป → สิทธิ์กู้คืนข้อมูลที่ลบ</span></div>`;
     const list = (Store.data.appTrash || {})[app] || [];
     const daysLeft = (d) => Math.max(0, Math.ceil((new Date(d) - Date.now()) / 864e5));
-    return `<div class="notice">${icon('archive-restore', 'i16')}<span>${what}ที่ถูกลบจะเก็บไว้ที่นี่ <b>30 วัน</b> กู้คืนได้ระหว่างนี้ เมื่อครบกำหนด ระบบจะลบถาวรอัตโนมัติ (ทุกคืน) · ${Store.isAdmin() ? 'ผู้ดูแลระบบเห็นรายการที่ลบทั้งหมดของแอปนี้' : 'คุณเห็นเฉพาะรายการที่คุณบันทึกหรือลบเอง'} · ทุกการลบและกู้คืนถูกบันทึกในประวัติ</span></div>
+    return `<div class="notice">${icon('archive-restore', 'i16')}<span>${what}ที่ถูกลบจะเก็บไว้ที่นี่ <b>30 วัน</b> กู้คืนได้ระหว่างนี้ เมื่อครบกำหนด ระบบจะลบถาวรอัตโนมัติ (ทุกคืน) · ${Store.isAdmin() ? 'ผู้ดูแลระบบเห็นรายการที่ลบทั้งหมดของแอปนี้' : 'คุณเห็นรายการของนักเรียนในขอบเขตของคุณ และรายการที่คุณบันทึกหรือลบเอง'} · ทุกการลบและกู้คืนถูกบันทึกในประวัติ</span></div>
       <div class="card"><div class="card-head"><h3>${what}ที่ลบไว้</h3><span class="muted small">${list.length} รายการ</span></div>
       ${list.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>นักเรียน</th><th>รายการ</th><th>บันทึกเมื่อ / โดย</th><th>ลบโดย</th><th>ลบเมื่อ</th><th>ลบถาวร</th><th></th></tr></thead><tbody>${list.map((t) => { const n = daysLeft(t.purgeAt);
         return `<tr><td>${Store.student(t.studentId) ? Apps.sLink(t.studentId) : esc(t.studentId || '—')}</td><td>${esc(t.label)}</td><td>${t.itemAt ? fmtDate(t.itemAt) : '—'}<div class="muted small">${esc(t.itemBy || '')}</div></td><td>${esc(t.by || '—')}</td><td>${fmtDate(t.deletedAt, true)}</td><td>${fmtDate(t.purgeAt)} <span class="badge ${n <= 3 ? 'b-danger' : n <= 7 ? 'b-warning' : 'b-neutral'}">เหลือ ${n} วัน</span></td>
         <td style="text-align:right"><button class="btn secondary sm" data-action="item-restore" data-app="${app}" data-id="${esc(t.id)}">${icon('rotate-ccw', 'i16')}กู้คืน</button></td></tr>`; }).join('')}</tbody></table></div>` : empty('ไม่มีรายการที่ถูกลบ', 'archive')}</div>`;
   }
-  const tabsBar = (tabs, cur, base) => `<div class="tabs no-print">${tabs.map(([k, l]) => `<button data-action="go" data-href="${base}?tab=${k}" class="${k === cur ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  const tabsBar = (tabs0, cur, base) => { const app = (base.match(/^#\/apps\/([\w-]+)/) || [])[1]; const tabs = app && !tabs0.some(([k]) => k === 'trash') ? tabs0.concat([['trash', trashLabel(app)]]) : tabs0; return `<div class="tabs no-print">${tabs.map(([k, l]) => `<button data-action="go" data-href="${base}?tab=${k}" class="${k === cur ? 'on' : ''}">${l}</button>`).join('')}</div>`; };
 
   /* ================= พฤติกรรม / ตัดคะแนน ================= */
   const behavior = {
@@ -154,7 +155,7 @@
           </tbody></table></div>${more(list.length, 'คน (เรียงจากคะแนนน้อยสุด)')}</div>`;
       } else if (tab === 'records') {
         return { title: this.name, actions: `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>`,
-          html: tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน'], ['trash', trashLabel('behavior')]], tab, base) + this.recordsSearch(q),
+          html: tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + this.recordsSearch(q),
           after: () => this.bindRecordsSearch() };
       } else if (tab === 'rules') {
         const rules = D().behavior.rules;
@@ -179,7 +180,7 @@
           ${rec.map((r) => `<tr><td>${fmtDate(r.at)}</td><td>${sLink(r.studentId)}</td><td>${esc(r.title)}${r.note ? `<div class="muted small">${esc(r.note)}</div>` : ''}</td><td class="num pts-pos">${signed(r.points)}</td><td>${esc(r.by)}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีกิจกรรมคืนคะแนน', 'heart-handshake')}</div>`;
       }
       return { title: this.name, actions: `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>`,
-        html: tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน'], ['trash', trashLabel('behavior')]], tab, base) + body };
+        html: tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + body };
     },
     // รายการบันทึก: กรองตามประเภทพฤติกรรม ภาคเรียน ชั้น ช่วงวันที่ และชื่อ/รหัส — ดูได้ทั้งรายรายการและสรุปรายคน
     // พฤติกรรมแบบเดียวกับหน้าบันทึก: ตัดคะแนน / เพิ่มคะแนน (+ ชื่อที่มีในบันทึกเก่าแต่ไม่อยู่ในตาราง)
@@ -397,7 +398,7 @@
       const titles = { screen: 'ผลคัดกรองทั้งหมด', visit: 'บันทึกเยี่ยมบ้าน', health: 'บันทึกสุขภาพ', needs: 'ความต้องการพิเศษ / สุขภาพ', referral: 'การส่งต่อ' };
       return { title: this.name, actions: `<button class="btn primary" data-action="${add[0]}">${icon('plus')}${add[1]}</button>`,
         html: `<div class="grid g3">${stat('smile', 'ปกติ', cnt('normal'), 'คน', 'green', 'ผลคัดกรองล่าสุด')}${stat('triangle-alert', 'เสี่ยง', cnt('risk'), 'คน', 'amber', 'ผลคัดกรองล่าสุด')}${stat('siren', 'มีปัญหา', cnt('problem'), 'คน', 'red', 'ผลคัดกรองล่าสุด')}</div>` +
-          tabsBar([['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ'], ['trash', trashLabel('care')]], tab, '#/apps/care') +
+          tabsBar([['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ']], tab, '#/apps/care') +
           (tab === 'trash' ? trashView('care', 'บันทึกสุขภาพ') : `<div class="card"><div class="card-head"><h3>${titles[tab]}</h3></div>${t[tab]}</div>`) };
     },
   };

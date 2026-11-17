@@ -93,9 +93,12 @@
   /* ---------- pages ---------- */
   function page(q) {
     if (!isC()) {
+      // other roles reach the case bin only when an admin allowed their role (Settings → จัดการแอป)
+      const binBtn = Store.binOk('counsel') ? `<button class="btn secondary" data-action="go" data-href="#/apps/counsel?tab=${q.tab === 'trash' ? 'overview' : 'trash'}">${icon(q.tab === 'trash' ? 'arrow-left' : 'archive-restore')}${q.tab === 'trash' ? 'กลับ' : `ที่ลบไว้ (30 วัน)${(D().caseTrash || []).length ? ' · ' + D().caseTrash.length : ''}`}</button>` : '';
+      if (q.tab === 'trash') return { title: 'ให้คำปรึกษา · ที่ลบไว้', actions: binBtn, html: trashPage() };
       const mine = new Set(Store.myStudents().map((s) => s.id));
       const list = progress().filter((p) => mine.has(p.studentId));
-      return { title: 'ให้คำปรึกษา', html: `<div class="notice">${icon('info', 'i16')}<span>หน้านี้แสดงความคืบหน้าของนักเรียนในความดูแลของคุณที่อยู่ในความดูแลของงานแนะแนว — รายละเอียดเคสเห็นเฉพาะครูแนะแนว</span></div>
+      return { title: 'ให้คำปรึกษา', actions: binBtn, html: `<div class="notice">${icon('info', 'i16')}<span>หน้านี้แสดงความคืบหน้าของนักเรียนในความดูแลของคุณที่อยู่ในความดูแลของงานแนะแนว — รายละเอียดเคสเห็นเฉพาะครูแนะแนว</span></div>
         <div class="card" id="appts"><div class="card-head"><h3>นักเรียนในความดูแลของงานแนะแนว</h3><span class="muted small">${list.filter((p) => !p.closed).length} เคสที่ยังเปิด</span></div>${progressTable(list, true)}</div>` };
     }
     if (q.case) return editorPage(q);
@@ -138,6 +141,7 @@
 
   // เคสที่ลบไว้ 30 วัน (กู้คืนได้)
   function trashPage() {
+    if (!Store.binOk('counsel')) return `<div class="notice">${icon('lock', 'i16')}<span>บทบาทของคุณไม่มีสิทธิ์ดูและกู้คืนเคสที่ลบไว้ — ผู้ดูแลระบบเปิดสิทธิ์ได้ที่ ตั้งค่า → จัดการแอป → สิทธิ์กู้คืนข้อมูลที่ลบ</span></div>`;
     const list = D().caseTrash || [];
     const daysLeft = (d) => Math.max(0, Math.ceil((new Date(d) - Date.now()) / 864e5));
     return `<div class="notice">${icon('archive-restore', 'i16')}<span>เคสที่ถูกลบจะเก็บไว้ที่นี่ <b>30 วัน</b> พร้อมบันทึกทุกครั้ง กู้คืนได้ระหว่างนี้ เมื่อครบกำหนด ระบบจะลบถาวรอัตโนมัติ (ทุกคืนเวลา 02:20 น.) · ทุกการลบและกู้คืนถูกบันทึกในประวัติ</span></div>

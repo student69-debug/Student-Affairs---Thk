@@ -166,6 +166,14 @@
 
   document.addEventListener('change', (e) => {
     const t = e.target;
+    if (t.dataset.restoreRole) {
+      const [app, role] = t.dataset.restoreRole.split('|');
+      const rr = { ...(Store.s.restoreRoles || {}) };
+      const set = new Set(rr[app] || []);
+      if (t.checked) set.add(role); else set.delete(role);
+      rr[app] = [...set];
+      Store.saveSettings({ restoreRoles: rr }).then(() => UI.toast('บันทึกสิทธิ์กู้คืนแล้ว'), fail);
+    }
     if (t.dataset.appToggle) {
       Store.saveSettings({ apps: { ...Store.s.apps, [t.dataset.appToggle]: t.checked } }).then(render, fail);
     }

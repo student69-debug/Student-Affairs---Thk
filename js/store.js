@@ -177,7 +177,7 @@
 
     async load() {
       const s = check(await sb.from('app_settings').select('*').eq('id', 1).single());
-      this.data = { settings: { year: s.year, term: s.term, baseScore: s.base_score, warnBelow: s.warn_below, alertBelow: s.alert_below, apps: s.apps || {}, parentView: s.parent_view || {} },
+      this.data = { settings: { year: s.year, term: s.term, baseScore: s.base_score, warnBelow: s.warn_below, alertBelow: s.alert_below, apps: s.apps || {}, parentView: s.parent_view || {}, restoreRoles: s.restore_roles || {} },
         behavior: {}, care: {}, history: [] };
       this.data.gradeStaff = [];
       this.data.subjects = [];
@@ -191,11 +191,15 @@
       const lists = await Promise.all(kinds.map(fetchAll));
       kinds.forEach((k, i) => setSlot(k, lists[i]));
       this.data.trash = [];
-      if (this.isAdmin() || this.profile.role === 'grade_head') { try { await this.loadTrash(); } catch (e) { /* bin not available */ } }
-      this.data.appTrash = { behavior: [], care: [] };
-      for (const app of ['behavior', 'care']) if (this.appOk(app)) { try { await this.loadAppTrash(app); } catch (e) { /* bin not available */ } }
+      // 30-day bins: one per app (+ the student registry); who may use each is set per role in Settings
+      if (this.binOk('registry')) { try { await this.loadTrash(); } catch (e) { /* bin not available */ } }
+      this.data.appTrash = {};
+      for (const app of Object.keys(this.s.restoreRoles || {})) {
+        if (app === 'registry' || app === 'counsel' || !this.binOk(app)) continue;
+        try { await this.loadAppTrash(app); } catch (e) { /* bin not available */ }
+      }
       this.data.caseTrash = [];
-      if (this.seesAll() && this.appOk('counsel')) { try { await this.loadCaseTrash(); } catch (e) { /* bin not available */ } }
+      if (this.binOk('counsel')) { try { await this.loadCaseTrash(); } catch (e) { /* bin not available */ } }
       if (this.isAdmin()) this.purgePhotos().catch(() => {});
     },
     async refresh(...kinds) { const lists = await Promise.all(kinds.map(fetchAll)); kinds.forEach((k, i) => setSlot(k, lists[i])); },
@@ -324,7 +328,7 @@
     async saveSettings(patch) {
       Object.assign(this.s, patch);
       const s = this.s;
-      check(await sb.from('app_settings').update({ year: s.year, term: s.term, base_score: s.baseScore, warn_below: s.warnBelow, alert_below: s.alertBelow, apps: s.apps, parent_view: s.parentView }).eq('id', 1));
+      check(await sb.from('app_settings').update({ year: s.year, term: s.term, base_score: s.baseScore, warn_below: s.warnBelow, alert_below: s.alertBelow, apps: s.apps, parent_view: s.parentView, restore_roles: s.restoreRoles }).eq('id', 1));
     },
     async log(studentId, action, detail) {
       await this.add('history', { studentId: studentId || '', action, detail });
@@ -356,6 +360,8 @@
     myStudents() { return this.data.students.filter((s) => s.status === 'studying' && s.mine); },
     // may this person use an app? admins always; others unless the admin switched it off for them (enforced in the database too)
     appOk(id) { return this.isAdmin() || !(this.profile && this.profile.apps && this.profile.apps[id] === false); },
+    // may this role see and restore the app's 30-day bin? (admins always; enforced in the database too)
+    binOk(app) { const r = this.profile && this.profile.role; return this.isAdmin() || (((this.s.restoreRoles || {})[app] || []).includes(r) && (app === 'registry' || this.appOk(app))); },
     seesAll() { const r = this.profile && this.profile.role; return r === 'admin' || r === 'counselor'; },
     roomsOf(userId) { return (this.data.teacherRooms || []).filter((t) => t.userId === userId).sort((a, b) => a.grade - b.grade || a.room - b.room); },
     myRooms() { return this.roomsOf(this.profile.id); },

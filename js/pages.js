@@ -285,6 +285,7 @@
     const tabs = `<div class="tabs">${[['list', 'รายชื่อนักเรียน'], ['history', 'ประวัติการเปลี่ยนแปลง'], ['trash', `ที่ลบไว้ (30 วัน)${trash.length ? ' · ' + trash.length : ''}`]].map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/registry?tab=${k}">${l}</button>`).join('')}</div>`;
     const actions = (admin ? `<button class="btn secondary" data-action="registry-import">${icon('file-up')}นำเข้าจาก Excel</button><button class="btn secondary" data-action="registry-promote">${icon('arrow-up-circle')}เลื่อนชั้น</button>` : '') + `<button class="btn primary" data-action="registry-edit">${icon('user-plus')}เพิ่มนักเรียน</button>`;
     const scopeNote = admin ? '' : `<div class="notice">${icon('shield-check', 'i16')}<span>คุณเพิ่ม แก้ไข และลบได้เฉพาะนักเรียน ${grades.map((g) => 'ม.' + g).join(', ')} (ระดับชั้นที่ดูแล) · นำเข้าและเลื่อนชั้น ทำได้เฉพาะผู้ดูแลระบบ</span></div>`;
+    if (tab === 'trash' && !Store.binOk('registry')) return { title: 'ทะเบียนนักเรียน (ข้อมูลกลาง)', actions, html: tabs + `<div class="notice">${icon('lock', 'i16')}<span>บทบาทของคุณไม่มีสิทธิ์ดูและกู้คืนนักเรียนที่ลบไว้ — ผู้ดูแลระบบเปิดสิทธิ์ได้ที่ ตั้งค่า → จัดการแอป → สิทธิ์กู้คืนข้อมูลที่ลบ</span></div>` };
     if (tab === 'trash') {
       const daysLeft = (d) => Math.max(0, Math.ceil((new Date(d) - Date.now()) / 864e5));
       return { title: 'ทะเบียนนักเรียน (ข้อมูลกลาง)', actions, html: tabs + `<div class="notice">${icon('archive-restore', 'i16')}<span>นักเรียนที่ถูกลบจะเก็บไว้ที่นี่ <b>30 วัน</b> กู้คืนได้ระหว่างนี้ เมื่อครบกำหนด ระบบจะลบถาวรอัตโนมัติ (ทุกคืนเวลา 02:15 น.) · ทุกการลบและกู้คืนถูกบันทึกในประวัติ</span></div>
@@ -502,6 +503,22 @@
 
   /* ---------------- ตั้งค่า ---------------- */
   const ROLES = { admin: 'ผู้ดูแลระบบ', counselor: 'ครูแนะแนว', grade_head: 'หัวหน้า / รองหัวหน้าระดับ', inspector: 'สารวัตรนักเรียน', teacher: 'ครูที่ปรึกษา / ครูทั่วไป', pending: 'รออนุมัติ (ไม่มีสิทธิ์)' };
+  // ตั้งค่า → จัดการแอป: บทบาทใดดู/กู้คืน "ที่ลบไว้ (30 วัน)" ของแต่ละแอปได้ (แอปใหม่ขึ้นในตารางเอง)
+  const BIN_ROLES = [['counselor', 'ครูแนะแนว'], ['grade_head', 'หัวหน้า / รองหัวหน้าระดับ'], ['inspector', 'สารวัตรนักเรียน'], ['teacher', 'ครูที่ปรึกษา / ครูทั่วไป']];
+  function restoreRolesCard(admin) {
+    const rr = Store.s.restoreRoles || {};
+    const rows = [['registry', 'ทะเบียนนักเรียน', 'database']].concat(Apps.all.map((a) => [a.id, a.name, a.icon]));
+    const cell = (app, role) => {
+      // the student registry page is only open to admins and grade heads
+      if (app === 'registry' && role !== 'grade_head') return '<td class="muted" style="text-align:center">—</td>';
+      return `<td style="text-align:center"><input type="checkbox" data-restore-role="${app}|${role}" ${(rr[app] || []).includes(role) ? 'checked' : ''} ${admin ? '' : 'disabled'} aria-label="${esc(role)} กู้คืน ${esc(app)}"></td>`;
+    };
+    return `<div class="card"><div class="card-head"><h3>สิทธิ์ดูและกู้คืนข้อมูลที่ลบ (ที่ลบไว้ 30 วัน)</h3><span class="muted small">ติ๊กบทบาทที่ให้ดูและกด "กู้คืน" ได้ในแต่ละแอป · ผู้ดูแลระบบทำได้เสมอ</span></div>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>แอป</th><th style="text-align:center">ผู้ดูแลระบบ</th>${BIN_ROLES.map(([, l]) => `<th style="text-align:center">${esc(l)}</th>`).join('')}</tr></thead><tbody>
+      ${rows.map(([id, name, ic]) => `<tr><td><span style="display:inline-flex;gap:8px;align-items:center">${icon(ic, 'i16')}${esc(name)}</span></td><td style="text-align:center">${icon('check', 'i16')}</td>${BIN_ROLES.map(([r]) => cell(id, r)).join('')}</tr>`).join('')}
+      </tbody></table></div>
+      <div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แต่ละคนเห็นเฉพาะรายการในขอบเขตของตัวเอง: ครูแนะแนวเห็นทั้งโรงเรียน · หัวหน้าระดับเห็นระดับชั้นที่ดูแล · ครูที่ปรึกษาเห็นห้องที่ปรึกษา · สารวัตรเห็นพฤติกรรมทั้งโรงเรียน · ทุกคนเห็นรายการที่ตัวเองบันทึกหรือลบ · แอปที่เพิ่มใหม่จะขึ้นในตารางนี้และมีแท็บ "ที่ลบไว้" เอง</div></div>`;
+  }
   const FUTURE = [['calendar-check', 'เช็กชื่อเข้าแถว / มาสาย'], ['graduation-cap', 'ทุนการศึกษา'], ['door-open', 'ขออนุญาตออกนอกโรงเรียน'], ['heart-handshake', 'กิจกรรม / จิตอาสา']];
   /* ---- Per-person app access ---- */
   function appsCell(u, admin) {
@@ -712,6 +729,7 @@
       body = `<div class="card"><div class="card-head"><h3>แอปที่ติดตั้ง</h3><span class="muted small">แอปที่เปิดจะขึ้นในเมนูและหน้านักเรียนรายคนเอง</span></div><div class="list">
         ${Apps.all.map((a) => `<div class="list-row"><span class="app-ic">${icon(a.icon)}</span><div class="grow"><div class="t">${esc(a.name)}</div><div class="s">ใช้รหัสนักเรียน · มีการ์ดสรุป · ส่งเหตุการณ์ลงไทม์ไลน์</div></div>
           <label class="switch" title="เปิด/ปิดแอป"><input type="checkbox" data-app-toggle="${a.id}" ${on(a.id) ? 'checked' : ''} ${admin ? '' : 'disabled'}><span></span></label></div>`).join('')}</div></div>
+        ${restoreRolesCard(admin)}
         <div class="card"><div class="card-head"><h3>แอปที่อาจเพิ่มภายหลัง</h3></div><div class="list">
         ${FUTURE.map(([ic, n]) => `<div class="list-row"><span class="app-ic off">${icon(ic)}</span><div class="grow"><div class="t">${n}</div></div><span class="badge b-neutral">ยังไม่ติดตั้ง</span></div>`).join('')}</div>
         <div class="card-body" style="border-top:1px solid var(--ink-200)"><b style="color:var(--ink-900)">ทุกแอปใหม่ต้องมี 3 อย่าง</b><ol style="margin:6px 0 0;padding-left:22px"><li>ใช้ <b>รหัสนักเรียน</b> อ้างอิงข้อมูลกลาง</li><li>มี <b>การ์ดสรุป</b> (ตัวเลข/สถานะ 1–2 ค่า) สำหรับหน้ารวม</li><li>ส่ง <b>เหตุการณ์ลงไทม์ไลน์</b> (วันที่ · หัวข้อ · ผู้บันทึก)</li></ol></div></div>`;
