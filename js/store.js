@@ -192,6 +192,8 @@
       kinds.forEach((k, i) => setSlot(k, lists[i]));
       this.data.trash = [];
       if (this.isAdmin() || this.profile.role === 'grade_head') { try { await this.loadTrash(); } catch (e) { /* bin not available */ } }
+      this.data.appTrash = { behavior: [], care: [] };
+      for (const app of ['behavior', 'care']) if (this.appOk(app)) { try { await this.loadAppTrash(app); } catch (e) { /* bin not available */ } }
       this.data.caseTrash = [];
       if (this.seesAll() && this.appOk('counsel')) { try { await this.loadCaseTrash(); } catch (e) { /* bin not available */ } }
       if (this.isAdmin()) this.purgePhotos().catch(() => {});
@@ -226,12 +228,25 @@
       const slots = { record: ['records'], health: ['health'], case: ['cases', 'progress'], subjects: ['subjects'] }[kind];
       if (r === 'ok') await this.refresh(...slots, ...(this.isAdmin() ? ['history'] : []));
       if (r === 'ok' && kind === 'case') await this.loadCaseTrash();
+      if (r === 'ok' && (kind === 'record' || kind === 'health')) await this.loadAppTrash(kind === 'record' ? 'behavior' : 'care');
       return r;
     },
     // deleted counselling cases, kept 30 days (counsellors and admins)
     async loadCaseTrash() {
       this.data.caseTrash = (check(await sb.rpc('case_trash_list')) || []).map((r) => ({ id: r.id, studentId: r.student_id, openDate: r.open_date, sessions: r.sessions_n, deletedAt: r.deleted_at, by: r.deleted_by_name || '', purgeAt: r.purge_at }));
       return this.data.caseTrash;
+    },
+    // deleted behaviour records / health logs, kept 30 days; each app has its own bin
+    async loadAppTrash(app) {
+      this.data.appTrash = this.data.appTrash || {};
+      this.data.appTrash[app] = (check(await sb.rpc('app_trash_list', { p_app: app })) || []).map((r) => ({ id: r.id, kind: r.kind, studentId: r.student_id, label: r.label, itemAt: r.item_at, itemBy: r.by_name || '', deletedAt: r.deleted_at, by: r.deleted_by_name || '', purgeAt: r.purge_at }));
+      return this.data.appTrash[app];
+    },
+    async restoreItem(id, app) {
+      const r = check(await sb.rpc('restore_item', { p_id: id }));
+      if (r === 'ok') await this.refresh(app === 'behavior' ? 'records' : 'health', ...(this.isAdmin() ? ['history'] : []));
+      await this.loadAppTrash(app);
+      return r;
     },
     async restoreCase(id) {
       const r = check(await sb.rpc('restore_case', { p_id: id }));
