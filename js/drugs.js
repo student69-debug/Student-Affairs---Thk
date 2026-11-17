@@ -236,7 +236,7 @@
       const lv = latestLevels(cur), cnt = (k) => [...lv.values()].filter((v) => v === k).length;
       const open = all().filter((x) => x.status !== 'closed').sort(byDate);
       const byCat = Object.entries(CATS).map(([k, c]) => { const l = cur.filter((x) => x.category === k); return [c.label, l.length, new Set(l.map((x) => x.studentId)).size]; });
-      return out(`<div class="grid g4">
+      return out(Apps.searchCard({ id: 'drugs', title: 'ค้นหาบันทึกบุหรี่ / สารเสพติด', typeLabel: 'ประเภท', typeHtml: '<option value="">ทุกประเภท</option>' + Apps.optList(Object.entries(CATS).map(([k, c]) => [k, c.label])) }) + `<div class="grid g4">
           ${Apps.stat('file-text', 'บันทึกภาคเรียนนี้', cur.length, 'รายการ', '', `${new Set(cur.map((x) => x.studentId)).size} คน · ภาคเรียน ${t}`)}
           ${Apps.stat('triangle-alert', 'กลุ่มเสี่ยง', cnt('risk'), 'คน', 'amber', 'กลุ่มล่าสุดของแต่ละคน')}
           ${Apps.stat('siren', 'กลุ่มเสพ / ติด', cnt('use') + cnt('addict'), 'คน', 'red', `เสพ ${cnt('use')} · ติด ${cnt('addict')}`)}
@@ -246,7 +246,8 @@
           <div class="card"><div class="card-head"><h3>แยกตามประเภท</h3><span class="muted small">ภาคเรียน ${esc(t)}</span></div>
             <div class="tbl-wrap"><table class="tbl"><thead><tr><th>ประเภท</th><th class="num">รายการ</th><th class="num">คน</th></tr></thead><tbody>
             ${byCat.map(([l, n, p]) => `<tr><td>${esc(l)}</td><td class="num">${n}</td><td class="num">${p}</td></tr>`).join('')}</tbody></table></div></div></div>
-        <div class="notice">${icon('shield-check', 'i16')}<span>${this.scopeText()}</span></div>`);
+        <div class="notice">${icon('shield-check', 'i16')}<span>${this.scopeText()}</span></div>`,
+        () => Apps.bindSearch('drugs', (v) => Apps.hashOf('#/apps/drugs', { tab: 'records', term: v.from || v.to ? 'all' : '', grade: v.grade, cat: v.type, from: v.from, to: v.to })));
     },
     scopeText() {
       const r = Store.user().role;
@@ -260,11 +261,12 @@
       const grades = [...new Set(Store.activeStudents().map((s) => String(s.grade)))].sort();
       return `<div class="card"><div class="toolbar no-print">
           <input class="input grow" id="dr-q" placeholder="ค้นหาชื่อ / รหัสนักเรียน / สาร" value="${esc(q.q || '')}">
-          <select class="select" id="dr-term" aria-label="ภาคเรียน"><option value="">ทุกภาคเรียน</option>${opt(terms().map((x) => [x, 'ภาคเรียน ' + x]), q.term ?? Store.termKey())}</select>
+          <select class="select" id="dr-term" aria-label="ภาคเรียน"><option value="">ทุกภาคเรียน</option>${opt(terms().map((x) => [x, 'ภาคเรียน ' + x]), q.term === 'all' ? '' : q.term ?? Store.termKey())}</select>
           <select class="select" id="dr-cat" aria-label="ประเภท"><option value="">ทุกประเภท</option>${opt(Object.entries(CATS).map(([k, c]) => [k, c.label]), q.cat)}</select>
           <select class="select" id="dr-level" aria-label="กลุ่ม"><option value="">ทุกกลุ่ม</option>${opt(Object.entries(LEVELS).map(([k, [l]]) => [k, l]), q.level)}</select>
           <select class="select" id="dr-status" aria-label="สถานะ"><option value="">ทุกสถานะ</option><option value="active" ${q.status === 'active' ? 'selected' : ''}>ยังไม่ปิดเรื่อง</option>${opt(Object.entries(STATUS).map(([k, [l]]) => [k, l]), q.status)}</select>
           <select class="select" id="dr-grade" aria-label="ระดับชั้น"><option value="">ทุกระดับชั้น</option>${opt(grades.map((g) => [g, 'ม.' + g]), q.grade)}</select>
+          <span class="bf-dates"><input class="input" type="date" id="dr-from" title="ตั้งแต่วันที่" aria-label="ตั้งแต่วันที่" value="${esc(q.from || '')}"><span class="muted">–</span><input class="input" type="date" id="dr-to" title="ถึงวันที่" aria-label="ถึงวันที่" value="${esc(q.to || '')}"></span>
         </div><div id="dr-out"></div></div>`;
     },
     bindRecords() {
@@ -272,10 +274,12 @@
       if (!$('dr-out')) return;
       if (location.hash.includes('status=active')) $('dr-term').value = '';
       const draw = () => {
-        const tq = $('dr-q').value.trim().toLowerCase(), term = $('dr-term').value, cat = $('dr-cat').value, level = $('dr-level').value, st = $('dr-status').value, grade = $('dr-grade').value;
+        const tq = $('dr-q').value.trim().toLowerCase(), term = $('dr-term').value, cat = $('dr-cat').value, level = $('dr-level').value, st = $('dr-status').value, grade = $('dr-grade').value, from = $('dr-from').value, to = $('dr-to').value;
         const list = this.list().filter((x) => {
           if (term && x.term !== term) return false;
           if (cat && x.category !== cat) return false;
+          const day = String(x.at || '').slice(0, 10);
+          if ((from && day < from) || (to && day > to)) return false;
           if (level && x.level !== level) return false;
           if (st === 'active' ? x.status === 'closed' : st && x.status !== st) return false;
           const s = Store.student(x.studentId);
@@ -286,7 +290,7 @@
         $('dr-out').innerHTML = `<div class="card-body bf-sum"><b>${list.length.toLocaleString()}</b> รายการ · <b>${new Set(list.map((x) => x.studentId)).size.toLocaleString()}</b> คน</div>` + this.table(list);
         UI.refreshIcons();
       };
-      ['dr-q', 'dr-term', 'dr-cat', 'dr-level', 'dr-status', 'dr-grade'].forEach((id) => $(id).addEventListener('input', draw));
+      ['dr-q', 'dr-term', 'dr-cat', 'dr-level', 'dr-status', 'dr-grade', 'dr-from', 'dr-to'].forEach((id) => $(id).addEventListener('input', draw));
       draw();
     },
 

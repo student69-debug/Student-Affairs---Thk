@@ -107,7 +107,8 @@
     const tabs = `<div class="tabs no-print">${[['overview', 'ภาพรวม'], ['cases', 'เคสทั้งหมด'], ['io', 'นำเข้า / ส่งออก'], ['trash', `ที่ลบไว้ (30 วัน)${(D().caseTrash || []).length ? ' · ' + D().caseTrash.length : ''}`], ['guide', 'คู่มือ']].map(([k, l]) => `<button data-action="go" data-href="${base}?tab=${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('')}</div>`;
     const actions = `<button class="btn primary" data-action="go" data-href="#/apps/counsel?case=new">${icon('folder-plus')}เปิดเคสใหม่</button>`;
     let html = '';
-    if (tab === 'overview') html = overview();
+    if (tab === 'overview') return { title: 'ให้คำปรึกษา', actions, html: tabs + overview(),
+      after: () => Apps.bindSearch('counsel', (v) => Apps.hashOf('#/apps/counsel', { tab: 'cases', grade: v.grade, k: v.type, from: v.from, to: v.to })) };
     else if (tab === 'cases') return { title: 'ให้คำปรึกษา', actions, html: tabs + casesList(q), after: bindCasesFilter };
     else if (tab === 'io') return { title: 'ให้คำปรึกษา', actions, html: tabs + ioPage(), after: bindIo };
     else if (tab === 'trash') html = trashPage();
@@ -125,7 +126,7 @@
     const kcount = KTYPES.map(([k, l]) => [k, l, o.filter((c) => c.types.includes(k)).length]);
     const kmax = Math.max(1, ...kcount.map((x) => x[2]));
     const mineOwner = o.filter((c) => c.owner === Store.user().email).length;
-    return `<div class="grid g4">
+    return Apps.searchCard({ id: 'counsel', title: 'ค้นหาเคสให้คำปรึกษา', hint: 'ช่วงวันที่ = วันที่เปิดเคส', typeLabel: 'ประเภทปัญหา', typeHtml: '<option value="">ทุกประเภทปัญหา</option>' + Apps.optList(KTYPES.map(([k, l]) => [k, k + ' ' + l])) }) + `<div class="grid g4">
         ${Apps.stat('folder-open', 'เคสที่ยังเปิด', o.length, 'เคส', '', `ของฉัน ${mineOwner} เคส`)}
         ${Apps.stat('siren', 'ควรพบผู้เชี่ยวชาญ', o.filter((c) => c.severity === 'ควรพบผู้เชี่ยวชาญ').length, 'เคส', 'red')}
         ${Apps.stat('calendar-clock', 'นัดภายใน 7 วัน', soon.length, 'นัด', 'amber', `เลยกำหนด ${appts.filter((c) => dayDiff(c.nextAppt) < 0).length}`)}
@@ -156,23 +157,28 @@
         <input class="input grow" id="cf-q" placeholder="ค้นหาชื่อ / รหัสนักเรียน" value="${esc(q.q || '')}">
         <select class="select" id="cf-status" aria-label="สถานะเคส"><option value="">ทั้งหมด</option><option value="open">ยังเปิดอยู่</option><option value="closed">ยุติแล้ว</option></select>
         <select class="select" id="cf-sev" aria-label="ระดับความรุนแรง"><option value="">ทุกระดับความรุนแรง</option>${SEV.map((s) => `<option>${s}</option>`).join('')}</select>
-        <select class="select" id="cf-k" aria-label="ประเภทปัญหา"><option value="">ทุกประเภทปัญหา</option>${KTYPES.map(([k, l]) => `<option value="${k}">${k} ${esc(l)}</option>`).join('')}</select>
+        <select class="select" id="cf-k" aria-label="ประเภทปัญหา"><option value="">ทุกประเภทปัญหา</option>${Apps.optList(KTYPES.map(([k, l]) => [k, k + ' ' + l]), q.k)}</select>
+        <select class="select" id="cf-grade" aria-label="ระดับชั้น">${Apps.get('behavior').gradeOptions(q.grade || '')}</select>
+        <span class="bf-dates"><input class="input" type="date" id="cf-from" title="เปิดเคสตั้งแต่วันที่" aria-label="เปิดเคสตั้งแต่วันที่" value="${esc(q.from || '')}"><span class="muted">–</span><input class="input" type="date" id="cf-to" title="เปิดเคสถึงวันที่" aria-label="เปิดเคสถึงวันที่" value="${esc(q.to || '')}"></span>
         <select class="select" id="cf-owner" aria-label="ผู้รับผิดชอบ"><option value="">ทุกผู้รับผิดชอบ</option><option value="${esc(Store.user().email)}">เคสของฉัน</option>${(D().counsellors || []).filter((c) => c.email !== Store.user().email).map((c) => `<option value="${esc(c.email)}">${esc(c.name)}</option>`).join('')}</select>
       </div><div id="cf-out"></div></div>`;
   }
   function bindCasesFilter() {
     const $ = (id) => document.getElementById(id);
     const draw = () => {
-      const t = $('cf-q').value.trim().toLowerCase(), st = $('cf-status').value, sev = $('cf-sev').value, k = $('cf-k').value, ow = $('cf-owner').value;
+      const t = $('cf-q').value.trim().toLowerCase(), st = $('cf-status').value, sev = $('cf-sev').value, k = $('cf-k').value, ow = $('cf-owner').value, g = $('cf-grade').value, from = $('cf-from').value, to = $('cf-to').value;
       const list = cases().filter((c) => {
         const s = Store.student(c.studentId);
+        if (g && (!s || String(s.grade) !== g)) return false;
+        const d = String(c.openDate || '').slice(0, 10);
+        if ((from && d < from) || (to && d > to)) return false;
         return (!st || (st === 'open' ? c.plan !== CLOSED : c.plan === CLOSED)) && (!sev || c.severity === sev) && (!k || c.types.includes(k)) && (!ow || c.owner === ow)
           && (!t || c.studentId.includes(t) || (s && fullName(s).toLowerCase().includes(t)));
       });
       $('cf-out').innerHTML = `<div class="card-body muted small" style="padding:10px 20px">${list.length} เคส</div>` + caseTable(list.slice(0, 300));
       UI.refreshIcons();
     };
-    ['cf-q', 'cf-status', 'cf-sev', 'cf-k', 'cf-owner'].forEach((id) => $(id).addEventListener('input', draw));
+    ['cf-q', 'cf-status', 'cf-sev', 'cf-k', 'cf-owner', 'cf-grade', 'cf-from', 'cf-to'].forEach((id) => $(id).addEventListener('input', draw));
     draw();
   }
 

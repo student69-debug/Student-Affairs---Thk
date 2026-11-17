@@ -25,6 +25,35 @@
   }
   const tabsBar = (tabs0, cur, base) => { const app = (base.match(/^#\/apps\/([\w-]+)/) || [])[1]; const tabs = app && !tabs0.some(([k]) => k === 'trash') ? tabs0.concat([['trash', trashLabel(app)]]) : tabs0; return `<div class="tabs no-print">${tabs.map(([k, l]) => `<button data-action="go" data-href="${base}?tab=${k}" class="${k === cur ? 'on' : ''}">${l}</button>`).join('')}</div>`; };
 
+  /* การ์ดค้นหาแบบเดียวกันทุกแอป: ระดับชั้น · ประเภท · ตั้งแต่วันที่ · ถึงวันที่ → เปิดผลในแท็บรายการของแอป */
+  const optList = (list, sel) => list.map(([k, l]) => `<option value="${esc(k)}" ${String(k) === String(sel ?? '') ? 'selected' : ''}>${esc(l)}</option>`).join('');
+  const gradeOpts = (sel = '') => {
+    const grades = [...new Set(Store.activeStudents().map((s) => String(s.grade)))].sort((a, b) => a.localeCompare(b, 'th', { numeric: true }));
+    return '<option value="">ทุกระดับชั้น</option>' + optList(grades.map((g) => [g, 'ม.' + g]), sel);
+  };
+  function searchCard({ id, title, hint = 'ดูว่ามีกี่ราย ใครบ้าง', typeLabel, typeHtml, q = {} }) {
+    return `<form class="card bsearch no-print" data-search="${id}"><div class="card-head"><h3>${icon('search', 'i16')} ${esc(title)}</h3><span class="muted small">${esc(hint)}</span></div>
+      <div class="card-body bsearch-row">
+        <div class="field"><label>ระดับชั้น</label><select class="select" name="grade">${gradeOpts(q.grade)}</select></div>
+        <div class="field grow"><label>${esc(typeLabel)}</label><select class="select" name="type">${typeHtml}</select></div>
+        <div class="field"><label>ตั้งแต่วันที่</label><input class="input" type="date" name="from" value="${esc(q.from || '')}"></div>
+        <div class="field"><label>ถึงวันที่</label><input class="input" type="date" name="to" value="${esc(q.to || '')}"></div>
+        <button class="btn primary" type="submit">${icon('search', 'i16')}ค้นหา</button>
+      </div></form>`;
+  }
+  // go(values) → hash; empty values are left out of the address
+  function bindSearch(id, go) {
+    const f = document.querySelector(`form[data-search="${id}"]`);
+    if (!f) return;
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (f.from.value && f.to.value && f.from.value > f.to.value) { toast('วันที่เริ่มต้องไม่หลังวันที่สิ้นสุด'); return; }
+      const v = {}; ['grade', 'type', 'from', 'to'].forEach((k) => { v[k] = f[k].value; });
+      location.hash = go(v);
+    });
+  }
+  const hashOf = (base, o) => base + '?' + new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== '')).toString();
+
   /* ================= พฤติกรรม / ตัดคะแนน ================= */
   const behavior = {
     id: 'behavior', name: 'พฤติกรรม / ตัดคะแนน', short: 'พฤติกรรม', icon: 'clipboard-pen', rule: 'rule-red',
@@ -146,7 +175,7 @@
       if (tab === 'overview') {
         const list = (Store.user().role === 'inspector' ? Store.activeStudents() : Store.myStudents()).map((s) => ({ s, sc: this.score(s.id) })).sort((a, b) => a.sc - b.sc);
         const hi = list.filter((x) => x.sc < Store.s.alertBelow).length, w = list.filter((x) => x.sc >= Store.s.alertBelow && x.sc < Store.s.warnBelow).length;
-        body = `<div class="grid g3">
+        body = this.searchCard() + `<div class="grid g3">
           ${stat('users', 'นักเรียนทั้งหมด', list.length, 'คน', '')}
           ${stat('triangle-alert', 'เฝ้าระวัง', w, 'คน', 'amber', `คะแนน ${Store.s.alertBelow}–${Store.s.warnBelow - 1}`)}
           ${stat('siren', 'เสี่ยงสูง', hi, 'คน', 'red', `ต่ำกว่า ${Store.s.alertBelow} → เชิญผู้ปกครอง`)}</div>
@@ -180,7 +209,8 @@
           ${rec.map((r) => `<tr><td>${fmtDate(r.at)}</td><td>${sLink(r.studentId)}</td><td>${esc(r.title)}${r.note ? `<div class="muted small">${esc(r.note)}</div>` : ''}</td><td class="num pts-pos">${signed(r.points)}</td><td>${esc(r.by)}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีกิจกรรมคืนคะแนน', 'heart-handshake')}</div>`;
       }
       return { title: this.name, actions: `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>`,
-        html: tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + body };
+        html: tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + body,
+        after: tab === 'overview' ? () => this.bindSearchCard() : undefined };
     },
     // รายการบันทึก: กรองตามประเภทพฤติกรรม ภาคเรียน ชั้น ช่วงวันที่ และชื่อ/รหัส — ดูได้ทั้งรายรายการและสรุปรายคน
     // พฤติกรรมแบบเดียวกับหน้าบันทึก: ตัดคะแนน / เพิ่มคะแนน (+ ชื่อที่มีในบันทึกเก่าแต่ไม่อยู่ในตาราง)
@@ -194,31 +224,13 @@
         + (pos.length ? `<optgroup label="เพิ่มคะแนน / คืนคะแนน">${pos.map((r) => opt(r.name, `${r.name} (${signed(r.points)})`)).join('')}</optgroup>` : '')
         + (other.length ? `<optgroup label="อื่น ๆ (จากบันทึกเดิม)">${other.map((x) => opt(x, x)).join('')}</optgroup>` : '');
     },
-    gradeOptions(selected = '') {
-      const grades = [...new Set(Store.activeStudents().map((s) => String(s.grade)))].sort((a, b) => a.localeCompare(b, 'th', { numeric: true }));
-      return '<option value="">ทุกระดับชั้น</option>' + grades.map((g) => `<option value="${esc(g)}" ${g === String(selected) ? 'selected' : ''}>ม.${esc(g)}</option>`).join('');
-    },
+    gradeOptions(selected = '') { return gradeOpts(selected); },
     // การ์ดค้นหาบนหน้าแรก → เปิดผลในแท็บรายการบันทึก (สรุปรายคน)
     searchCard() {
-      return `<form class="card bsearch" id="home-bsearch"><div class="card-head"><h3>${icon('search', 'i16')} ค้นหาประวัติพฤติกรรม</h3><span class="muted small">ดูว่ามีกี่ราย ใครบ้าง</span></div>
-        <div class="card-body bsearch-row">
-          <div class="field"><label>ระดับชั้น</label><select class="select" name="grade">${this.gradeOptions()}</select></div>
-          <div class="field grow"><label>พฤติกรรม</label><select class="select" name="type">${this.typeOptions()}</select></div>
-          <div class="field"><label>ตั้งแต่วันที่</label><input class="input" type="date" name="from"></div>
-          <div class="field"><label>ถึงวันที่</label><input class="input" type="date" name="to"></div>
-          <button class="btn primary" type="submit">${icon('search', 'i16')}ค้นหา</button>
-        </div></form>`;
+      return searchCard({ id: 'behavior', title: 'ค้นหาประวัติพฤติกรรม', typeLabel: 'พฤติกรรม', typeHtml: this.typeOptions() });
     },
     bindSearchCard() {
-      const f = document.getElementById('home-bsearch');
-      if (!f) return;
-      f.addEventListener('submit', (e) => {
-        e.preventDefault();
-        if (f.from.value && f.to.value && f.from.value > f.to.value) { toast('วันที่เริ่มต้องไม่หลังวันที่สิ้นสุด'); return; }
-        const p = new URLSearchParams({ tab: 'records', view: 'people' });
-        ['grade', 'type', 'from', 'to'].forEach((k) => { if (f[k].value) p.set(k, f[k].value); });
-        location.hash = '#/apps/behavior?' + p.toString();
-      });
+      bindSearch('behavior', (v) => hashOf('#/apps/behavior', { tab: 'records', view: 'people', grade: v.grade, type: v.type, from: v.from, to: v.to }));
     },
     recordsSearch(q) {
       const all = D().behavior.records, cur = Store.termKey(), dated = !!(q.from || q.to);
@@ -311,12 +323,15 @@
       (this.c().health || []).filter(f).forEach((x) => ev.push({ app: 'care', at: x.date + 'T10:00:00', studentId: x.studentId, by: x.by, dot: 'care', ic: 'thermometer', title: `บันทึกสุขภาพ · ${esc(x.symptom)}${x.referred ? ' <span class="badge b-warning">ส่งต่อ</span>' : ''}`, note: [x.detail, x.action && 'การดูแล: ' + x.action].filter(Boolean).join(' · ') }));
       return ev;
     },
-    tables(sid) {
-      const f = (x) => !sid || x.studentId === sid;
+    tables(sid, flt = {}) {
+      const inGrade = (x) => !flt.grade || String((Store.student(x.studentId) || {}).grade) === String(flt.grade);
+      const inDate = (d) => { d = String(d || '').slice(0, 10); return (!flt.from || d >= flt.from) && (!flt.to || d <= flt.to); };
+      const f = (x) => (!sid || x.studentId === sid) && inGrade(x) && (x.date !== undefined ? inDate(x.date) : x.at !== undefined ? inDate(x.at) : true);
       const st = !sid;
       const sc = this.c().screenings.filter(f).sort(byDate), vi = this.c().visits.filter(f).sort(byDate), ne = this.c().needs.filter(f), rf = this.c().referrals.filter(f).sort(byDate);
       const hl = (this.c().health || []).filter(f).sort((p, q) => (p.date < q.date ? 1 : p.date > q.date ? -1 : 0));
       const canDel = (x) => Store.isAdmin() || x.byUser === Store.user().id;
+      this._n = { health: hl.length, screen: sc.length, visit: vi.length, needs: ne.length, referral: rf.length };
       return {
         health: hl.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>อาการ</th><th>รายละเอียด</th><th>การดูแล</th><th>ส่งต่อ</th><th>ผู้บันทึก</th><th></th></tr></thead><tbody>${hl.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.date)}</td><td>${esc(x.symptom)}</td><td class="muted">${esc(x.detail) || '—'}</td><td>${esc(x.action) || '—'}</td><td>${x.referred ? '<span class="badge b-warning">ส่งต่อ</span>' : '—'}</td><td>${esc(x.by)}</td><td>${canDel(x) ? `<button class="icon-btn" title="ลบ" data-action="care-health-del" data-id="${x.id}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>${more(hl.length, 'รายการ')}` : empty('ยังไม่มีบันทึกสุขภาพ', 'thermometer'),
         screen: sc.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>เครื่องมือ</th><th>ผล</th><th>ผู้ประเมิน</th><th>หมายเหตุ</th></tr></thead><tbody>${sc.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${esc(x.tool)}</td><td>${screenBadge(x.result)}</td><td>${esc(x.by)}</td><td class="muted">${esc(x.note) || '—'}</td></tr>`).join('')}</tbody></table></div>${more(sc.length, 'รายการ')}` : empty('ยังไม่มีผลคัดกรอง', 'clipboard-check'),
@@ -391,7 +406,9 @@
     },
     page(q) {
       const tab = q.tab || 'screen';
-      const t = this.tables();
+      const flt = { grade: q.grade || '', from: q.from || '', to: q.to || '' }, filtered = !!(flt.grade || flt.from || flt.to);
+      const t = this.tables(undefined, flt), n = this._n;
+      const KINDS = [['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ']];
       const add = { screen: ['care-screen', 'บันทึกผลคัดกรอง'], visit: ['care-visit', 'บันทึกเยี่ยมบ้าน'], health: ['care-health', 'บันทึกสุขภาพ'], needs: ['care-need', 'เพิ่มข้อมูล'], referral: ['care-referral', 'บันทึกการส่งต่อ'] }[tab === 'trash' ? 'health' : tab];
       const latest = Store.myStudents().map((s) => this.latestScreen(s.id)).filter(Boolean);
       const cnt = (r) => latest.filter((x) => x.result === r).length;
@@ -399,7 +416,9 @@
       return { title: this.name, actions: `<button class="btn primary" data-action="${add[0]}">${icon('plus')}${add[1]}</button>`,
         html: `<div class="grid g3">${stat('smile', 'ปกติ', cnt('normal'), 'คน', 'green', 'ผลคัดกรองล่าสุด')}${stat('triangle-alert', 'เสี่ยง', cnt('risk'), 'คน', 'amber', 'ผลคัดกรองล่าสุด')}${stat('siren', 'มีปัญหา', cnt('problem'), 'คน', 'red', 'ผลคัดกรองล่าสุด')}</div>` +
           tabsBar([['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ']], tab, '#/apps/care') +
-          (tab === 'trash' ? trashView('care', 'บันทึกสุขภาพ') : `<div class="card"><div class="card-head"><h3>${titles[tab]}</h3></div>${t[tab]}</div>`) };
+          (tab === 'trash' ? trashView('care', 'บันทึกสุขภาพ') : searchCard({ id: 'care', title: 'ค้นหาบันทึกดูแลช่วยเหลือ', hint: 'ความต้องการพิเศษไม่มีวันที่ — กรองได้เฉพาะระดับชั้น', typeLabel: 'ประเภทบันทึก', typeHtml: optList(KINDS, tab), q: flt })
+            + `<div class="card"><div class="card-head"><h3>${titles[tab]}</h3>${filtered ? `<span class="muted small"><b>${(n[tab] || 0).toLocaleString()}</b> รายการ · ${[flt.grade && 'ม.' + esc(flt.grade), (flt.from || flt.to) && `${flt.from ? fmtDate(flt.from) : '…'} – ${flt.to ? fmtDate(flt.to) : '…'}`].filter(Boolean).join(' · ')} · <a href="#/apps/care?tab=${tab}">ล้างการค้นหา</a></span>` : ''}</div>${t[tab]}</div>`),
+        after: () => bindSearch('care', (v) => hashOf('#/apps/care', { tab: v.type, grade: v.grade, from: v.from, to: v.to })) };
     },
   };
 
@@ -414,6 +433,6 @@
     get: (id) => ALL.find((a) => a.id === id),
     enabled: () => ALL.filter((a) => Store.s.apps[a.id] !== false && Store.appOk(a.id)),
     events: (sid) => window.Apps.enabled().flatMap((a) => a.events(sid)).sort(byDate),
-    stat, sLink, tabsBar, trashView,
+    stat, sLink, tabsBar, trashView, searchCard, bindSearch, hashOf, optList,
   };
 })();
