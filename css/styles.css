@@ -73,7 +73,7 @@ svg.i28{width:28px;height:28px}
 .avatar{width:34px;height:34px;border-radius:50%;background:var(--navy-100);color:var(--navy-800);display:grid;place-items:center;font:600 14px var(--font-display);flex:none}
 .avatar.lg{width:84px;height:84px;font-size:30px;border-radius:var(--radius-lg)}
 
-.main{min-width:0}
+.main{min-width:0;overflow-x:clip}  /* clip (not hidden): nothing can widen the page sideways on phones, and the sticky top bar still sticks */
 .content{max-width:var(--content-max);margin:0 auto;padding:28px;display:flex;flex-direction:column;gap:20px}
 .page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .page-head h2{font-size:24px;line-height:1.35}
@@ -153,7 +153,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 .tbl tbody tr.clickable{cursor:pointer}
 .tbl tbody tr:hover td{background:var(--navy-50)}
 .tbl .num{text-align:right;font-family:var(--font-mono)}
-.tbl-wrap{overflow-x:auto}
+.tbl-wrap{overflow-x:auto;position:relative}  /* relative: absolute bits inside (sr-only headers) stay in the scroll box instead of widening the page on phones */
 .pts-neg{color:var(--red-700);font:600 14px var(--font-mono)}
 .pts-pos{color:var(--green-600);font:600 14px var(--font-mono)}
 
@@ -177,7 +177,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px}
 .form-grid .full{grid-column:1/-1}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px 20px;border-bottom:1px solid var(--ink-200)}
-.toolbar .input,.toolbar .select{height:36px;width:auto}
+.toolbar .input,.toolbar .select{height:36px;width:auto;max-width:100%}  /* long option text (regulation rule names) must not push the page wider than a phone */
 .toolbar .grow{flex:1;min-width:200px}
 .radio-row{display:flex;gap:16px;flex-wrap:wrap}
 .radio-row label{display:flex;align-items:center;gap:6px;font-weight:400;font-size:14px}
