@@ -63,6 +63,8 @@ svg.i28{width:28px;height:28px}
 .topbar{position:sticky;top:0;z-index:20;height:var(--topbar-h);background:var(--white);border-bottom:1px solid var(--ink-200);display:flex;align-items:center;gap:14px;padding:0 28px}
 .topbar h1{font:500 18px var(--font-display);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .topbar .menu-btn{display:none}
+.topbar .home-btn{flex:none;gap:6px}
+.topbar .home-btn[hidden]{display:none}
 .quick-search{position:relative;width:280px}
 .quick-search input{width:100%;height:36px;border:1px solid var(--ink-200);border-radius:var(--radius-sm);padding:0 12px 0 34px;background:var(--ink-50)}
 .quick-search svg{position:absolute;left:10px;top:9px;color:var(--ink-400)}
@@ -274,6 +276,9 @@ a.app-card:hover{box-shadow:var(--shadow-2);border-color:var(--navy-300);color:i
   .nav-scrim{display:none;position:fixed;inset:0;background:rgba(8,33,51,.45);z-index:50}
   .topbar{padding:0 16px}
   .topbar .menu-btn{display:inline-grid}
+  .topbar{gap:8px}
+  .topbar .home-btn{padding:0 10px}
+  .topbar .home-btn span{display:none}
   .content{padding:20px 16px}
   .g2,.g3,.form-grid{grid-template-columns:minmax(0,1fr)}
   .user-chip .uname{display:none}

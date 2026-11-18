@@ -55,6 +55,7 @@
     const page = route(path, q);
     document.getElementById('nav').innerHTML = navHTML(path);
     document.getElementById('page-title').textContent = page.title;
+    document.querySelector('.topbar .home-btn').hidden = path === '';
     document.title = page.title + ' · Student Affairs – Thk';
     const head = page.actions ? `<div class="page-head no-print"><div><h2>${esc(page.title)}</h2></div><div class="actions">${page.actions}</div></div>` : `<h2 class="sr-only">${esc(page.title)}</h2>`;
     const contentEl = document.getElementById('content');
