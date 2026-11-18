@@ -21,6 +21,7 @@
     needs: { table: 'care_needs', order: 'id', cols: [['id', 'id'], ['studentId', 'student_id'], ['kind', 'kind'], ['text', 'text']] },
     referrals: { table: 'care_referrals', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['type', 'type'], ['to', 'to'], ['note', 'note']] },
     drugs: { table: 'drug_cases', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['term', 'term'], ['category', 'category'], ['substance', 'substance'], ['act', 'act'], ['foundBy', 'found_by'], ['place', 'place'], ['items', 'items'], ['level', 'level'], ['actions', 'actions'], ['points', 'points'], ['recordId', 'behavior_record_id'], ['status', 'status'], ['followUp', 'follow_up'], ['note', 'note'], ['photos', 'photos'], ['by', 'by_name'], ['byUser', 'by_user'], ['updatedAt', 'updated_at']] },
+    nurse: { table: 'nurse_visits', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['outAt', 'out_at'], ['term', 'term'], ['period', 'period'], ['symptomGroup', 'symptom_group'], ['symptom', 'symptom'], ['temp', 'temp'], ['care', 'care'], ['medicine', 'medicine'], ['outcome', 'outcome'], ['parentNotified', 'parent_notified'], ['note', 'note'], ['by', 'by_name'], ['outBy', 'out_by_name'], ['byUser', 'by_user'], ['updatedAt', 'updated_at']] },
     users: { table: 'profiles', order: 'created_at', cols: [['id', 'id'], ['name', 'name'], ['email', 'email'], ['role', 'role'], ['apps', 'app_access']] },
   };
   const fromRow = (kind, r) => { const o = {}; MAPS[kind].cols.forEach(([a, b]) => { o[a] = r[b] ?? (b === 'next_at' || b === 'student_id' ? '' : r[b]); }); return o; };
@@ -63,6 +64,8 @@
     },
     async progress() { return (await paged((a, b) => sb.rpc('case_progress').range(a, b))).map(progressFrom); },
     async counsellors() { return check(await sb.rpc('counsellor_list')); },
+    // students resting in the nurse room right now (every staff member; no symptoms)
+    async nurseNow() { return (check(await sb.rpc('nurse_now')) || []).map((r) => ({ id: r.id, studentId: r.student_id, at: r.at, period: r.period || '', by: r.by_name || '' })); },
     // everyone involved in each incident (directory info only, so it works across rooms)
     async incidentPeople() { return (await paged((a, b) => sb.rpc('incident_people').range(a, b))).map((r) => ({ incidentId: r.incident_id, studentId: r.student_id, involvement: r.involvement })); },
   };
@@ -85,7 +88,7 @@
     students: ['students'], history: ['history'], users: ['users'], cases: ['cases'], progress: ['progress'], counsellors: ['counsellors'], subjects: ['subjects'],
     health: ['care', 'health'], incidents: ['behavior', 'incidents'], incidentPeople: ['behavior', 'people'],
     teacherRooms: ['teacherRooms'], teacherGrades: ['teacherGrades'], gradeStaff: ['gradeStaff'], rules: ['behavior', 'rules'], records: ['behavior', 'records'],
-    screenings: ['care', 'screenings'], visits: ['care', 'visits'], needs: ['care', 'needs'], referrals: ['care', 'referrals'], drugs: ['drugs'],
+    screenings: ['care', 'screenings'], visits: ['care', 'visits'], needs: ['care', 'needs'], referrals: ['care', 'referrals'], drugs: ['drugs'], nurse: ['nurse'], nurseNow: ['nurseNow'],
   };
   function setSlot(kind, list) {
     const p = SLOT[kind];
@@ -186,7 +189,7 @@
         behavior: {}, care: {}, history: [] };
       this.data.gradeStaff = [];
       this.data.subjects = [];
-      const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'incidents', 'incidentPeople', 'cases', 'progress', 'counsellors', 'screenings', 'visits', 'needs', 'referrals', 'health', 'drugs'];
+      const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'incidents', 'incidentPeople', 'cases', 'progress', 'counsellors', 'screenings', 'visits', 'needs', 'referrals', 'health', 'drugs', 'nurse', 'nurseNow'];
       if (!this.isAdmin() && this.profile.role === 'grade_head') kinds.push('history'); // own grades only (row level security)
       if (this.isAdmin()) {
         kinds.push('history', 'gradeStaff', 'subjects');
@@ -236,10 +239,10 @@
     },
     async deleteItem(kind, id, password) {
       const r = check(await sb.rpc('delete_item', { p_kind: kind, p_id: String(id), p_password: password }));
-      const slots = { record: ['records'], health: ['health'], drug: ['drugs', 'records'], case: ['cases', 'progress'], subjects: ['subjects'] }[kind];
+      const slots = { record: ['records'], health: ['health'], drug: ['drugs', 'records'], nurse: ['nurse', 'nurseNow'], case: ['cases', 'progress'], subjects: ['subjects'] }[kind];
       if (r === 'ok') await this.refresh(...slots, ...(this.isAdmin() ? ['history'] : []));
       if (r === 'ok' && kind === 'case') await this.loadCaseTrash();
-      if (r === 'ok' && (kind === 'record' || kind === 'health' || kind === 'drug')) await this.loadAppTrash({ record: 'behavior', health: 'care', drug: 'drugs' }[kind]);
+      if (r === 'ok' && (kind === 'record' || kind === 'health' || kind === 'drug' || kind === 'nurse')) await this.loadAppTrash({ record: 'behavior', health: 'care', drug: 'drugs', nurse: 'nurse' }[kind]);
       return r;
     },
     // deleted counselling cases, kept 30 days (counsellors and admins)
@@ -255,7 +258,7 @@
     },
     async restoreItem(id, app) {
       const r = check(await sb.rpc('restore_item', { p_id: id }));
-      if (r === 'ok') await this.refresh(...({ behavior: ['records'], care: ['health'], drugs: ['drugs', 'records'] }[app] || []), ...(this.isAdmin() ? ['history'] : []));
+      if (r === 'ok') await this.refresh(...({ behavior: ['records'], care: ['health'], drugs: ['drugs', 'records'], nurse: ['nurse', 'nurseNow'] }[app] || []), ...(this.isAdmin() ? ['history'] : []));
       await this.loadAppTrash(app);
       return r;
     },
@@ -275,6 +278,9 @@
     },
     async removeEvidence(paths) { if (paths.length) check(await sb.storage.from('drug-evidence').remove(paths)); paths.forEach((p) => this._evUrls.delete(p)); },
     async updateDrug(id, p) { const r = check(await sb.rpc('drug_update', { p_id: id, p })); await this.refresh('drugs'); return r; },
+    /* ---- ห้องพยาบาล: writes go through nurse_save / nurse_update (any staff may check a resting student out) ---- */
+    async saveNurse(p) { const id = check(await sb.rpc('nurse_save', { p })); await this.refresh('nurse', 'nurseNow'); return id; },
+    async updateNurse(id, p) { const r = check(await sb.rpc('nurse_update', { p_id: id, p })); await this.refresh('nurse', 'nurseNow'); return r; },
     async loadMyStaff() {
       this.data.myStaff = (check(await sb.rpc('grade_staff_view')) || []).map((r) => ({ id: r.id, name: r.name, email: r.email, role: r.role, rooms: r.rooms || [], grades: r.grades || [] }));
       return this.data.myStaff;
