@@ -104,16 +104,18 @@
     if (q.case) return editorPage(q);
     const tab = q.tab || 'overview';
     const base = '#/apps/counsel';
-    const tabs = cardsHtml() + `<div class="tabs no-print">${[['overview', 'ภาพรวม'], ['cases', 'เคสทั้งหมด'], ['io', 'นำเข้า / ส่งออก'], ['trash', `ที่ลบไว้ (30 วัน)${(D().caseTrash || []).length ? ' · ' + D().caseTrash.length : ''}`], ['guide', 'คู่มือ']].map(([k, l]) => `<button data-action="go" data-href="${base}?tab=${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+    // app standard: search → summary cards → tabs → content, on every tab
+    const search = Apps.searchCard({ id: 'counsel', title: 'ค้นหาเคสให้คำปรึกษา', hint: 'ช่วงวันที่ = วันที่เปิดเคส', typeLabel: 'ประเภทปัญหา', typeHtml: '<option value="">ทุกประเภทปัญหา</option>' + Apps.optList(KTYPES.map(([k, l]) => [k, k + ' ' + l]), q.k), q });
+    const bindS = () => Apps.bindSearch('counsel', (v) => Apps.hashOf('#/apps/counsel', { tab: 'cases', grade: v.grade, k: v.type, from: v.from, to: v.to }));
+    const tabs = search + cardsHtml() + `<div class="tabs no-print">${[['overview', 'ภาพรวม'], ['cases', 'เคสทั้งหมด'], ['io', 'นำเข้า / ส่งออก'], ['trash', `ที่ลบไว้ (30 วัน)${(D().caseTrash || []).length ? ' · ' + D().caseTrash.length : ''}`], ['guide', 'คู่มือ']].map(([k, l]) => `<button data-action="go" data-href="${base}?tab=${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('')}</div>`;
     const actions = `<button class="btn primary" data-action="go" data-href="#/apps/counsel?case=new">${icon('folder-plus')}เปิดเคสใหม่</button>`;
     let html = '';
-    if (tab === 'overview') return { title: 'ให้คำปรึกษา', actions, html: tabs + overview(),
-      after: () => Apps.bindSearch('counsel', (v) => Apps.hashOf('#/apps/counsel', { tab: 'cases', grade: v.grade, k: v.type, from: v.from, to: v.to })) };
-    else if (tab === 'cases') return { title: 'ให้คำปรึกษา', actions, html: tabs + casesList(q), after: bindCasesFilter };
-    else if (tab === 'io') return { title: 'ให้คำปรึกษา', actions, html: tabs + ioPage(), after: bindIo };
+    if (tab === 'overview') return { title: 'ให้คำปรึกษา', actions, html: tabs + overview(), after: bindS };
+    else if (tab === 'cases') return { title: 'ให้คำปรึกษา', actions, html: tabs + casesList(q), after: () => { bindS(); bindCasesFilter(); } };
+    else if (tab === 'io') return { title: 'ให้คำปรึกษา', actions, html: tabs + ioPage(), after: () => { bindS(); bindIo(); } };
     else if (tab === 'trash') html = trashPage();
     else html = guide();
-    return { title: 'ให้คำปรึกษา', actions, html: tabs + html };
+    return { title: 'ให้คำปรึกษา', actions, html: tabs + html, after: bindS };
   }
 
   // summary cards stay on top of every tab (app standard, like the care app); each opens its list below
@@ -135,7 +137,7 @@
     const close = o.filter((c) => c.severity !== 'ปลอดภัย').sort((a, b) => SEV.indexOf(b.severity) - SEV.indexOf(a.severity));
     const kcount = KTYPES.map(([k, l]) => [k, l, o.filter((c) => c.types.includes(k)).length]);
     const kmax = Math.max(1, ...kcount.map((x) => x[2]));
-    return Apps.searchCard({ id: 'counsel', title: 'ค้นหาเคสให้คำปรึกษา', hint: 'ช่วงวันที่ = วันที่เปิดเคส', typeLabel: 'ประเภทปัญหา', typeHtml: '<option value="">ทุกประเภทปัญหา</option>' + Apps.optList(KTYPES.map(([k, l]) => [k, k + ' ' + l])) }) + `
+    return `
       <div class="grid g-main">
         <div class="card" id="appts"><div class="card-head"><h3>นัดหมายที่ต้องติดตาม</h3></div>${appts.length ? `<div class="list">${appts.slice(0, 12).map((c) => { const s = Store.student(c.studentId), dd = dayDiff(c.nextAppt);
           return `<a class="list-row" href="#/apps/counsel?case=${c.id}"><div class="grow"><div class="t">${esc(fullName(s))} <span class="muted small">${s ? klass(s) : ''}</span></div><div class="s">${kBadges(c.types)} · ${esc(ownerName(c.owner))}</div></div><span class="badge ${dd < 0 ? 'b-danger' : dd <= 2 ? 'b-warning' : 'b-info'}">${apptText(c)}${dd < 0 ? ' เลยกำหนด' : dd === 0 ? ' วันนี้' : ''}</span></a>`; }).join('')}</div>` : empty('ไม่มีนัดหมาย', 'calendar')}</div>

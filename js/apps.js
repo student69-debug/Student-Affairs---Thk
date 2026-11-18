@@ -184,14 +184,14 @@
       const list = (Store.user().role === 'inspector' ? Store.activeStudents() : Store.myStudents()).map((s) => ({ s, sc: this.score(s.id) })).sort((a, b) => a.sc - b.sc);
       const isHi = (x) => x.sc < Store.s.alertBelow, isW = (x) => x.sc >= Store.s.alertBelow && x.sc < Store.s.warnBelow;
       const hi = list.filter(isHi).length, w = list.filter(isW).length;
-      const cards = `<div class="grid g3">
+      const cards = this.searchCard(q) + `<div class="grid g3">
           ${stat('users', 'นักเรียนทั้งหมด', list.length, 'คน', '', '', base + '?level=all&go=score-list')}
           ${stat('triangle-alert', 'เฝ้าระวัง', w, 'คน', 'amber', `คะแนน ${Store.s.alertBelow}–${Store.s.warnBelow - 1}`, base + '?level=watch&go=score-list')}
           ${stat('siren', 'เสี่ยงสูง', hi, 'คน', 'red', `ต่ำกว่า ${Store.s.alertBelow} → เชิญผู้ปกครองทำทัณฑ์บน`, base + '?level=high&go=score-list')}</div>`;
       if (tab === 'overview') {
         const lvl = { watch: ['เฝ้าระวัง', isW], high: ['เสี่ยงสูง', isHi] }[q.level];
         const shown = lvl ? list.filter(lvl[1]) : list;
-        body = this.searchCard() + `
+        body = `
           <div class="card" id="score-list"><div class="card-head"><h3>คะแนนคงเหลือรายคน (น้อยไปมาก)${lvl ? ' · ' + lvl[0] : ''}</h3>${lvl ? `<span class="muted small">${shown.length.toLocaleString()} คน · <a href="${base}?level=all&go=score-list">แสดงทุกคน</a></span>` : ''}</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชั้น</th><th>คะแนน</th><th>สถานะ</th><th class="num">รายการ</th></tr></thead><tbody>
           ${shown.length ? '' : `<tr><td colspan="6">${empty('ไม่มีนักเรียนในกลุ่มนี้', 'smile')}</td></tr>`}${shown.slice(0, LIMIT).map(({ s, sc }) => { const lv = scoreLevel(sc); return `<tr class="clickable" data-action="go" data-href="#/student/${s.id}"><td class="mono">${s.id}</td><td>${esc(fullName(s))}</td><td>${klass(s)}</td><td>${meter(sc)}</td><td><span class="badge ${lv.cls}">${lv.label}</span></td><td class="num">${this.records(s.id).length}</td></tr>`; }).join('')}
           </tbody></table></div>${more(shown.length, 'คน (เรียงจากคะแนนน้อยสุด)')}</div>`;
@@ -199,7 +199,7 @@
       } else if (tab === 'records') {
         return { title: this.name, actions: `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>`,
           html: cards + tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + this.recordsSearch(q),
-          after: () => this.bindRecordsSearch() };
+          after: () => { this.bindSearchCard(); this.bindRecordsSearch(); } };
       } else if (tab === 'rules') {
         const admin = Store.user().role === 'admin';
         const all = D().behavior.rules, rules = activeRules(), old = all.filter((r) => r.active === false);
@@ -232,7 +232,7 @@
       }
       return { title: this.name, actions: `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>`,
         html: cards + tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + body,
-        after: tab === 'overview' ? () => this.bindSearchCard() : undefined };
+        after: () => this.bindSearchCard() };
     },
     // รายการบันทึก: กรองตามประเภทพฤติกรรม ภาคเรียน ชั้น ช่วงวันที่ และชื่อ/รหัส — ดูได้ทั้งรายรายการและสรุปรายคน
     // พฤติกรรมแบบเดียวกับหน้าบันทึก: ตัดคะแนน / เพิ่มคะแนน (+ ชื่อที่มีในบันทึกเก่าแต่ไม่อยู่ในตาราง)
@@ -261,8 +261,8 @@
         C.chartCard('การหักคะแนนแยกตามระดับชั้น', `ภาคเรียน ${esc(term)} · จำนวนรายการ`, C.vbars(perGrade, { unit: 'รายการ', color: 'var(--red-600)' })),
       ]);
     },
-    searchCard() {
-      return searchCard({ id: 'behavior', title: 'ค้นหาประวัติพฤติกรรม', typeLabel: 'พฤติกรรม', typeHtml: this.typeOptions() });
+    searchCard(q = {}) {
+      return searchCard({ id: 'behavior', title: 'ค้นหาประวัติพฤติกรรม', typeLabel: 'พฤติกรรม', typeHtml: this.typeOptions(q.type || ''), q });
     },
     bindSearchCard() {
       bindSearch('behavior', (v) => hashOf('#/apps/behavior', { tab: 'records', view: 'people', grade: v.grade, type: v.type, from: v.from, to: v.to }));
@@ -474,10 +474,9 @@
       const cnt = (r) => latest.filter((x) => x.result === r).length;
       const titles = { screen: 'ผลคัดกรองทั้งหมด', visit: 'บันทึกเยี่ยมบ้าน', health: 'บันทึกสุขภาพ', needs: 'ความต้องการพิเศษ / สุขภาพ', referral: 'การส่งต่อ' };
       return { title: this.name, actions: `<button class="btn primary" data-action="${add[0]}">${icon('plus')}${add[1]}</button>`,
-        html: `<div class="grid g3">${[['smile', 'normal', 'green'], ['triangle-alert', 'risk', 'amber'], ['siren', 'problem', 'red']].map(([ic, r, tone]) => stat(ic, RES[r], cnt(r), 'คน', tone, 'ผลคัดกรองล่าสุด', '#/apps/care?tab=screen&result=' + r)).join('')}</div>` +
+        html: searchCard({ id: 'care', title: 'ค้นหาบันทึกดูแลช่วยเหลือ', hint: 'ความต้องการพิเศษไม่มีวันที่ — กรองได้เฉพาะระดับชั้น', typeLabel: 'ประเภทบันทึก', typeHtml: optList(KINDS, tab), q: flt }) + `<div class="grid g3">${[['smile', 'normal', 'green'], ['triangle-alert', 'risk', 'amber'], ['siren', 'problem', 'red']].map(([ic, r, tone]) => stat(ic, RES[r], cnt(r), 'คน', tone, 'ผลคัดกรองล่าสุด', '#/apps/care?tab=screen&result=' + r)).join('')}</div>` +
           tabsBar([['overview', 'ภาพรวม'], ['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ']], tab, '#/apps/care') +
-          (tab === 'trash' ? trashView('care', 'บันทึกสุขภาพ') : searchCard({ id: 'care', title: 'ค้นหาบันทึกดูแลช่วยเหลือ', hint: 'ความต้องการพิเศษไม่มีวันที่ — กรองได้เฉพาะระดับชั้น', typeLabel: 'ประเภทบันทึก', typeHtml: optList(KINDS, tab), q: flt })
-            + (tab === 'overview' ? this.dashHtml() : `<div class="card"><div class="card-head"><h3>${flt.result ? 'ผลคัดกรองล่าสุด: ' + RES[flt.result] : titles[tab]}</h3>${filtered ? `<span class="muted small"><b>${(n[tab] || 0).toLocaleString()}</b> ${flt.result ? 'คน' : 'รายการ'}${[flt.grade && 'ม.' + esc(flt.grade), (flt.from || flt.to) && `${flt.from ? fmtDate(flt.from) : '…'} – ${flt.to ? fmtDate(flt.to) : '…'}`].filter(Boolean).map((x) => ' · ' + x).join('')} · <a href="#/apps/care?tab=${tab}">ล้างการค้นหา</a></span>` : ''}</div>${t[tab]}</div>`)),
+          (tab === 'trash' ? trashView('care', 'บันทึกสุขภาพ') : (tab === 'overview' ? this.dashHtml() : `<div class="card"><div class="card-head"><h3>${flt.result ? 'ผลคัดกรองล่าสุด: ' + RES[flt.result] : titles[tab]}</h3>${filtered ? `<span class="muted small"><b>${(n[tab] || 0).toLocaleString()}</b> ${flt.result ? 'คน' : 'รายการ'}${[flt.grade && 'ม.' + esc(flt.grade), (flt.from || flt.to) && `${flt.from ? fmtDate(flt.from) : '…'} – ${flt.to ? fmtDate(flt.to) : '…'}`].filter(Boolean).map((x) => ' · ' + x).join('')} · <a href="#/apps/care?tab=${tab}">ล้างการค้นหา</a></span>` : ''}</div>${t[tab]}</div>`)),
         after: () => bindSearch('care', (v) => hashOf('#/apps/care', { tab: v.type, grade: v.grade, from: v.from, to: v.to })) };
     },
   };

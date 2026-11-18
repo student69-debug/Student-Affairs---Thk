@@ -194,16 +194,18 @@
           ${Apps.stat('calendar-check', 'วันนี้', td.length, 'ครั้ง', '', `${new Set(td.map((x) => x.studentId)).size} คน`, '#/apps/nurse?tab=records&from=' + today() + '&to=' + today())}
           ${Apps.stat('file-text', 'ภาคเรียนนี้', cur.length, 'ครั้ง', '', `${new Set(cur.map((x) => x.studentId)).size} คน · ภาคเรียน ${t}`, '#/apps/nurse?tab=records')}
           ${Apps.stat('ambulance', 'กลับบ้าน / ส่ง รพ.', sent.length, 'ครั้ง', 'red', `กลับบ้าน ${sent.filter((x) => x.outcome === 'home').length} · ส่ง รพ. ${sent.filter((x) => x.outcome === 'hospital').length}`, '#/apps/nurse?tab=records&outcome=home,hospital')}</div>`;
-      const out = (html, after) => ({ title: this.name, actions, html: cards + tabs + html, after });
+      // app standard: search → summary cards → tabs → content, on every tab
+      const search = Apps.searchCard({ id: 'nurse', title: 'ค้นหาบันทึกห้องพยาบาล', typeLabel: 'อาการ', typeHtml: '<option value="">ทุกอาการ</option>' + Apps.optList(Object.entries(GROUPS), q.group), q });
+      const bindS = () => Apps.bindSearch('nurse', (v) => Apps.hashOf('#/apps/nurse', { tab: 'records', term: v.from || v.to ? 'all' : '', grade: v.grade, group: v.type, from: v.from, to: v.to }));
+      const out = (html, after) => ({ title: this.name, actions, html: search + cards + tabs + html, after: () => { bindS(); if (after) after(); } });
       if (tab === 'trash') return out(Apps.trashView('nurse', 'บันทึกห้องพยาบาล'));
       if (tab === 'records') return out(this.recordsHtml(q), () => this.bindRecords());
       if (tab === 'report') return out(this.reportHtml(q), () => this.bindReport());
       return out(this.boardHtml() + `
-        ${Apps.searchCard({ id: 'nurse', title: 'ค้นหาบันทึกห้องพยาบาล', typeLabel: 'อาการ', typeHtml: '<option value="">ทุกอาการ</option>' + Apps.optList(Object.entries(GROUPS)) })}
         ${this.dashHtml(cur, t)}
         <div class="card"><div class="card-head"><h3>บันทึกวันนี้</h3><span class="muted small">${td.length} รายการ</span></div>${this.table(td.sort(byDate))}</div>
         <div class="notice">${icon('shield-check', 'i16')}<span>${this.scopeText()}</span></div>`,
-        () => { this.bindBoard(); Apps.bindSearch('nurse', (v) => Apps.hashOf('#/apps/nurse', { tab: 'records', term: v.from || v.to ? 'all' : '', grade: v.grade, group: v.type, from: v.from, to: v.to })); });
+        () => this.bindBoard());
     },
     dashHtml(cur, term) {
       const C = window.Charts;

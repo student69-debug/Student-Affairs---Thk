@@ -234,18 +234,21 @@
           ${Apps.stat('triangle-alert', 'กลุ่มเสี่ยง', cnt('risk'), 'คน', 'amber', 'กลุ่มล่าสุดของแต่ละคน', '#/apps/drugs?tab=records&level=risk')}
           ${Apps.stat('siren', 'กลุ่มเสพ / ติด', cnt('use') + cnt('addict'), 'คน', 'red', `เสพ ${cnt('use')} · ติด ${cnt('addict')}`, '#/apps/drugs?tab=records&level=use,addict')}
           ${Apps.stat('hourglass', 'ยังไม่ปิดเรื่อง', open.length, 'รายการ', 'amber', 'รอดำเนินการ / กำลังติดตาม', '#/apps/drugs?tab=records&status=active')}</div>`;
-      const out = (html, after) => ({ title: this.name, actions, html: cards + tabs + html, after });
+      // app standard: search → summary cards → tabs → content, on every tab
+      const search = Apps.searchCard({ id: 'drugs', title: 'ค้นหาบันทึกบุหรี่ / สารเสพติด', typeLabel: 'ประเภท', typeHtml: '<option value="">ทุกประเภท</option>' + Apps.optList(Object.entries(CATS).map(([k, c]) => [k, c.label]), q.cat), q });
+      const bindS = () => Apps.bindSearch('drugs', (v) => Apps.hashOf('#/apps/drugs', { tab: 'records', term: v.from || v.to ? 'all' : '', grade: v.grade, cat: v.type, from: v.from, to: v.to }));
+      const out = (html, after) => ({ title: this.name, actions, html: search + cards + tabs + html, after: () => { bindS(); if (after) after(); } });
       if (tab === 'trash') return out(Apps.trashView('drugs', 'บันทึกบุหรี่ / สารเสพติด'));
       if (tab === 'records') return out(this.recordsHtml(q), () => this.bindRecords());
       if (tab === 'report') return out(this.reportHtml(q), () => this.bindReport());
       if (tab === 'points') return out(this.pointsHtml(), () => this.bindPoints());
       if (tab === 'guide') return out(this.guideHtml());
       // ภาพรวม: ภาคเรียนปัจจุบัน
-      return out(Apps.searchCard({ id: 'drugs', title: 'ค้นหาบันทึกบุหรี่ / สารเสพติด', typeLabel: 'ประเภท', typeHtml: '<option value="">ทุกประเภท</option>' + Apps.optList(Object.entries(CATS).map(([k, c]) => [k, c.label])) }) + `
+      return out(`
         ${this.dashHtml(cur, t)}
         <div class="card"><div class="card-head"><h3>ต้องติดตาม</h3><span class="muted small">ยังไม่ปิดเรื่อง · ทุกภาคเรียน</span></div>${this.table(open.slice(0, 20))}</div>
         <div class="notice">${icon('shield-check', 'i16')}<span>${this.scopeText()}</span></div>`,
-        () => Apps.bindSearch('drugs', (v) => Apps.hashOf('#/apps/drugs', { tab: 'records', term: v.from || v.to ? 'all' : '', grade: v.grade, cat: v.type, from: v.from, to: v.to })));
+        );
     },
     // สรุปภาพรวมของแอป: ภาคเรียนปัจจุบัน + 8 สัปดาห์ล่าสุด
     dashHtml(cur, term) {
