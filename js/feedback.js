@@ -16,6 +16,7 @@
     [/^#\/apps/, 'แอป'], [/^#\/reports/, 'รายงาน'], [/^#\/settings/, 'ตั้งค่า']];
   const pageName = (p) => { const m = PAGES.find(([re]) => re.test(p || '')); return m ? m[1] : (p || '-'); };
 
+  let openBox = () => {};
   let mine = null; // my recent messages (loaded when the box opens)
   let kind = 'want';
   const isStaff = () => { const r = Store.profile && Store.profile.role; return ['teacher', 'inspector', 'grade_head', 'counselor', 'admin'].includes(r); };
@@ -61,6 +62,7 @@
         loadMine();
       }
     };
+    openBox = () => open(true);
     fab.addEventListener('click', () => open(panel.hidden));
     wrap.addEventListener('click', (e) => {
       const b = e.target.closest('[data-fb]');
@@ -123,7 +125,7 @@
   /* ---------- Settings → ข้อเสนอแนะ (admin) ---------- */
   let list = null;
   let filter = 'open';
-  const html = () => `<div class="card" id="fb-admin"><div class="card-head"><h3>ข้อเสนอแนะจากผู้ใช้</h3><span class="muted small">ผู้ใช้ส่งจากปุ่มรูปกล่องข้อความมุมขวาล่างของทุกหน้า</span></div><div class="card-body">${icon('loader', 'i16')} กำลังโหลด…</div></div>`;
+  const html = (q = {}) => { if (q.status && (q.status in STATUS || q.status === 'open' || q.status === 'all')) filter = q.status; return `<div class="card" id="fb-admin"><div class="card-head"><h3>ข้อเสนอแนะจากผู้ใช้</h3><span class="muted small">ผู้ใช้ส่งจากปุ่มรูปกล่องข้อความมุมขวาล่างของทุกหน้า</span></div><div class="card-body">${icon('loader', 'i16')} กำลังโหลด…</div></div>`; };
 
   async function after() {
     try {
@@ -147,7 +149,7 @@
           <td><button class="btn secondary sm" type="button" data-fb-note="${f.id}">${icon('message-square-reply', 'i16')}ตอบกลับ</button></td></tr>`).join('')}
       </tbody></table></div>` : `<div class="card-body">${empty('ยังไม่มีข้อความในกลุ่มนี้', 'inbox')}</div>`}`;
     UI.refreshIcons();
-    el.querySelectorAll('[data-fb-filter]').forEach((b) => b.addEventListener('click', () => { filter = b.dataset.fbFilter; draw(); }));
+    el.querySelectorAll('[data-fb-filter]').forEach((b) => b.addEventListener('click', () => { filter = b.dataset.fbFilter; history.replaceState(null, '', '#/settings?tab=feedback&status=' + filter); draw(); }));
     el.querySelectorAll('[data-fb-status]').forEach((s) => s.addEventListener('change', async () => {
       const f = list.find((x) => String(x.id) === s.dataset.fbStatus);
       try { await setStatus(f, s.value, f.admin_note); toast('เปลี่ยนสถานะแล้ว'); draw(); } catch (e) { toast('บันทึกไม่สำเร็จ: ' + e.message); s.value = f.status; }
@@ -166,5 +168,33 @@
     f.status = status; f.admin_note = (note || '').trim() || null;
   }
 
-  window.Feedback = { mount, html, after, KINDS, STATUS };
+  /* ---------- home page card: admins see the latest open messages from everyone, staff see their own ---------- */
+  const homeCard = () => isStaff() ? `<div class="card" id="fb-home"><div class="card-head"><h3>${Store.isAdmin() ? 'ข้อเสนอแนะจากผู้ใช้' : 'ข้อเสนอแนะของฉัน'}</h3></div><div class="card-body muted small">${icon('loader', 'i16')} กำลังโหลด…</div></div>` : '';
+  async function homeAfter() {
+    const el = document.getElementById('fb-home');
+    if (!el) return;
+    const admin = Store.isAdmin();
+    let rows;
+    try {
+      rows = Store.demo ? (Store.data.feedback || []).filter((f) => admin || f.by_user === Store.profile.id)
+        : check(await (admin ? sb().from('feedback').select('id,at,by_name,by_role,kind,message,page,status,admin_note').order('at', { ascending: false }).limit(1000)
+          : sb().from('feedback').select('id,at,kind,message,status,admin_note').eq('by_user', Store.profile.id).order('at', { ascending: false }).limit(50))) || [];
+    } catch (e) { el.querySelector('.card-body').textContent = 'โหลดไม่สำเร็จ: ' + e.message; return; }
+    if (!document.body.contains(el)) return;
+    const n = (s) => rows.filter((f) => f.status === s).length;
+    const link = (s) => admin ? `#/settings?tab=feedback&status=${s}` : '';
+    const chip = (s, l, cls) => admin ? `<a class="chip" href="${link(s)}"><span class="badge ${cls}">${n(s)}</span>${l}</a>` : `<span class="chip" style="cursor:default"><span class="badge ${cls}">${n(s)}</span>${l}</span>`;
+    const shown = admin ? rows.filter((f) => f.status === 'new' || f.status === 'planned').slice(0, 5) : rows.slice(0, 4);
+    const send = `<button class="btn secondary sm" type="button" data-fb-open>${icon('message-square-plus', 'i16')}ส่งข้อเสนอแนะ</button>`;
+    el.innerHTML = `<div class="card-head"><h3>${admin ? 'ข้อเสนอแนะจากผู้ใช้' : 'ข้อเสนอแนะของฉัน'}</h3>${admin ? `<a class="small" href="#/settings?tab=feedback&status=all">ดูทั้งหมด ${rows.length} รายการ</a>` : send}</div>
+      <div class="card-body" style="border-bottom:1px solid var(--ink-200)"><div class="chips">${chip('new', 'ใหม่', 'b-warning')}${chip('planned', 'กำลังพัฒนา', 'b-info')}${chip('done', 'ทำแล้ว', 'b-success')}${admin ? '' : chip('declined', 'ยังไม่ทำ', 'b-neutral')}</div></div>
+      ${shown.length ? `<div class="list">${shown.map((f) => `<${admin ? `a href="${link(f.status)}"` : 'div'} class="list-row fb-home-row"><span class="ic-kind">${icon((KINDS[f.kind] || KINDS.other)[1], 'i16')}</span><div class="grow"><div class="t fb-home-msg">${esc(f.message)}</div>
+          <div class="s">${admin ? esc(f.by_name || '-') + ' · ' : ''}${esc((KINDS[f.kind] || KINDS.other)[0])} · ${esc(pageName(f.page))} · ${esc(fmtDate(f.at))}${f.admin_note ? ' · ตอบกลับ: ' + esc(f.admin_note) : ''}</div></div>${statusBadge(f.status)}</${admin ? 'a' : 'div'}>`).join('')}</div>`
+        : `<div class="card-body">${empty(admin ? 'ไม่มีข้อเสนอแนะที่ค้างอยู่' : 'ยังไม่ได้ส่งข้อเสนอแนะ — กดตัวการ์ตูนมุมขวาล่าง หรือปุ่ม "ส่งข้อเสนอแนะ"', 'inbox')}</div>`}`;
+    UI.refreshIcons();
+    const b = el.querySelector('[data-fb-open]');
+    if (b) b.addEventListener('click', () => openBox());
+  }
+
+  window.Feedback = { mount, html, after, homeCard, homeAfter, KINDS, STATUS };
 })();

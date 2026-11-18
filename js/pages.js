@@ -109,8 +109,9 @@
         <div class="card" id="watch-list"><div class="card-head"><h3>นักเรียนที่ต้องเฝ้าระวัง${showWatch ? ` (${watch.length.toLocaleString()} คน)` : ''}</h3>${showWatch ? '<a class="small" href="#/?go=watch-list">ย่อ</a>' : watch.length > 8 ? `<a class="small" href="#/?show=watch&go=watch-list">ดูทั้งหมด ${watch.length.toLocaleString()} คน</a>` : ''}</div>
           ${watch.length ? `<div class="list">${watch.slice(0, showWatch ? 300 : 8).map(({ s, reasons }) => `<a class="list-row" href="#/student/${s.id}">${avatar(s)}<div class="grow"><div class="t">${esc(fullName(s))}</div><div class="s">${klass(s)} · ${esc(s.advisor)}</div></div><div class="chips">${reasons.join('')}</div></a>`).join('')}</div>` : empty('ไม่มีนักเรียนที่ต้องเฝ้าระวัง', 'smile')}</div>
       </div>
+      ${window.Feedback ? Feedback.homeCard() : ''}
       <div><h3 style="font-size:17px;font-weight:500;margin-bottom:12px">ทางลัดไปแต่ละแอป</h3>
-      <div class="grid g-auto">${Apps.enabled().map((a) => `<a class="card app-card ${a.rule}" href="#/apps/${a.id}"><div class="top"><span class="app-ic">${icon(a.icon)}</span><h4>${esc(a.name)}</h4>${icon('chevron-right', 'i16')}</div></a>`).join('')}</div></div>`, after: () => { if (on('behavior')) B().bindSearchCard(); } };
+      <div class="grid g-auto">${Apps.enabled().map((a) => `<a class="card app-card ${a.rule}" href="#/apps/${a.id}"><div class="top"><span class="app-ic">${icon(a.icon)}</span><h4>${esc(a.name)}</h4>${icon('chevron-right', 'i16')}</div></a>`).join('')}</div></div>`, after: () => { if (on('behavior')) B().bindSearchCard(); if (window.Feedback) Feedback.homeAfter(); } };
   }
 
   /* ---------------- ค้นหานักเรียน ---------------- */
@@ -695,7 +696,7 @@
     } else if (tab === 'subjects' && admin) {
       return { title: 'ตั้งค่า', html: tabs + subjectsHtml(), after: bindSubjects };
     } else if (tab === 'feedback' && admin) {
-      return { title: 'ตั้งค่า', html: tabs + Feedback.html(), after: Feedback.after };
+      return { title: 'ตั้งค่า', html: tabs + Feedback.html(q), after: Feedback.after };
     } else if (tab === 'api' && admin) {
       return { title: 'ตั้งค่า', html: tabs + ApiKeys.html(), after: ApiKeys.after };
     } else if (tab === 'parents') {
