@@ -66,6 +66,8 @@
     document.getElementById('user-avatar').textContent = u.name.replace(/^ครู/, '').slice(0, 1);
     document.querySelector('.shell').classList.remove('nav-open');
     UI.refreshIcons();
+    // a selected tab past the right edge of a scrolling tab bar: bring it into view
+    contentEl.querySelectorAll('.tabs').forEach((t) => { const b = t.querySelector('button.on'); if (!b || t.scrollWidth <= t.clientWidth) return; const tr = t.getBoundingClientRect(), br = b.getBoundingClientRect(); if (br.right > tr.right || br.left < tr.left) t.scrollLeft += br.left - tr.left - (tr.width - br.width) / 2; });
     if (page.after) page.after();
     if (!samePage && window.Charts) Charts.animate(contentEl);
     UI.hydratePhotos(document.getElementById('content'));
@@ -446,6 +448,7 @@
       gateEl.innerHTML = '';
       document.querySelector('.shell').hidden = false;
       render();
+      if (window.Feedback) Feedback.mount();
     } catch (err) {
       gate(`<div class="card rule login">${BRAND}${icon('wifi-off', 'i28')}<h2>เชื่อมต่อฐานข้อมูลไม่ได้</h2><p class="muted" style="margin:0">${esc(err.message)}</p><button class="btn primary" id="gate-reload">ลองอีกครั้ง</button></div>`);
       document.getElementById('gate-reload').addEventListener('click', () => location.reload());
