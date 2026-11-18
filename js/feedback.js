@@ -168,6 +168,21 @@
     f.status = status; f.admin_note = (note || '').trim() || null;
   }
 
+  /* ---------- home page number card (top row): admins count new messages, staff count their own ---------- */
+  const statCard = () => !isStaff() ? '' : Store.isAdmin()
+    ? Apps.stat('lightbulb', 'ข้อเสนอแนะใหม่', '–', 'ข้อ', 'blue', 'กำลังโหลด…', '#/settings?tab=feedback&status=new').replace('class="card stat', 'id="fb-stat" class="card stat')
+    : Apps.stat('lightbulb', 'ข้อเสนอแนะของฉัน', '–', 'ข้อ', 'blue', 'กดตัวการ์ตูนมุมขวาล่างเพื่อส่ง', '#/?fb=mine&go=fb-home').replace('class="card stat', 'id="fb-stat" class="card stat');
+  function fillStat(rows, admin) {
+    const el = document.getElementById('fb-stat');
+    if (!el) return;
+    const n = (s) => rows.filter((f) => f.status === s).length;
+    const val = el.querySelector('.val');
+    const tn = [...val.childNodes].find((x) => x.nodeType === 3);
+    if (tn) tn.nodeValue = String(admin ? n('new') : rows.length);
+    const hint = el.querySelector('.hint');
+    if (hint) hint.textContent = admin ? `กำลังพัฒนา ${n('planned')} · ทำแล้ว ${n('done')}` : (rows.length ? `ทำแล้ว ${n('done')} · กำลังพัฒนา ${n('planned')}` : 'กดตัวการ์ตูนมุมขวาล่างเพื่อส่ง');
+  }
+
   /* ---------- home page card: admins see the latest open messages from everyone, staff see their own ---------- */
   const homeCard = () => isStaff() ? `<div class="card" id="fb-home"><div class="card-head"><h3>${Store.isAdmin() ? 'ข้อเสนอแนะจากผู้ใช้' : 'ข้อเสนอแนะของฉัน'}</h3></div><div class="card-body muted small">${icon('loader', 'i16')} กำลังโหลด…</div></div>` : '';
   async function homeAfter() {
@@ -181,6 +196,7 @@
           : sb().from('feedback').select('id,at,kind,message,status,admin_note').eq('by_user', Store.profile.id).order('at', { ascending: false }).limit(50))) || [];
     } catch (e) { el.querySelector('.card-body').textContent = 'โหลดไม่สำเร็จ: ' + e.message; return; }
     if (!document.body.contains(el)) return;
+    fillStat(rows, admin);
     const n = (s) => rows.filter((f) => f.status === s).length;
     const link = (s) => admin ? `#/settings?tab=feedback&status=${s}` : '';
     const chip = (s, l, cls) => admin ? `<a class="chip" href="${link(s)}"><span class="badge ${cls}">${n(s)}</span>${l}</a>` : `<span class="chip" style="cursor:default"><span class="badge ${cls}">${n(s)}</span>${l}</span>`;
@@ -196,5 +212,5 @@
     if (b) b.addEventListener('click', () => openBox());
   }
 
-  window.Feedback = { mount, html, after, homeCard, homeAfter, KINDS, STATUS };
+  window.Feedback = { mount, html, after, homeCard, homeAfter, statCard, KINDS, STATUS };
 })();

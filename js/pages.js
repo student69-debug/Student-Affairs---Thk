@@ -95,12 +95,13 @@
         <div class="actions">${on('behavior') ? `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}
         ${on('counsel') && Store.seesAll() ? `<button class="btn secondary" data-action="counsel-record">${icon('message-square-plus')}บันทึกให้คำปรึกษา</button>` : ''}</div></div>
       ${!Store.seesAll() && !Store.myScopeText() && Store.user().role !== 'inspector' ? `<div class="notice warn">${icon('info', 'i16')}<span>บัญชีของคุณยังไม่ได้กำหนด${Store.user().role === 'grade_head' ? 'ระดับชั้นที่ดูแล' : 'ห้องที่ปรึกษา'} — ค้นหาและบันทึกพฤติกรรมได้ แต่จะยังไม่เห็นรายละเอียดนักเรียน กรุณาแจ้งผู้ดูแลระบบ</span></div>` : ''}
-      <div class="grid ${Store.isAdmin() ? 'g5' : 'g4'}">
+      <div class="grid ${Store.isAdmin() ? 'g6' : 'g5'}">
         ${stat('file-plus', 'บันทึกใหม่วันนี้', today.length, 'รายการ', '', 'จากทุกแอป', '#/?show=today&go=recent-list')}
         ${stat('triangle-alert', 'นักเรียนเฝ้าระวัง', watch.length, 'คน', 'amber', 'คะแนนต่ำ / คัดกรองมีปัญหา', '#/?show=watch&go=watch-list')}
         ${stat('messages-square', 'ให้คำปรึกษาเดือนนี้', cMonth, 'ครั้ง', 'green', '', on('counsel') ? (Store.seesAll() ? '#/apps/counsel?tab=cases&sfrom=' + monthIso : '#/apps/counsel?tab=overview&go=appts') : '')}
         ${stat('calendar-clock', 'นัดติดตาม 7 วัน', fu, 'นัด', 'red', '', on('counsel') ? '#/apps/counsel?tab=overview&go=appts' : '')}
         ${Store.isAdmin() ? (() => { const n = (D().users || []).filter((u) => u.role === 'pending').length; return stat('hourglass', 'รออนุมัติ', n, 'คน', 'amber', n ? 'กดเพื่อเลือกบทบาทและอนุมัติ' : 'ไม่มีผู้รออนุมัติ', '#/teachers?role=pending'); })() : ''}
+        ${window.Feedback ? Feedback.statCard() : ''}
       </div>
       ${on('behavior') ? B().searchCard() : ''}
       ${dashboard(act)}

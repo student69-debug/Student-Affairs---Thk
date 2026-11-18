@@ -94,6 +94,7 @@ svg.i28{width:28px;height:28px}
 .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
 .g5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.g6{grid-template-columns:repeat(6,minmax(0,1fr))}
 .g-auto{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
 .g-main{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}
 
@@ -265,6 +266,7 @@ a.app-card:hover{box-shadow:var(--shadow-2);border-color:var(--navy-300);color:i
 @media (max-width:1080px){
   .g4{grid-template-columns:repeat(2,minmax(0,1fr))}
   .g5{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .g6{grid-template-columns:repeat(3,minmax(0,1fr))}
   .g-main{grid-template-columns:minmax(0,1fr)}
   .quick-search{display:none}
 }
@@ -283,7 +285,7 @@ a.app-card:hover{box-shadow:var(--shadow-2);border-color:var(--navy-300);color:i
   .g2,.g3,.form-grid{grid-template-columns:minmax(0,1fr)}
   .user-chip .uname{display:none}
 }
-@media (max-width:520px){.g4{grid-template-columns:minmax(0,1fr)}.g5{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.g4{grid-template-columns:minmax(0,1fr)}.g5{grid-template-columns:repeat(2,minmax(0,1fr))}.g6{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* phones: summary cards 2 per row and compact, so the list under them (every app tab) stays near the top */
 @media (max-width:520px){
   .grid:has(> .stat){grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -528,3 +530,6 @@ details.card>summary::-webkit-details-marker{display:none}
 .fb-home-msg{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 #fb-home .chip .badge{height:18px;padding:0 7px}
 a.chip{color:inherit;text-decoration:none}
+
+.stat .ic.blue{background:var(--navy-50,#eef0fb);color:var(--navy-800)}
+#fb-home{scroll-margin-top:72px}
