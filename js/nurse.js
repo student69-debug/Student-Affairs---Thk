@@ -193,10 +193,10 @@
       const t = Store.termKey(), cur = all().filter((x) => x.term === t), td = all().filter((x) => dayOf(x.at) === today());
       const sent = cur.filter((x) => x.outcome === 'home' || x.outcome === 'hospital');
       return out(this.boardHtml() + `<div class="grid g4">
-          ${Apps.stat('bed', 'กำลังพักอยู่', now().length, 'คน', '', 'ครูทุกคนเห็นบอร์ดนี้')}
+          ${Apps.stat('bed', 'กำลังพักอยู่', now().length, 'คน', '', 'ครูทุกคนเห็นบอร์ดนี้', '#/apps/nurse?go=nurse-board')}
           ${Apps.stat('calendar-check', 'วันนี้', td.length, 'ครั้ง', '', `${new Set(td.map((x) => x.studentId)).size} คน`, '#/apps/nurse?tab=records&from=' + today() + '&to=' + today())}
-          ${Apps.stat('file-text', 'ภาคเรียนนี้', cur.length, 'ครั้ง', '', `${new Set(cur.map((x) => x.studentId)).size} คน · ภาคเรียน ${t}`)}
-          ${Apps.stat('ambulance', 'กลับบ้าน / ส่ง รพ.', sent.length, 'ครั้ง', 'red', `กลับบ้าน ${sent.filter((x) => x.outcome === 'home').length} · ส่ง รพ. ${sent.filter((x) => x.outcome === 'hospital').length}`)}</div>
+          ${Apps.stat('file-text', 'ภาคเรียนนี้', cur.length, 'ครั้ง', '', `${new Set(cur.map((x) => x.studentId)).size} คน · ภาคเรียน ${t}`, '#/apps/nurse?tab=records')}
+          ${Apps.stat('ambulance', 'กลับบ้าน / ส่ง รพ.', sent.length, 'ครั้ง', 'red', `กลับบ้าน ${sent.filter((x) => x.outcome === 'home').length} · ส่ง รพ. ${sent.filter((x) => x.outcome === 'hospital').length}`, '#/apps/nurse?tab=records&outcome=home,hospital')}</div>
         ${Apps.searchCard({ id: 'nurse', title: 'ค้นหาบันทึกห้องพยาบาล', typeLabel: 'อาการ', typeHtml: '<option value="">ทุกอาการ</option>' + Apps.optList(Object.entries(GROUPS)) })}
         ${this.dashHtml(cur, t)}
         <div class="card"><div class="card-head"><h3>บันทึกวันนี้</h3><span class="muted small">${td.length} รายการ</span></div>${this.table(td.sort(byDate))}</div>
@@ -230,7 +230,7 @@
           <input class="input grow" id="nv-q" placeholder="ค้นหาชื่อ / รหัสนักเรียน / อาการ" value="${esc(q.q || '')}">
           <select class="select" id="nv-term" aria-label="ภาคเรียน"><option value="">ทุกภาคเรียน</option>${opt(terms().map((x) => [x, 'ภาคเรียน ' + x]), q.term === 'all' ? '' : q.term ?? Store.termKey())}</select>
           <select class="select" id="nv-group" aria-label="อาการ"><option value="">ทุกอาการ</option>${opt(Object.entries(GROUPS), q.group)}</select>
-          <select class="select" id="nv-out" aria-label="ผล"><option value="">ทุกผล</option>${opt(Object.entries(OUTCOMES).map(([k, [l]]) => [k, l]), q.outcome)}</select>
+          <select class="select" id="nv-out" aria-label="ผล"><option value="">ทุกผล</option>${opt(Object.entries(OUTCOMES).map(([k, [l]]) => [k, l]).concat([['home,hospital', OUTCOMES.home[0] + ' / ' + OUTCOMES.hospital[0]]]), q.outcome)}</select>
           <select class="select" id="nv-grade" aria-label="ระดับชั้น"><option value="">ทุกระดับชั้น</option>${opt(grades.map((g) => [g, 'ม.' + g]), q.grade)}</select>
           <span class="bf-dates"><input class="input" type="date" id="nv-from" title="ตั้งแต่วันที่" aria-label="ตั้งแต่วันที่" value="${esc(q.from || '')}"><span class="muted">–</span><input class="input" type="date" id="nv-to" title="ถึงวันที่" aria-label="ถึงวันที่" value="${esc(q.to || '')}"></span>
           <button class="btn ghost sm" id="nv-csv">${icon('download', 'i16')}CSV</button>
@@ -242,7 +242,7 @@
       return this.list().filter((x) => {
         if (term && x.term !== term) return false;
         if (g && x.symptomGroup !== g) return false;
-        if (oc && x.outcome !== oc) return false;
+        if (oc && !oc.split(',').includes(x.outcome)) return false;
         const day = dayOf(x.at);
         if ((from && day < from) || (to && day > to)) return false;
         const s = Store.student(x.studentId);

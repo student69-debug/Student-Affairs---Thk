@@ -28,7 +28,7 @@
 
   function route(path, q) {
     const parts = path.split('/');
-    if (path === '') return Pages.home();
+    if (path === '') return Pages.home(q);
     if (parts[0] === 'search') return Pages.search(q);
     if (parts[0] === 'student') return Pages.student(decodeURIComponent(parts[1] || ''), q);
     if (parts[0] === 'registry') return Pages.registry(q);

@@ -127,10 +127,10 @@
     const kmax = Math.max(1, ...kcount.map((x) => x[2]));
     const mineOwner = o.filter((c) => c.owner === Store.user().email).length;
     return Apps.searchCard({ id: 'counsel', title: 'ค้นหาเคสให้คำปรึกษา', hint: 'ช่วงวันที่ = วันที่เปิดเคส', typeLabel: 'ประเภทปัญหา', typeHtml: '<option value="">ทุกประเภทปัญหา</option>' + Apps.optList(KTYPES.map(([k, l]) => [k, k + ' ' + l])) }) + `<div class="grid g4">
-        ${Apps.stat('folder-open', 'เคสที่ยังเปิด', o.length, 'เคส', '', `ของฉัน ${mineOwner} เคส`)}
-        ${Apps.stat('siren', 'ควรพบผู้เชี่ยวชาญ', o.filter((c) => c.severity === 'ควรพบผู้เชี่ยวชาญ').length, 'เคส', 'red')}
-        ${Apps.stat('calendar-clock', 'นัดภายใน 7 วัน', soon.length, 'นัด', 'amber', `เลยกำหนด ${appts.filter((c) => dayDiff(c.nextAppt) < 0).length}`)}
-        ${Apps.stat('folder-plus', 'เปิดเคสเดือนนี้', all.filter((c) => c.openDate >= monthStart).length, 'เคส', 'green')}</div>
+        ${Apps.stat('folder-open', 'เคสที่ยังเปิด', o.length, 'เคส', '', `ของฉัน ${mineOwner} เคส`, '#/apps/counsel?tab=cases&status=open')}
+        ${Apps.stat('siren', 'ควรพบผู้เชี่ยวชาญ', o.filter((c) => c.severity === 'ควรพบผู้เชี่ยวชาญ').length, 'เคส', 'red', '', '#/apps/counsel?tab=cases&status=open&sev=' + encodeURIComponent('ควรพบผู้เชี่ยวชาญ'))}
+        ${Apps.stat('calendar-clock', 'นัดภายใน 7 วัน', soon.length, 'นัด', 'amber', `เลยกำหนด ${appts.filter((c) => dayDiff(c.nextAppt) < 0).length}`, '#/apps/counsel?go=appts')}
+        ${Apps.stat('folder-plus', 'เปิดเคสเดือนนี้', all.filter((c) => c.openDate >= monthStart).length, 'เคส', 'green', '', '#/apps/counsel?tab=cases&from=' + monthStart)}</div>
       <div class="grid g-main">
         <div class="card" id="appts"><div class="card-head"><h3>นัดหมายที่ต้องติดตาม</h3></div>${appts.length ? `<div class="list">${appts.slice(0, 12).map((c) => { const s = Store.student(c.studentId), dd = dayDiff(c.nextAppt);
           return `<a class="list-row" href="#/apps/counsel?case=${c.id}"><div class="grow"><div class="t">${esc(fullName(s))} <span class="muted small">${s ? klass(s) : ''}</span></div><div class="s">${kBadges(c.types)} · ${esc(ownerName(c.owner))}</div></div><span class="badge ${dd < 0 ? 'b-danger' : dd <= 2 ? 'b-warning' : 'b-info'}">${apptText(c)}${dd < 0 ? ' เลยกำหนด' : dd === 0 ? ' วันนี้' : ''}</span></a>`; }).join('')}</div>` : empty('ไม่มีนัดหมาย', 'calendar')}</div>
@@ -170,8 +170,9 @@
   function casesList(q) {
     return `<div class="card"><div class="toolbar no-print">
         <input class="input grow" id="cf-q" placeholder="ค้นหาชื่อ / รหัสนักเรียน" value="${esc(q.q || '')}">
-        <select class="select" id="cf-status" aria-label="สถานะเคส"><option value="">ทั้งหมด</option><option value="open">ยังเปิดอยู่</option><option value="closed">ยุติแล้ว</option></select>
-        <select class="select" id="cf-sev" aria-label="ระดับความรุนแรง"><option value="">ทุกระดับความรุนแรง</option>${SEV.map((s) => `<option>${s}</option>`).join('')}</select>
+        <select class="select" id="cf-status" aria-label="สถานะเคส"><option value="">ทั้งหมด</option>${Apps.optList([['open', 'ยังเปิดอยู่'], ['closed', 'ยุติแล้ว']], q.status)}</select>
+        <select class="select" id="cf-sev" aria-label="ระดับความรุนแรง"><option value="">ทุกระดับความรุนแรง</option>${Apps.optList(SEV.map((s) => [s, s]), q.sev)}</select>
+        <input type="hidden" id="cf-sfrom" value="${/^\d{4}-\d{2}-\d{2}$/.test(q.sfrom || '') ? q.sfrom : ''}">
         <select class="select" id="cf-k" aria-label="ประเภทปัญหา"><option value="">ทุกประเภทปัญหา</option>${Apps.optList(KTYPES.map(([k, l]) => [k, k + ' ' + l]), q.k)}</select>
         <select class="select" id="cf-grade" aria-label="ระดับชั้น">${Apps.get('behavior').gradeOptions(q.grade || '')}</select>
         <span class="bf-dates"><input class="input" type="date" id="cf-from" title="เปิดเคสตั้งแต่วันที่" aria-label="เปิดเคสตั้งแต่วันที่" value="${esc(q.from || '')}"><span class="muted">–</span><input class="input" type="date" id="cf-to" title="เปิดเคสถึงวันที่" aria-label="เปิดเคสถึงวันที่" value="${esc(q.to || '')}"></span>
@@ -181,16 +182,20 @@
   function bindCasesFilter() {
     const $ = (id) => document.getElementById(id);
     const draw = () => {
-      const t = $('cf-q').value.trim().toLowerCase(), st = $('cf-status').value, sev = $('cf-sev').value, k = $('cf-k').value, ow = $('cf-owner').value, g = $('cf-grade').value, from = $('cf-from').value, to = $('cf-to').value;
+      const t = $('cf-q').value.trim().toLowerCase(), st = $('cf-status').value, sev = $('cf-sev').value, k = $('cf-k').value, ow = $('cf-owner').value, g = $('cf-grade').value, from = $('cf-from').value, to = $('cf-to').value, sfrom = $('cf-sfrom').value;
       const list = cases().filter((c) => {
         const s = Store.student(c.studentId);
         if (g && (!s || String(s.grade) !== g)) return false;
+        // from the home card "ให้คำปรึกษาเดือนนี้": cases with a session on or after this date
+        if (sfrom && !(c.sessions || []).some((x) => String(x.date || '').slice(0, 10) >= sfrom)) return false;
         const d = String(c.openDate || '').slice(0, 10);
         if ((from && d < from) || (to && d > to)) return false;
         return (!st || (st === 'open' ? c.plan !== CLOSED : c.plan === CLOSED)) && (!sev || c.severity === sev) && (!k || c.types.includes(k)) && (!ow || c.owner === ow)
           && (!t || c.studentId.includes(t) || (s && fullName(s).toLowerCase().includes(t)));
       });
-      $('cf-out').innerHTML = `<div class="card-body muted small" style="padding:10px 20px">${list.length} เคส</div>` + caseTable(list.slice(0, 300));
+      $('cf-out').innerHTML = `<div class="card-body muted small" style="padding:10px 20px">${list.length} เคส${sfrom ? ` · มีการให้คำปรึกษาตั้งแต่ ${fmtDate(sfrom)} <a href="#" id="cf-sfrom-clear">ล้าง</a>` : ''}</div>` + caseTable(list.slice(0, 300));
+      const clr = $('cf-sfrom-clear');
+      if (clr) clr.addEventListener('click', (e) => { e.preventDefault(); $('cf-sfrom').value = ''; draw(); });
       UI.refreshIcons();
     };
     ['cf-q', 'cf-status', 'cf-sev', 'cf-k', 'cf-owner', 'cf-grade', 'cf-from', 'cf-to'].forEach((id) => $(id).addEventListener('input', draw));

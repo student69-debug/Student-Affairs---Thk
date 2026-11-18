@@ -236,9 +236,9 @@
       const lv = latestLevels(cur), cnt = (k) => [...lv.values()].filter((v) => v === k).length;
       const open = all().filter((x) => x.status !== 'closed').sort(byDate);
       return out(Apps.searchCard({ id: 'drugs', title: 'ค้นหาบันทึกบุหรี่ / สารเสพติด', typeLabel: 'ประเภท', typeHtml: '<option value="">ทุกประเภท</option>' + Apps.optList(Object.entries(CATS).map(([k, c]) => [k, c.label])) }) + `<div class="grid g4">
-          ${Apps.stat('file-text', 'บันทึกภาคเรียนนี้', cur.length, 'รายการ', '', `${new Set(cur.map((x) => x.studentId)).size} คน · ภาคเรียน ${t}`)}
-          ${Apps.stat('triangle-alert', 'กลุ่มเสี่ยง', cnt('risk'), 'คน', 'amber', 'กลุ่มล่าสุดของแต่ละคน')}
-          ${Apps.stat('siren', 'กลุ่มเสพ / ติด', cnt('use') + cnt('addict'), 'คน', 'red', `เสพ ${cnt('use')} · ติด ${cnt('addict')}`)}
+          ${Apps.stat('file-text', 'บันทึกภาคเรียนนี้', cur.length, 'รายการ', '', `${new Set(cur.map((x) => x.studentId)).size} คน · ภาคเรียน ${t}`, '#/apps/drugs?tab=records')}
+          ${Apps.stat('triangle-alert', 'กลุ่มเสี่ยง', cnt('risk'), 'คน', 'amber', 'กลุ่มล่าสุดของแต่ละคน', '#/apps/drugs?tab=records&level=risk')}
+          ${Apps.stat('siren', 'กลุ่มเสพ / ติด', cnt('use') + cnt('addict'), 'คน', 'red', `เสพ ${cnt('use')} · ติด ${cnt('addict')}`, '#/apps/drugs?tab=records&level=use,addict')}
           ${Apps.stat('hourglass', 'ยังไม่ปิดเรื่อง', open.length, 'รายการ', 'amber', 'รอดำเนินการ / กำลังติดตาม', '#/apps/drugs?tab=records&status=active')}</div>
         ${this.dashHtml(cur, t)}
         <div class="card"><div class="card-head"><h3>ต้องติดตาม</h3><span class="muted small">ยังไม่ปิดเรื่อง · ทุกภาคเรียน</span></div>${this.table(open.slice(0, 20))}</div>
@@ -274,7 +274,7 @@
           <input class="input grow" id="dr-q" placeholder="ค้นหาชื่อ / รหัสนักเรียน / สาร" value="${esc(q.q || '')}">
           <select class="select" id="dr-term" aria-label="ภาคเรียน"><option value="">ทุกภาคเรียน</option>${opt(terms().map((x) => [x, 'ภาคเรียน ' + x]), q.term === 'all' ? '' : q.term ?? Store.termKey())}</select>
           <select class="select" id="dr-cat" aria-label="ประเภท"><option value="">ทุกประเภท</option>${opt(Object.entries(CATS).map(([k, c]) => [k, c.label]), q.cat)}</select>
-          <select class="select" id="dr-level" aria-label="กลุ่ม"><option value="">ทุกกลุ่ม</option>${opt(Object.entries(LEVELS).map(([k, [l]]) => [k, l]), q.level)}</select>
+          <select class="select" id="dr-level" aria-label="กลุ่ม"><option value="">ทุกกลุ่ม</option>${opt(Object.entries(LEVELS).map(([k, [l]]) => [k, l]).concat([['use,addict', LEVELS.use[0] + ' / ' + LEVELS.addict[0]]]), q.level)}</select>
           <select class="select" id="dr-status" aria-label="สถานะ"><option value="">ทุกสถานะ</option><option value="active" ${q.status === 'active' ? 'selected' : ''}>ยังไม่ปิดเรื่อง</option>${opt(Object.entries(STATUS).map(([k, [l]]) => [k, l]), q.status)}</select>
           <select class="select" id="dr-grade" aria-label="ระดับชั้น"><option value="">ทุกระดับชั้น</option>${opt(grades.map((g) => [g, 'ม.' + g]), q.grade)}</select>
           <span class="bf-dates"><input class="input" type="date" id="dr-from" title="ตั้งแต่วันที่" aria-label="ตั้งแต่วันที่" value="${esc(q.from || '')}"><span class="muted">–</span><input class="input" type="date" id="dr-to" title="ถึงวันที่" aria-label="ถึงวันที่" value="${esc(q.to || '')}"></span>
@@ -291,7 +291,7 @@
           if (cat && x.category !== cat) return false;
           const day = String(x.at || '').slice(0, 10);
           if ((from && day < from) || (to && day > to)) return false;
-          if (level && x.level !== level) return false;
+          if (level && !level.split(',').includes(x.level)) return false;
           if (st === 'active' ? x.status === 'closed' : st && x.status !== st) return false;
           const s = Store.student(x.studentId);
           if (grade && (!s || String(s.grade) !== grade)) return false;

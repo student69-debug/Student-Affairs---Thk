@@ -70,7 +70,8 @@
       <div class="grid g-dash">${cards.join('')}</div>`;
   }
 
-  function home() {
+  function home(q = {}) {
+    const showToday = q.show === 'today', showWatch = q.show === 'watch';
     const ev = Apps.events();
     const today = ev.filter((e) => isToday(e.at));
     const act = Store.myStudents();
@@ -84,7 +85,8 @@
     const month = new Date(); month.setDate(1); month.setHours(0, 0, 0, 0);
     // counselling progress (counsellors see every case; others only students in their own scope)
     const prog = on('counsel') ? (D().progress || []) : [];
-    const monthIso = month.toISOString().slice(0, 10), todayIso = new Date().toISOString().slice(0, 10), in7Iso = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+    // local date, not toISOString (Bangkok midnight on the 1st is still the previous day in UTC)
+    const monthIso = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-01`, todayIso = new Date().toISOString().slice(0, 10), in7Iso = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
     const cMonth = prog.reduce((a, p) => a + p.sessionDates.filter((d) => d >= monthIso).length, 0);
     const fu = prog.filter((p) => !p.closed && p.nextAppt && p.nextAppt >= todayIso && p.nextAppt <= in7Iso).length;
 
@@ -94,18 +96,18 @@
         ${on('counsel') && Store.seesAll() ? `<button class="btn secondary" data-action="counsel-record">${icon('message-square-plus')}บันทึกให้คำปรึกษา</button>` : ''}</div></div>
       ${!Store.seesAll() && !Store.myScopeText() && Store.user().role !== 'inspector' ? `<div class="notice warn">${icon('info', 'i16')}<span>บัญชีของคุณยังไม่ได้กำหนด${Store.user().role === 'grade_head' ? 'ระดับชั้นที่ดูแล' : 'ห้องที่ปรึกษา'} — ค้นหาและบันทึกพฤติกรรมได้ แต่จะยังไม่เห็นรายละเอียดนักเรียน กรุณาแจ้งผู้ดูแลระบบ</span></div>` : ''}
       <div class="grid ${Store.isAdmin() ? 'g5' : 'g4'}">
-        ${stat('file-plus', 'บันทึกใหม่วันนี้', today.length, 'รายการ', '', 'จากทุกแอป')}
-        ${stat('triangle-alert', 'นักเรียนเฝ้าระวัง', watch.length, 'คน', 'amber', 'คะแนนต่ำ / คัดกรองมีปัญหา')}
-        ${stat('messages-square', 'ให้คำปรึกษาเดือนนี้', cMonth, 'ครั้ง', 'green')}
+        ${stat('file-plus', 'บันทึกใหม่วันนี้', today.length, 'รายการ', '', 'จากทุกแอป', '#/?show=today&go=recent-list')}
+        ${stat('triangle-alert', 'นักเรียนเฝ้าระวัง', watch.length, 'คน', 'amber', 'คะแนนต่ำ / คัดกรองมีปัญหา', '#/?show=watch&go=watch-list')}
+        ${stat('messages-square', 'ให้คำปรึกษาเดือนนี้', cMonth, 'ครั้ง', 'green', '', on('counsel') ? (Store.seesAll() ? '#/apps/counsel?tab=cases&sfrom=' + monthIso : '#/apps/counsel?go=appts') : '')}
         ${stat('calendar-clock', 'นัดติดตาม 7 วัน', fu, 'นัด', 'red', '', on('counsel') ? '#/apps/counsel?go=appts' : '')}
         ${Store.isAdmin() ? (() => { const n = (D().users || []).filter((u) => u.role === 'pending').length; return stat('hourglass', 'รออนุมัติ', n, 'คน', 'amber', n ? 'กดเพื่อเลือกบทบาทและอนุมัติ' : 'ไม่มีผู้รออนุมัติ', '#/teachers?role=pending'); })() : ''}
       </div>
       ${on('behavior') ? B().searchCard() : ''}
       ${dashboard(act)}
       <div class="grid g-main">
-        <div class="card"><div class="card-head"><h3>บันทึกล่าสุด</h3><span class="muted small">วันนี้ ${today.length} รายการ</span></div>${timeline(ev.slice(0, 10), true)}</div>
-        <div class="card"><div class="card-head"><h3>นักเรียนที่ต้องเฝ้าระวัง</h3><a class="small" href="#/apps/behavior">ดูทั้งหมด</a></div>
-          ${watch.length ? `<div class="list">${watch.slice(0, 8).map(({ s, reasons }) => `<a class="list-row" href="#/student/${s.id}">${avatar(s)}<div class="grow"><div class="t">${esc(fullName(s))}</div><div class="s">${klass(s)} · ${esc(s.advisor)}</div></div><div class="chips">${reasons.join('')}</div></a>`).join('')}</div>` : empty('ไม่มีนักเรียนที่ต้องเฝ้าระวัง', 'smile')}</div>
+        <div class="card" id="recent-list"><div class="card-head"><h3>${showToday ? 'บันทึกวันนี้ (ทุกรายการ)' : 'บันทึกล่าสุด'}</h3><span class="muted small">วันนี้ ${today.length} รายการ · ${showToday ? '<a href="#/?go=recent-list">แสดงล่าสุด 10 รายการ</a>' : '<a href="#/?show=today&go=recent-list">ดูทั้งหมดของวันนี้</a>'}</span></div>${showToday ? (today.length ? timeline(today, true) : empty('วันนี้ยังไม่มีบันทึก', 'calendar')) : timeline(ev.slice(0, 10), true)}</div>
+        <div class="card" id="watch-list"><div class="card-head"><h3>นักเรียนที่ต้องเฝ้าระวัง${showWatch ? ` (${watch.length.toLocaleString()} คน)` : ''}</h3>${showWatch ? '<a class="small" href="#/?go=watch-list">ย่อ</a>' : watch.length > 8 ? `<a class="small" href="#/?show=watch&go=watch-list">ดูทั้งหมด ${watch.length.toLocaleString()} คน</a>` : ''}</div>
+          ${watch.length ? `<div class="list">${watch.slice(0, showWatch ? 300 : 8).map(({ s, reasons }) => `<a class="list-row" href="#/student/${s.id}">${avatar(s)}<div class="grow"><div class="t">${esc(fullName(s))}</div><div class="s">${klass(s)} · ${esc(s.advisor)}</div></div><div class="chips">${reasons.join('')}</div></a>`).join('')}</div>` : empty('ไม่มีนักเรียนที่ต้องเฝ้าระวัง', 'smile')}</div>
       </div>
       <div><h3 style="font-size:17px;font-weight:500;margin-bottom:12px">ทางลัดไปแต่ละแอป</h3>
       <div class="grid g-auto">${Apps.enabled().map((a) => `<a class="card app-card ${a.rule}" href="#/apps/${a.id}"><div class="top"><span class="app-ic">${icon(a.icon)}</span><h4>${esc(a.name)}</h4>${icon('chevron-right', 'i16')}</div></a>`).join('')}</div></div>`, after: () => { if (on('behavior')) B().bindSearchCard(); } };
@@ -232,23 +234,31 @@
     const staff = D().users.filter((u) => u.role !== 'parent');
     const count = (r) => staff.filter((u) => u.role === r).length;
     const roleOpts = Object.entries(ROLES).filter(([k]) => k !== 'parent');
+    // groups behind the summary cards: lead = every role above teacher · noroom = teachers without rooms yet
+    const LEAD = ['grade_head', 'inspector', 'counselor', 'admin'];
+    const GROUPS = { lead: ['หัวหน้าระดับ / สารวัตร / แนะแนว / ผู้ดูแล', (u) => LEAD.includes(u.role)], noroom: ['ครูที่ปรึกษาที่ยังไม่กำหนดห้อง', (u) => u.role === 'teacher' && !Store.roomsOf(u.id).length] };
+    const inRole = (u, r) => !r || (GROUPS[r] ? GROUPS[r][1](u) : u.role === r);
+    const nOf = (r) => staff.filter((u) => inRole(u, r)).length;
+    const href = (r) => '#/teachers' + (r ? '?role=' + r : '');
     return { title: 'ทะเบียนครู', actions, html: tabs + `
       <div class="grid g4">
-        ${Apps.stat('users', 'บุคลากรทั้งหมด', staff.length, 'คน', '')}
-        ${Apps.stat('hourglass', 'รออนุมัติ', count('pending'), 'คน', 'amber', count('pending') ? 'เลือกบทบาทในตารางเพื่ออนุมัติ' : '')}
-        ${Apps.stat('school', 'ครูที่ปรึกษา', count('teacher'), 'คน', 'green', `ยังไม่กำหนดห้อง ${staff.filter((u) => u.role === 'teacher' && !Store.roomsOf(u.id).length).length} คน`)}
-        ${Apps.stat('layers', 'หัวหน้าระดับ / สารวัตร / แนะแนว / ผู้ดูแล', count('grade_head') + count('inspector') + count('counselor') + count('admin'), 'คน', '')}
+        ${Apps.stat('users', 'บุคลากรทั้งหมด', staff.length, 'คน', '', '', href(''))}
+        ${Apps.stat('hourglass', 'รออนุมัติ', count('pending'), 'คน', 'amber', count('pending') ? 'เลือกบทบาทในตารางเพื่ออนุมัติ' : '', href('pending'))}
+        ${Apps.stat('school', 'ครูที่ปรึกษา', count('teacher'), 'คน', 'green', `ยังไม่กำหนดห้อง ${nOf('noroom')} คน`, href('teacher'))}
+        ${Apps.stat('layers', GROUPS.lead[0], nOf('lead'), 'คน', '', '', href('lead'))}
       </div>
-      <div class="card"><div class="toolbar">
+      <div class="card" id="tf-list"><div class="toolbar">
         <input class="input grow" id="tf-q" placeholder="ค้นหาชื่อ / อีเมล" value="${esc(q.q || '')}">
-        <select class="select" id="tf-role" aria-label="บทบาท"><option value="">ทุกบทบาท</option>${roleOpts.map(([k, l]) => `<option value="${k}" ${q.role === k ? 'selected' : ''}>${esc(l)} (${count(k)})</option>`).join('')}</select>
+        <select class="select" id="tf-role" aria-label="บทบาท"><option value="">ทุกบทบาท</option>${roleOpts.map(([k, l]) => `<option value="${k}" ${q.role === k ? 'selected' : ''}>${esc(l)} (${count(k)})</option>`).join('')}
+          <optgroup label="กลุ่ม">${Object.entries(GROUPS).map(([k, [l]]) => `<option value="${k}" ${q.role === k ? 'selected' : ''}>${esc(l)} (${nOf(k)})</option>`).join('')}</optgroup></select>
       </div><div id="tf-out"></div>
       <div class="card-body muted small" style="border-top:1px solid var(--ink-200)">${icon('user-plus', 'i16')} เพิ่มครู: ให้ครูกด "สมัครใช้งาน" ที่หน้าเข้าสู่ระบบ แล้วเลือกบทบาทให้ในตารางนี้ · ทุกการเปลี่ยนแปลงถูกบันทึกในแท็บประวัติ</div></div>`,
       after: () => {
         const $ = (id) => document.getElementById(id);
         const draw = () => {
           const t = $('tf-q').value.trim().toLowerCase(), r = $('tf-role').value;
-          const list = staff.filter((u) => (!r || u.role === r) && (!t || (u.name || '').toLowerCase().includes(t) || (u.email || '').toLowerCase().includes(t)));
+          Apps.markStats(href(r));
+          const list = staff.filter((u) => inRole(u, r) && (!t || (u.name || '').toLowerCase().includes(t) || (u.email || '').toLowerCase().includes(t)));
           $('tf-out').innerHTML = `<div class="card-body muted small" style="padding:10px 20px;border-bottom:1px solid var(--ink-200)">${list.length} คน</div>` + usersTable(list, true);
           UI.refreshIcons();
         };

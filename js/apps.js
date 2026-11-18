@@ -182,15 +182,18 @@
       let body = '';
       if (tab === 'overview') {
         const list = (Store.user().role === 'inspector' ? Store.activeStudents() : Store.myStudents()).map((s) => ({ s, sc: this.score(s.id) })).sort((a, b) => a.sc - b.sc);
-        const hi = list.filter((x) => x.sc < Store.s.alertBelow).length, w = list.filter((x) => x.sc >= Store.s.alertBelow && x.sc < Store.s.warnBelow).length;
+        const isHi = (x) => x.sc < Store.s.alertBelow, isW = (x) => x.sc >= Store.s.alertBelow && x.sc < Store.s.warnBelow;
+        const hi = list.filter(isHi).length, w = list.filter(isW).length;
+        const lvl = { watch: ['เฝ้าระวัง', isW], high: ['เสี่ยงสูง', isHi] }[q.level];
+        const shown = lvl ? list.filter(lvl[1]) : list;
         body = this.searchCard() + `<div class="grid g3">
-          ${stat('users', 'นักเรียนทั้งหมด', list.length, 'คน', '')}
-          ${stat('triangle-alert', 'เฝ้าระวัง', w, 'คน', 'amber', `คะแนน ${Store.s.alertBelow}–${Store.s.warnBelow - 1}`)}
-          ${stat('siren', 'เสี่ยงสูง', hi, 'คน', 'red', `ต่ำกว่า ${Store.s.alertBelow} → เชิญผู้ปกครองทำทัณฑ์บน`)}</div>
-          <div class="card"><div class="card-head"><h3>คะแนนคงเหลือรายคน (น้อยไปมาก)</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชั้น</th><th>คะแนน</th><th>สถานะ</th><th class="num">รายการ</th></tr></thead><tbody>
-          ${list.slice(0, LIMIT).map(({ s, sc }) => { const lv = scoreLevel(sc); return `<tr class="clickable" data-action="go" data-href="#/student/${s.id}"><td class="mono">${s.id}</td><td>${esc(fullName(s))}</td><td>${klass(s)}</td><td>${meter(sc)}</td><td><span class="badge ${lv.cls}">${lv.label}</span></td><td class="num">${this.records(s.id).length}</td></tr>`; }).join('')}
-          </tbody></table></div>${more(list.length, 'คน (เรียงจากคะแนนน้อยสุด)')}</div>`;
-        body = body.replace('<div class="card"><div class="card-head"><h3>คะแนนคงเหลือรายคน', this.dashHtml(list.map((x) => x.s)) + '<div class="card"><div class="card-head"><h3>คะแนนคงเหลือรายคน');
+          ${stat('users', 'นักเรียนทั้งหมด', list.length, 'คน', '', '', base + '?go=score-list')}
+          ${stat('triangle-alert', 'เฝ้าระวัง', w, 'คน', 'amber', `คะแนน ${Store.s.alertBelow}–${Store.s.warnBelow - 1}`, base + '?level=watch&go=score-list')}
+          ${stat('siren', 'เสี่ยงสูง', hi, 'คน', 'red', `ต่ำกว่า ${Store.s.alertBelow} → เชิญผู้ปกครองทำทัณฑ์บน`, base + '?level=high&go=score-list')}</div>
+          <div class="card" id="score-list"><div class="card-head"><h3>คะแนนคงเหลือรายคน (น้อยไปมาก)${lvl ? ' · ' + lvl[0] : ''}</h3>${lvl ? `<span class="muted small">${shown.length.toLocaleString()} คน · <a href="${base}?go=score-list">แสดงทุกคน</a></span>` : ''}</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชั้น</th><th>คะแนน</th><th>สถานะ</th><th class="num">รายการ</th></tr></thead><tbody>
+          ${shown.length ? '' : `<tr><td colspan="6">${empty('ไม่มีนักเรียนในกลุ่มนี้', 'smile')}</td></tr>`}${shown.slice(0, LIMIT).map(({ s, sc }) => { const lv = scoreLevel(sc); return `<tr class="clickable" data-action="go" data-href="#/student/${s.id}"><td class="mono">${s.id}</td><td>${esc(fullName(s))}</td><td>${klass(s)}</td><td>${meter(sc)}</td><td><span class="badge ${lv.cls}">${lv.label}</span></td><td class="num">${this.records(s.id).length}</td></tr>`; }).join('')}
+          </tbody></table></div>${more(shown.length, 'คน (เรียงจากคะแนนน้อยสุด)')}</div>`;
+        body = body.replace('<div class="card" id="score-list">', this.dashHtml(list.map((x) => x.s)) + '<div class="card" id="score-list">');
       } else if (tab === 'records') {
         return { title: this.name, actions: `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>`,
           html: tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + this.recordsSearch(q),
@@ -366,7 +369,8 @@
       const inDate = (d) => { d = String(d || '').slice(0, 10); return (!flt.from || d >= flt.from) && (!flt.to || d <= flt.to); };
       const f = (x) => (!sid || x.studentId === sid) && inGrade(x) && (x.date !== undefined ? inDate(x.date) : x.at !== undefined ? inDate(x.at) : true);
       const st = !sid;
-      const sc = this.c().screenings.filter(f).sort(byDate), vi = this.c().visits.filter(f).sort(byDate), ne = this.c().needs.filter(f), rf = this.c().referrals.filter(f).sort(byDate);
+      // result = only each student's latest screening with that result (what the care cards count)
+      const sc = this.c().screenings.filter(f).filter((x) => !flt.result || (x.result === flt.result && this.latestScreen(x.studentId) === x)).sort(byDate), vi = this.c().visits.filter(f).sort(byDate), ne = this.c().needs.filter(f), rf = this.c().referrals.filter(f).sort(byDate);
       const hl = (this.c().health || []).filter(f).sort((p, q) => (p.date < q.date ? 1 : p.date > q.date ? -1 : 0));
       const canDel = (x) => Store.isAdmin() || x.byUser === Store.user().id;
       this._n = { health: hl.length, screen: sc.length, visit: vi.length, needs: ne.length, referral: rf.length };
@@ -459,7 +463,8 @@
     },
     page(q) {
       const tab = q.tab || 'overview';
-      const flt = { grade: q.grade || '', from: q.from || '', to: q.to || '' }, filtered = !!(flt.grade || flt.from || flt.to);
+      const RES = { normal: 'ปกติ', risk: 'เสี่ยง', problem: 'มีปัญหา' };
+      const flt = { grade: q.grade || '', from: q.from || '', to: q.to || '', result: tab === 'screen' && RES[q.result] ? q.result : '' }, filtered = !!(flt.grade || flt.from || flt.to || flt.result);
       const t = this.tables(undefined, flt), n = this._n;
       const KINDS = [['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ']];
       const add = { screen: ['care-screen', 'บันทึกผลคัดกรอง'], visit: ['care-visit', 'บันทึกเยี่ยมบ้าน'], health: ['care-health', 'บันทึกสุขภาพ'], needs: ['care-need', 'เพิ่มข้อมูล'], referral: ['care-referral', 'บันทึกการส่งต่อ'] }[tab === 'trash' || tab === 'overview' ? 'health' : tab];
@@ -467,17 +472,27 @@
       const cnt = (r) => latest.filter((x) => x.result === r).length;
       const titles = { screen: 'ผลคัดกรองทั้งหมด', visit: 'บันทึกเยี่ยมบ้าน', health: 'บันทึกสุขภาพ', needs: 'ความต้องการพิเศษ / สุขภาพ', referral: 'การส่งต่อ' };
       return { title: this.name, actions: `<button class="btn primary" data-action="${add[0]}">${icon('plus')}${add[1]}</button>`,
-        html: `<div class="grid g3">${stat('smile', 'ปกติ', cnt('normal'), 'คน', 'green', 'ผลคัดกรองล่าสุด')}${stat('triangle-alert', 'เสี่ยง', cnt('risk'), 'คน', 'amber', 'ผลคัดกรองล่าสุด')}${stat('siren', 'มีปัญหา', cnt('problem'), 'คน', 'red', 'ผลคัดกรองล่าสุด')}</div>` +
+        html: `<div class="grid g3">${[['smile', 'normal', 'green'], ['triangle-alert', 'risk', 'amber'], ['siren', 'problem', 'red']].map(([ic, r, tone]) => stat(ic, RES[r], cnt(r), 'คน', tone, 'ผลคัดกรองล่าสุด', '#/apps/care?tab=screen&result=' + r)).join('')}</div>` +
           tabsBar([['overview', 'ภาพรวม'], ['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ']], tab, '#/apps/care') +
           (tab === 'trash' ? trashView('care', 'บันทึกสุขภาพ') : searchCard({ id: 'care', title: 'ค้นหาบันทึกดูแลช่วยเหลือ', hint: 'ความต้องการพิเศษไม่มีวันที่ — กรองได้เฉพาะระดับชั้น', typeLabel: 'ประเภทบันทึก', typeHtml: optList(KINDS, tab), q: flt })
-            + (tab === 'overview' ? this.dashHtml() : `<div class="card"><div class="card-head"><h3>${titles[tab]}</h3>${filtered ? `<span class="muted small"><b>${(n[tab] || 0).toLocaleString()}</b> รายการ · ${[flt.grade && 'ม.' + esc(flt.grade), (flt.from || flt.to) && `${flt.from ? fmtDate(flt.from) : '…'} – ${flt.to ? fmtDate(flt.to) : '…'}`].filter(Boolean).join(' · ')} · <a href="#/apps/care?tab=${tab}">ล้างการค้นหา</a></span>` : ''}</div>${t[tab]}</div>`)),
+            + (tab === 'overview' ? this.dashHtml() : `<div class="card"><div class="card-head"><h3>${flt.result ? 'ผลคัดกรองล่าสุด: ' + RES[flt.result] : titles[tab]}</h3>${filtered ? `<span class="muted small"><b>${(n[tab] || 0).toLocaleString()}</b> ${flt.result ? 'คน' : 'รายการ'}${[flt.grade && 'ม.' + esc(flt.grade), (flt.from || flt.to) && `${flt.from ? fmtDate(flt.from) : '…'} – ${flt.to ? fmtDate(flt.to) : '…'}`].filter(Boolean).map((x) => ' · ' + x).join('')} · <a href="#/apps/care?tab=${tab}">ล้างการค้นหา</a></span>` : ''}</div>${t[tab]}</div>`)),
         after: () => bindSearch('care', (v) => hashOf('#/apps/care', { tab: v.type, grade: v.grade, from: v.from, to: v.to })) };
     },
   };
 
   function stat(ic, label, val, unit, tone, hint = '', href = '') {
     const tag = href ? 'a' : 'div';
-    return `<${tag} class="card stat${href ? ' link' : ''}"${href ? ` href="${href}"` : ''}><div class="lbl"><span class="ic ${tone}">${icon(ic)}</span>${esc(label)}</div><div class="val">${val}<small> ${unit}</small></div>${hint ? `<div class="hint">${esc(hint)}</div>` : ''}</${tag}>`;
+    // highlight the card whose list is on screen now (same address, ignoring the scroll target go=)
+    const noGo = (h) => h.replace(/([?&])go=[^&]*&?/, '$1').replace(/[?&]$/, '');
+    const here = href && noGo(href).includes('?') && noGo(decodeURI(location.hash)) === noGo(href);
+    return `<${tag} class="card stat${href ? ' link' : ''}${here ? ' on' : ''}"${href ? ` href="${href}"` : ''}><div class="lbl"><span class="ic ${tone}">${icon(ic)}</span>${esc(label)}</div><div class="val">${val}<small> ${unit}</small></div>${hint ? `<div class="hint">${esc(hint)}</div>` : ''}</${tag}>`;
+  }
+
+  // a filter changed on the page itself: put it in the address (without re-rendering) and move the card highlight
+  function markStats(href) {
+    const noGo = (h) => h.replace(/([?&])go=[^&]*&?/, '$1').replace(/[?&]$/, '');
+    if (noGo(decodeURI(location.hash)) !== href) history.replaceState(null, '', href);
+    document.querySelectorAll('#content a.stat.link').forEach((a) => a.classList.toggle('on', href.includes('?') && noGo(a.getAttribute('href')) === href));
   }
 
   const ALL = [care, window.CounselApp, behavior];
@@ -486,6 +501,6 @@
     get: (id) => ALL.find((a) => a.id === id),
     enabled: () => ALL.filter((a) => Store.s.apps[a.id] !== false && Store.appOk(a.id)),
     events: (sid) => window.Apps.enabled().flatMap((a) => a.events(sid)).sort(byDate),
-    stat, sLink, tabsBar, trashView, searchCard, bindSearch, hashOf, optList,
+    stat, markStats, sLink, tabsBar, trashView, searchCard, bindSearch, hashOf, optList,
   };
 })();
