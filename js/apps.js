@@ -9,6 +9,13 @@
   const groups = new WeakMap();
   const group = (arr) => { let m = groups.get(arr); if (!m) { m = new Map(); arr.forEach((x) => { const l = m.get(x.studentId); if (l) l.push(x); else m.set(x.studentId, [x]); }); groups.set(arr, m); } return m; };
   const of = (arr, sid) => group(arr).get(sid) || [];
+  // behaviour rules follow the school regulation (ข้อ 50 หมวด 1–10, ข้อ 53 เพิ่มคะแนน); inactive ones stay only for old records
+  const activeRules = () => D().behavior.rules.filter((r) => r.active !== false);
+  const ruleCat = (r) => r.category || (r.restore ? 'กิจกรรมคืนคะแนน' : r.points < 0 ? 'ตัดคะแนน (อื่น ๆ)' : 'เพิ่มคะแนน (อื่น ๆ)');
+  const ruleGroups = (rules) => { const m = new Map(); rules.forEach((r) => { const k = ruleCat(r); if (!m.has(k)) m.set(k, []); m.get(k).push(r); }); return [...m]; };
+  const ruleLabel = (r) => `${r.code ? r.code + ' ' : ''}${r.name} (${signed(r.points)})`;
+  const ruleInfo = (r) => (r ? [r.level && r.level !== 'ดุลยพินิจ' ? 'ความผิดระดับ' + r.level : '', r.note].filter(Boolean).join(' · ') : '');
+  const LEVEL_BADGE = { 'เบา': 'b-neutral', 'กลาง': 'b-warning', 'หนัก': 'b-danger', 'ดุลยพินิจ': 'b-info' };
   const LIMIT = 300;
   const more = (n, what) => (n > LIMIT ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง ${LIMIT} จาก ${n.toLocaleString()} ${what} — ใช้หน้าค้นหาหรือรายงานเพื่อดูรายคน</div>` : '');
   const trashCount = (app) => ((Store.data.appTrash || {})[app] || []).length;
@@ -92,14 +99,14 @@
         </tbody></table></div>` : empty('ยังไม่มีบันทึกพฤติกรรมในภาคเรียนนี้')}`;
     },
     openRecord(sid, restoreOnly = false) {
-      const rules = D().behavior.rules.filter((r) => (restoreOnly ? r.restore : true));
-      const opt = (list) => list.map((r) => `<option value="${r.id}" data-p="${r.points}">${esc(r.name)} (${signed(r.points)})</option>`).join('');
-      const neg = rules.filter((r) => r.points < 0), pos = rules.filter((r) => r.points >= 0);
+      const rules = activeRules().filter((r) => (restoreOnly ? r.restore : true));
+      const opt = (list) => list.map((r) => `<option value="${r.id}" data-p="${r.points}" data-info="${esc(ruleInfo(r))}">${esc(ruleLabel(r))}</option>`).join('');
       const d = dialog({
         title: restoreOnly ? 'บันทึกกิจกรรมคืนคะแนน' : 'บันทึกพฤติกรรม', accent: true, submitLabel: 'ยืนยันการบันทึก', submitClass: 'accent',
         body: `<div class="form-grid">${studentField('student', sid)}
           <div class="field full"><label>พฤติกรรม <span class="req">*</span></label><select class="select" name="rule" required>
-            ${neg.length ? `<optgroup label="ตัดคะแนน">${opt(neg)}</optgroup>` : ''}${pos.length ? `<optgroup label="เพิ่มคะแนน / คืนคะแนน">${opt(pos)}</optgroup>` : ''}</select></div>
+            ${ruleGroups(rules).map(([cat, list]) => `<optgroup label="${esc(cat)}">${opt(list)}</optgroup>`).join('')}</select>
+            <span class="help" data-rule-info>${esc(ruleInfo(rules[0]))}</span></div>
           <div class="field"><label>คะแนน <span class="req">*</span></label><input class="input mono" type="number" name="points" required value="${rules[0] ? rules[0].points : 0}"><span class="help">ติดลบ = ตัดคะแนน</span></div>
           <div class="field"><label>วันที่ / เวลาที่เกิดเหตุ</label><input class="input" type="datetime-local" name="at" value="${localInput()}"></div>
           ${restoreOnly ? '' : `<label class="full inc-toggle"><input type="checkbox" name="multi"> <span><b>เหตุการณ์ที่มีนักเรียนหลายคน</b> (เช่น ทะเลาะวิวาท) — ลงผู้ก่อเหตุและผู้ร่วมกระทำพร้อมกัน</span></label>
@@ -156,6 +163,7 @@
       const setMulti = (onOff) => { if (!multi) return; multi.checked = onOff; box.hidden = !onOff; if (onOff && !list.children.length) addRow(); };
       sel.addEventListener('change', () => {
         pts.value = sel.selectedOptions[0].dataset.p;
+        d.form.querySelector('[data-rule-info]').textContent = sel.selectedOptions[0].dataset.info || '';
         list && list.querySelectorAll('[data-f=pts]').forEach((x) => { x.value = pts.value; });
         if (/ทะเลาะ|วิวาท/.test(sel.selectedOptions[0].textContent)) setMulti(true); // fights usually involve more than one student
       });
@@ -188,11 +196,19 @@
           html: tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + this.recordsSearch(q),
           after: () => this.bindRecordsSearch() };
       } else if (tab === 'rules') {
-        const rules = D().behavior.rules;
-        body = `<div class="card"><div class="card-head"><h3>ตารางพฤติกรรมและคะแนนมาตรฐาน</h3><button class="btn secondary sm" data-action="behavior-rule">${icon('plus', 'i16')}เพิ่มพฤติกรรม</button></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>พฤติกรรม</th><th>ประเภท</th><th class="num">คะแนน</th><th></th></tr></thead><tbody>
-          ${rules.map((r) => `<tr><td>${esc(r.name)}</td><td>${r.restore ? '<span class="badge b-info">คืนคะแนน</span>' : r.points < 0 ? '<span class="badge b-danger">ตัดคะแนน</span>' : '<span class="badge b-success">เพิ่มคะแนน</span>'}</td><td class="num ${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${signed(r.points)}</td>
-          <td style="text-align:right"><button class="icon-btn" title="แก้ไข" data-action="behavior-rule" data-id="${r.id}">${icon('pencil', 'i16')}</button></td></tr>`).join('')}
-          </tbody></table></div></div>`;
+        const admin = Store.user().role === 'admin';
+        const all = D().behavior.rules, rules = activeRules(), old = all.filter((r) => r.active === false);
+        const row = (r) => `<tr${r.active === false ? ' class="muted"' : ''}><td class="mono small" style="white-space:nowrap">${esc(r.code || '—')}</td><td>${esc(r.name)}${r.note ? `<div class="small" style="color:var(--red-700)">${esc(r.note)}</div>` : ''}</td>
+          <td>${r.level ? `<span class="badge ${LEVEL_BADGE[r.level] || 'b-neutral'}">${esc(r.level)}</span>` : r.restore ? '<span class="badge b-info">คืนคะแนน</span>' : r.points < 0 ? '' : '<span class="badge b-success">เพิ่มคะแนน</span>'}</td>
+          <td class="num ${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${signed(r.points)}</td>
+          <td style="text-align:right">${admin ? `<button class="icon-btn" title="แก้ไข" data-action="behavior-rule" data-id="${r.id}">${icon('pencil', 'i16')}</button>` : ''}</td></tr>`;
+        const head = '<thead><tr><th style="width:72px">ข้อ</th><th>พฤติกรรม</th><th style="width:110px">ระดับความผิด</th><th class="num" style="width:70px">คะแนน</th><th style="width:44px"></th></tr></thead>';
+        const nNeg = rules.filter((r) => r.points < 0).length, nPos = rules.filter((r) => r.points > 0 && !r.restore).length;
+        body = `<div class="card"><div class="card-head"><div><h3>ตารางพฤติกรรมและคะแนนมาตรฐาน</h3><div class="muted small">ตามระเบียบโรงเรียนธรรมศาสตร์คลองหลวงวิทยาคม (ประกาศ 20 ก.พ. 2569) · ตัดคะแนน ${nNeg} ข้อ (ข้อ 50) · เพิ่มคะแนน ${nPos} ข้อ (ข้อ 53)</div></div>${admin ? `<button class="btn secondary sm" data-action="behavior-rule">${icon('plus', 'i16')}เพิ่มพฤติกรรม</button>` : ''}</div>
+          <div class="tbl-wrap"><table class="tbl rule-tbl">${head}
+          ${ruleGroups(rules).map(([cat, list]) => `<tbody><tr class="rule-cat"><th colspan="5">${esc(cat)} <span class="muted small">· ${list.length} ข้อ</span></th></tr>${list.map(row).join('')}</tbody>`).join('')}
+          </table></div>
+          ${old.length ? `<details class="card-body" style="border-top:1px solid var(--ink-200)"><summary class="small muted" style="cursor:pointer">รายการเดิมที่ไม่ใช้แล้ว ${old.length} รายการ (ซ่อนจากหน้าบันทึก · บันทึกเก่ายังแสดงตามเดิม)</summary><div class="tbl-wrap" style="margin-top:8px"><table class="tbl">${head}<tbody>${old.map(row).join('')}</tbody></table></div></details>` : ''}</div>`;
       } else if (tab === 'threshold') {
         const s = Store.s;
         body = `<form class="card" data-form="threshold" style="max-width:640px"><div class="card-head"><h3>คะแนนตั้งต้นและเกณฑ์แจ้งเตือน</h3></div><div class="card-body"><div class="form-grid">
@@ -216,13 +232,11 @@
     // รายการบันทึก: กรองตามประเภทพฤติกรรม ภาคเรียน ชั้น ช่วงวันที่ และชื่อ/รหัส — ดูได้ทั้งรายรายการและสรุปรายคน
     // พฤติกรรมแบบเดียวกับหน้าบันทึก: ตัดคะแนน / เพิ่มคะแนน (+ ชื่อที่มีในบันทึกเก่าแต่ไม่อยู่ในตาราง)
     typeOptions(selected = '') {
-      const rules = D().behavior.rules, names = new Set(rules.map((r) => r.name));
+      const rules = activeRules(), names = new Set(rules.map((r) => r.name));
       const opt = (name, label) => `<option value="${esc(name)}" ${name === selected ? 'selected' : ''}>${esc(label)}</option>`;
-      const neg = rules.filter((r) => r.points < 0), pos = rules.filter((r) => r.points >= 0);
       const other = [...new Set(D().behavior.records.map((r) => r.title).filter((x) => x && !names.has(x)))].sort((a, b) => a.localeCompare(b, 'th'));
       return '<option value="">ทุกพฤติกรรม</option>'
-        + (neg.length ? `<optgroup label="ตัดคะแนน">${neg.map((r) => opt(r.name, `${r.name} (${signed(r.points)})`)).join('')}</optgroup>` : '')
-        + (pos.length ? `<optgroup label="เพิ่มคะแนน / คืนคะแนน">${pos.map((r) => opt(r.name, `${r.name} (${signed(r.points)})`)).join('')}</optgroup>` : '')
+        + ruleGroups(rules).map(([cat, list]) => `<optgroup label="${esc(cat)}">${list.map((r) => opt(r.name, ruleLabel(r))).join('')}</optgroup>`).join('')
         + (other.length ? `<optgroup label="อื่น ๆ (จากบันทึกเดิม)">${other.map((x) => opt(x, x)).join('')}</optgroup>` : '');
     },
     gradeOptions(selected = '') { return gradeOpts(selected); },
@@ -303,14 +317,22 @@
     },
     ruleDialog(id) {
       const r = D().behavior.rules.find((x) => x.id === id);
-      dialog({ title: r ? 'แก้ไขพฤติกรรม' : 'เพิ่มพฤติกรรม', size: 'sm',
-        body: `<div class="field"><label>ชื่อพฤติกรรม <span class="req">*</span></label><input class="input" name="name" required value="${esc(r ? r.name : '')}"></div>
+      const cats = [...new Set(D().behavior.rules.map(ruleCat))];
+      dialog({ title: r ? 'แก้ไขพฤติกรรม' : 'เพิ่มพฤติกรรม',
+        body: `<div class="form-grid">
+          <div class="field full"><label>ชื่อพฤติกรรม <span class="req">*</span></label><textarea class="textarea" name="name" required rows="2">${esc(r ? r.name : '')}</textarea></div>
+          <div class="field full"><label>หมวด</label><input class="input" name="category" list="dl-rule-cats" value="${esc(r ? r.category || '' : '')}" placeholder="เช่น หมวด 7 การมาเรียน การเข้าเรียนและการเข้าร่วมกิจกรรม"><datalist id="dl-rule-cats">${cats.map((c) => `<option value="${esc(c)}">`).join('')}</datalist></div>
+          <div class="field"><label>ข้อในระเบียบ</label><input class="input mono" name="code" value="${esc(r ? r.code || '' : '')}" placeholder="เช่น 50.7.1"></div>
+          <div class="field"><label>ระดับความผิด</label><select class="select" name="level">${optList([['', '— ไม่ระบุ —'], ['เบา', 'เบา'], ['กลาง', 'กลาง'], ['หนัก', 'หนัก'], ['ดุลยพินิจ', 'ดุลยพินิจของคณะกรรมการ']], r ? r.level || '' : '')}</select></div>
           <div class="field"><label>คะแนนมาตรฐาน <span class="req">*</span></label><input class="input mono" type="number" name="points" required value="${r ? r.points : -5}"><span class="help">ติดลบ = ตัดคะแนน, บวก = เพิ่มคะแนน</span></div>
-          <label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" name="restore" ${r && r.restore ? 'checked' : ''}> เป็นกิจกรรมคืนคะแนน</label>`,
+          <div class="field"><label>หมายเหตุ</label><input class="input" name="note" value="${esc(r ? r.note || '' : '')}" placeholder="เช่น ทำทัณฑ์บน"></div>
+          <label class="full" style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" name="restore" ${r && r.restore ? 'checked' : ''}> เป็นกิจกรรมคืนคะแนน</label>
+          <label class="full" style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" name="active" ${!r || r.active !== false ? 'checked' : ''}> ใช้งานอยู่ (เอาออก = ซ่อนจากหน้าบันทึก แต่บันทึกเก่ายังอยู่)</label></div>`,
         onSubmit: async (v) => {
-          const obj = { name: v.name.trim(), points: Number(v.points), restore: !!v.restore };
+          const obj = { name: v.name.trim().replace(/\s+/g, ' '), points: Number(v.points), restore: !!v.restore, active: !!v.active,
+            category: v.category.trim() || null, code: v.code.trim() || null, level: v.level || null, note: v.note.trim() || null };
           if (r) await Store.update('rules', r.id, obj);
-          else await Store.add('rules', { id: 'c' + Date.now().toString(36), sort: D().behavior.rules.length + 1, ...obj });
+          else await Store.add('rules', { id: 'c' + Date.now().toString(36), sort: Math.max(0, ...D().behavior.rules.filter((x) => x.sort < 900).map((x) => x.sort || 0)) + 1, ...obj });
           toast('บันทึกตารางพฤติกรรมแล้ว'); App.render();
         } });
     },

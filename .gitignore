@@ -8,3 +8,7 @@ node_modules/
 *.csv
 .env
 .env.*
+
+# documents the user drops here (regulations etc.) stay local
+*.docx
+~$*

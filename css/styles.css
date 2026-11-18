@@ -469,3 +469,6 @@ details.card>summary::-webkit-details-marker{display:none}
 .update-bar>span{flex:1;line-height:1.45}
 .update-bar .btn{flex:none}
 @media print{.update-bar{display:none}}
+/* behaviour rule table grouped by หมวด */
+.rule-tbl tr.rule-cat th{background:var(--navy-50,#eef0fb);color:var(--navy-900,#111770);font-weight:600;text-align:left;font-size:14px;padding-top:10px;padding-bottom:10px}
+.rule-tbl td{vertical-align:top}

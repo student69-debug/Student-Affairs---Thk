@@ -11,7 +11,7 @@
     teacherGrades: { table: 'teacher_grades', order: 'user_id', cols: [['userId', 'user_id'], ['grade', 'grade']] },
     gradeStaff: { table: 'grade_staff', order: 'grade', cols: [['grade', 'grade'], ['title', 'title'], ['name', 'name']] },
     history: { table: 'registry_history', order: 'at', desc: true, cols: [['id', 'id'], ['at', 'at'], ['by', 'by_name'], ['studentId', 'student_id'], ['action', 'action'], ['detail', 'detail']] },
-    rules: { table: 'behavior_rules', order: 'sort', cols: [['id', 'id'], ['name', 'name'], ['points', 'points'], ['restore', 'restore'], ['sort', 'sort']] },
+    rules: { table: 'behavior_rules', order: 'sort', cols: [['id', 'id'], ['name', 'name'], ['points', 'points'], ['restore', 'restore'], ['sort', 'sort'], ['code', 'code'], ['category', 'category'], ['level', 'level'], ['note', 'note'], ['active', 'active']] },
     records: { table: 'behavior_records', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['ruleId', 'rule_id'], ['title', 'title'], ['points', 'points'], ['note', 'note'], ['by', 'by_name'], ['byUser', 'by_user'], ['at', 'at'], ['term', 'term'], ['incidentId', 'incident_id'], ['involvement', 'involvement']] },
     incidents: { table: 'behavior_incidents', order: 'occurred_at', desc: true, cols: [['id', 'id'], ['at', 'occurred_at'], ['place', 'place'], ['detail', 'detail'], ['by', 'created_by_name'], ['byUser', 'created_by']] },
     health: { table: 'health_logs', order: 'log_date', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['date', 'log_date'], ['symptom', 'symptom'], ['referred', 'referred'], ['detail', 'detail'], ['action', 'action_taken'], ['by', 'by_name'], ['byUser', 'by_user'], ['at', 'at']] },
