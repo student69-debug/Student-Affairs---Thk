@@ -225,21 +225,23 @@
       const tab = q.tab || 'overview', base = '#/apps/drugs';
       const tabs = Apps.tabsBar([['overview', 'ภาพรวม'], ['records', 'รายการบันทึก'], ['report', 'รายงาน'], ['points', 'เกณฑ์ตัดคะแนน'], ['guide', 'แนวปฏิบัติ']], tab, base);
       const actions = `<button class="btn accent" data-action="drug-record">${icon('plus')}บันทึกเหตุการณ์</button>`;
-      const out = (html, after) => ({ title: this.name, actions, html: tabs + html, after });
+      // summary cards stay on top of every tab (app standard, like the care app); each opens its list below
+      const t = Store.termKey(), cur = all().filter((x) => x.term === t);
+      const lv = latestLevels(cur), cnt = (k) => [...lv.values()].filter((v) => v === k).length;
+      const open = all().filter((x) => x.status !== 'closed').sort(byDate);
+      const cards = `<div class="grid g4">
+          ${Apps.stat('file-text', 'บันทึกภาคเรียนนี้', cur.length, 'รายการ', '', `${new Set(cur.map((x) => x.studentId)).size} คน · ภาคเรียน ${t}`, '#/apps/drugs?tab=records')}
+          ${Apps.stat('triangle-alert', 'กลุ่มเสี่ยง', cnt('risk'), 'คน', 'amber', 'กลุ่มล่าสุดของแต่ละคน', '#/apps/drugs?tab=records&level=risk')}
+          ${Apps.stat('siren', 'กลุ่มเสพ / ติด', cnt('use') + cnt('addict'), 'คน', 'red', `เสพ ${cnt('use')} · ติด ${cnt('addict')}`, '#/apps/drugs?tab=records&level=use,addict')}
+          ${Apps.stat('hourglass', 'ยังไม่ปิดเรื่อง', open.length, 'รายการ', 'amber', 'รอดำเนินการ / กำลังติดตาม', '#/apps/drugs?tab=records&status=active')}</div>`;
+      const out = (html, after) => ({ title: this.name, actions, html: cards + tabs + html, after });
       if (tab === 'trash') return out(Apps.trashView('drugs', 'บันทึกบุหรี่ / สารเสพติด'));
       if (tab === 'records') return out(this.recordsHtml(q), () => this.bindRecords());
       if (tab === 'report') return out(this.reportHtml(q), () => this.bindReport());
       if (tab === 'points') return out(this.pointsHtml(), () => this.bindPoints());
       if (tab === 'guide') return out(this.guideHtml());
       // ภาพรวม: ภาคเรียนปัจจุบัน
-      const t = Store.termKey(), cur = all().filter((x) => x.term === t);
-      const lv = latestLevels(cur), cnt = (k) => [...lv.values()].filter((v) => v === k).length;
-      const open = all().filter((x) => x.status !== 'closed').sort(byDate);
-      return out(Apps.searchCard({ id: 'drugs', title: 'ค้นหาบันทึกบุหรี่ / สารเสพติด', typeLabel: 'ประเภท', typeHtml: '<option value="">ทุกประเภท</option>' + Apps.optList(Object.entries(CATS).map(([k, c]) => [k, c.label])) }) + `<div class="grid g4">
-          ${Apps.stat('file-text', 'บันทึกภาคเรียนนี้', cur.length, 'รายการ', '', `${new Set(cur.map((x) => x.studentId)).size} คน · ภาคเรียน ${t}`, '#/apps/drugs?tab=records')}
-          ${Apps.stat('triangle-alert', 'กลุ่มเสี่ยง', cnt('risk'), 'คน', 'amber', 'กลุ่มล่าสุดของแต่ละคน', '#/apps/drugs?tab=records&level=risk')}
-          ${Apps.stat('siren', 'กลุ่มเสพ / ติด', cnt('use') + cnt('addict'), 'คน', 'red', `เสพ ${cnt('use')} · ติด ${cnt('addict')}`, '#/apps/drugs?tab=records&level=use,addict')}
-          ${Apps.stat('hourglass', 'ยังไม่ปิดเรื่อง', open.length, 'รายการ', 'amber', 'รอดำเนินการ / กำลังติดตาม', '#/apps/drugs?tab=records&status=active')}</div>
+      return out(Apps.searchCard({ id: 'drugs', title: 'ค้นหาบันทึกบุหรี่ / สารเสพติด', typeLabel: 'ประเภท', typeHtml: '<option value="">ทุกประเภท</option>' + Apps.optList(Object.entries(CATS).map(([k, c]) => [k, c.label])) }) + `
         ${this.dashHtml(cur, t)}
         <div class="card"><div class="card-head"><h3>ต้องติดตาม</h3><span class="muted small">ยังไม่ปิดเรื่อง · ทุกภาคเรียน</span></div>${this.table(open.slice(0, 20))}</div>
         <div class="notice">${icon('shield-check', 'i16')}<span>${this.scopeText()}</span></div>`,

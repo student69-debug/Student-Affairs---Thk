@@ -454,5 +454,10 @@
 
   window.App = { render };
   window.addEventListener('hashchange', render);
+  // a filter changed by hand: the highlighted summary card no longer describes the list (pages that keep it in sync mark their toolbar data-stat-sync)
+  document.getElementById('content').addEventListener('input', (e) => {
+    const bar = e.target.closest('.toolbar');
+    if (bar && !bar.hasAttribute('data-stat-sync')) document.querySelectorAll('#content a.stat.on').forEach((a) => a.classList.remove('on'));
+  });
   boot();
 })();

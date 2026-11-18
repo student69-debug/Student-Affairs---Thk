@@ -186,17 +186,19 @@
       const tab = q.tab || 'overview', base = '#/apps/nurse';
       const tabs = Apps.tabsBar([['overview', 'ภาพรวม'], ['records', 'รายการบันทึก'], ['report', 'รายงาน']], tab, base);
       const actions = `<button class="btn accent" data-action="nurse-record">${icon('plus')}บันทึกเข้าห้องพยาบาล</button>`;
-      const out = (html, after) => ({ title: this.name, actions, html: tabs + html, after });
+      // summary cards stay on top of every tab (app standard, like the care app); each opens its list below
+      const t = Store.termKey(), cur = all().filter((x) => x.term === t), td = all().filter((x) => dayOf(x.at) === today());
+      const sent = cur.filter((x) => x.outcome === 'home' || x.outcome === 'hospital');
+      const cards = `<div class="grid g4">
+          ${Apps.stat('bed', 'กำลังพักอยู่', now().length, 'คน', '', 'ครูทุกคนเห็นบอร์ดนี้', '#/apps/nurse?tab=overview&go=nurse-board')}
+          ${Apps.stat('calendar-check', 'วันนี้', td.length, 'ครั้ง', '', `${new Set(td.map((x) => x.studentId)).size} คน`, '#/apps/nurse?tab=records&from=' + today() + '&to=' + today())}
+          ${Apps.stat('file-text', 'ภาคเรียนนี้', cur.length, 'ครั้ง', '', `${new Set(cur.map((x) => x.studentId)).size} คน · ภาคเรียน ${t}`, '#/apps/nurse?tab=records')}
+          ${Apps.stat('ambulance', 'กลับบ้าน / ส่ง รพ.', sent.length, 'ครั้ง', 'red', `กลับบ้าน ${sent.filter((x) => x.outcome === 'home').length} · ส่ง รพ. ${sent.filter((x) => x.outcome === 'hospital').length}`, '#/apps/nurse?tab=records&outcome=home,hospital')}</div>`;
+      const out = (html, after) => ({ title: this.name, actions, html: cards + tabs + html, after });
       if (tab === 'trash') return out(Apps.trashView('nurse', 'บันทึกห้องพยาบาล'));
       if (tab === 'records') return out(this.recordsHtml(q), () => this.bindRecords());
       if (tab === 'report') return out(this.reportHtml(q), () => this.bindReport());
-      const t = Store.termKey(), cur = all().filter((x) => x.term === t), td = all().filter((x) => dayOf(x.at) === today());
-      const sent = cur.filter((x) => x.outcome === 'home' || x.outcome === 'hospital');
-      return out(this.boardHtml() + `<div class="grid g4">
-          ${Apps.stat('bed', 'กำลังพักอยู่', now().length, 'คน', '', 'ครูทุกคนเห็นบอร์ดนี้', '#/apps/nurse?go=nurse-board')}
-          ${Apps.stat('calendar-check', 'วันนี้', td.length, 'ครั้ง', '', `${new Set(td.map((x) => x.studentId)).size} คน`, '#/apps/nurse?tab=records&from=' + today() + '&to=' + today())}
-          ${Apps.stat('file-text', 'ภาคเรียนนี้', cur.length, 'ครั้ง', '', `${new Set(cur.map((x) => x.studentId)).size} คน · ภาคเรียน ${t}`, '#/apps/nurse?tab=records')}
-          ${Apps.stat('ambulance', 'กลับบ้าน / ส่ง รพ.', sent.length, 'ครั้ง', 'red', `กลับบ้าน ${sent.filter((x) => x.outcome === 'home').length} · ส่ง รพ. ${sent.filter((x) => x.outcome === 'hospital').length}`, '#/apps/nurse?tab=records&outcome=home,hospital')}</div>
+      return out(this.boardHtml() + `
         ${Apps.searchCard({ id: 'nurse', title: 'ค้นหาบันทึกห้องพยาบาล', typeLabel: 'อาการ', typeHtml: '<option value="">ทุกอาการ</option>' + Apps.optList(Object.entries(GROUPS)) })}
         ${this.dashHtml(cur, t)}
         <div class="card"><div class="card-head"><h3>บันทึกวันนี้</h3><span class="muted small">${td.length} รายการ</span></div>${this.table(td.sort(byDate))}</div>

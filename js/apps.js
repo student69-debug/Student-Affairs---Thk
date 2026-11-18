@@ -180,23 +180,25 @@
       const tab = q.tab || 'overview';
       const base = '#/apps/behavior';
       let body = '';
+      // summary cards stay on top of every tab (app standard, like the care app); each opens its list below
+      const list = (Store.user().role === 'inspector' ? Store.activeStudents() : Store.myStudents()).map((s) => ({ s, sc: this.score(s.id) })).sort((a, b) => a.sc - b.sc);
+      const isHi = (x) => x.sc < Store.s.alertBelow, isW = (x) => x.sc >= Store.s.alertBelow && x.sc < Store.s.warnBelow;
+      const hi = list.filter(isHi).length, w = list.filter(isW).length;
+      const cards = `<div class="grid g3">
+          ${stat('users', 'นักเรียนทั้งหมด', list.length, 'คน', '', '', base + '?level=all&go=score-list')}
+          ${stat('triangle-alert', 'เฝ้าระวัง', w, 'คน', 'amber', `คะแนน ${Store.s.alertBelow}–${Store.s.warnBelow - 1}`, base + '?level=watch&go=score-list')}
+          ${stat('siren', 'เสี่ยงสูง', hi, 'คน', 'red', `ต่ำกว่า ${Store.s.alertBelow} → เชิญผู้ปกครองทำทัณฑ์บน`, base + '?level=high&go=score-list')}</div>`;
       if (tab === 'overview') {
-        const list = (Store.user().role === 'inspector' ? Store.activeStudents() : Store.myStudents()).map((s) => ({ s, sc: this.score(s.id) })).sort((a, b) => a.sc - b.sc);
-        const isHi = (x) => x.sc < Store.s.alertBelow, isW = (x) => x.sc >= Store.s.alertBelow && x.sc < Store.s.warnBelow;
-        const hi = list.filter(isHi).length, w = list.filter(isW).length;
         const lvl = { watch: ['เฝ้าระวัง', isW], high: ['เสี่ยงสูง', isHi] }[q.level];
         const shown = lvl ? list.filter(lvl[1]) : list;
-        body = this.searchCard() + `<div class="grid g3">
-          ${stat('users', 'นักเรียนทั้งหมด', list.length, 'คน', '', '', base + '?go=score-list')}
-          ${stat('triangle-alert', 'เฝ้าระวัง', w, 'คน', 'amber', `คะแนน ${Store.s.alertBelow}–${Store.s.warnBelow - 1}`, base + '?level=watch&go=score-list')}
-          ${stat('siren', 'เสี่ยงสูง', hi, 'คน', 'red', `ต่ำกว่า ${Store.s.alertBelow} → เชิญผู้ปกครองทำทัณฑ์บน`, base + '?level=high&go=score-list')}</div>
-          <div class="card" id="score-list"><div class="card-head"><h3>คะแนนคงเหลือรายคน (น้อยไปมาก)${lvl ? ' · ' + lvl[0] : ''}</h3>${lvl ? `<span class="muted small">${shown.length.toLocaleString()} คน · <a href="${base}?go=score-list">แสดงทุกคน</a></span>` : ''}</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชั้น</th><th>คะแนน</th><th>สถานะ</th><th class="num">รายการ</th></tr></thead><tbody>
+        body = this.searchCard() + `
+          <div class="card" id="score-list"><div class="card-head"><h3>คะแนนคงเหลือรายคน (น้อยไปมาก)${lvl ? ' · ' + lvl[0] : ''}</h3>${lvl ? `<span class="muted small">${shown.length.toLocaleString()} คน · <a href="${base}?level=all&go=score-list">แสดงทุกคน</a></span>` : ''}</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชั้น</th><th>คะแนน</th><th>สถานะ</th><th class="num">รายการ</th></tr></thead><tbody>
           ${shown.length ? '' : `<tr><td colspan="6">${empty('ไม่มีนักเรียนในกลุ่มนี้', 'smile')}</td></tr>`}${shown.slice(0, LIMIT).map(({ s, sc }) => { const lv = scoreLevel(sc); return `<tr class="clickable" data-action="go" data-href="#/student/${s.id}"><td class="mono">${s.id}</td><td>${esc(fullName(s))}</td><td>${klass(s)}</td><td>${meter(sc)}</td><td><span class="badge ${lv.cls}">${lv.label}</span></td><td class="num">${this.records(s.id).length}</td></tr>`; }).join('')}
           </tbody></table></div>${more(shown.length, 'คน (เรียงจากคะแนนน้อยสุด)')}</div>`;
         body = body.replace('<div class="card" id="score-list">', this.dashHtml(list.map((x) => x.s)) + '<div class="card" id="score-list">');
       } else if (tab === 'records') {
         return { title: this.name, actions: `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>`,
-          html: tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + this.recordsSearch(q),
+          html: cards + tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + this.recordsSearch(q),
           after: () => this.bindRecordsSearch() };
       } else if (tab === 'rules') {
         const admin = Store.user().role === 'admin';
@@ -229,7 +231,7 @@
           ${rec.map((r) => `<tr><td>${fmtDate(r.at)}</td><td>${sLink(r.studentId)}</td><td>${esc(r.title)}${r.note ? `<div class="muted small">${esc(r.note)}</div>` : ''}</td><td class="num pts-pos">${signed(r.points)}</td><td>${esc(r.by)}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีกิจกรรมคืนคะแนน', 'heart-handshake')}</div>`;
       }
       return { title: this.name, actions: `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>`,
-        html: tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + body,
+        html: cards + tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + body,
         after: tab === 'overview' ? () => this.bindSearchCard() : undefined };
     },
     // รายการบันทึก: กรองตามประเภทพฤติกรรม ภาคเรียน ชั้น ช่วงวันที่ และชื่อ/รหัส — ดูได้ทั้งรายรายการและสรุปรายคน
@@ -484,7 +486,7 @@
     const tag = href ? 'a' : 'div';
     // highlight the card whose list is on screen now (same address, ignoring the scroll target go=)
     const noGo = (h) => h.replace(/([?&])go=[^&]*&?/, '$1').replace(/[?&]$/, '');
-    const here = href && noGo(href).includes('?') && noGo(decodeURI(location.hash)) === noGo(href);
+    const here = href && noGo(href).includes('?') && noGo(decodeURI(location.hash)) === noGo(decodeURI(href));
     return `<${tag} class="card stat${href ? ' link' : ''}${here ? ' on' : ''}"${href ? ` href="${href}"` : ''}><div class="lbl"><span class="ic ${tone}">${icon(ic)}</span>${esc(label)}</div><div class="val">${val}<small> ${unit}</small></div>${hint ? `<div class="hint">${esc(hint)}</div>` : ''}</${tag}>`;
   }
 
@@ -492,7 +494,7 @@
   function markStats(href) {
     const noGo = (h) => h.replace(/([?&])go=[^&]*&?/, '$1').replace(/[?&]$/, '');
     if (noGo(decodeURI(location.hash)) !== href) history.replaceState(null, '', href);
-    document.querySelectorAll('#content a.stat.link').forEach((a) => a.classList.toggle('on', href.includes('?') && noGo(a.getAttribute('href')) === href));
+    document.querySelectorAll('#content a.stat.link').forEach((a) => a.classList.toggle('on', href.includes('?') && noGo(decodeURI(a.getAttribute('href'))) === href));
   }
 
   const ALL = [care, window.CounselApp, behavior];

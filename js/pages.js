@@ -98,8 +98,8 @@
       <div class="grid ${Store.isAdmin() ? 'g5' : 'g4'}">
         ${stat('file-plus', 'บันทึกใหม่วันนี้', today.length, 'รายการ', '', 'จากทุกแอป', '#/?show=today&go=recent-list')}
         ${stat('triangle-alert', 'นักเรียนเฝ้าระวัง', watch.length, 'คน', 'amber', 'คะแนนต่ำ / คัดกรองมีปัญหา', '#/?show=watch&go=watch-list')}
-        ${stat('messages-square', 'ให้คำปรึกษาเดือนนี้', cMonth, 'ครั้ง', 'green', '', on('counsel') ? (Store.seesAll() ? '#/apps/counsel?tab=cases&sfrom=' + monthIso : '#/apps/counsel?go=appts') : '')}
-        ${stat('calendar-clock', 'นัดติดตาม 7 วัน', fu, 'นัด', 'red', '', on('counsel') ? '#/apps/counsel?go=appts' : '')}
+        ${stat('messages-square', 'ให้คำปรึกษาเดือนนี้', cMonth, 'ครั้ง', 'green', '', on('counsel') ? (Store.seesAll() ? '#/apps/counsel?tab=cases&sfrom=' + monthIso : '#/apps/counsel?tab=overview&go=appts') : '')}
+        ${stat('calendar-clock', 'นัดติดตาม 7 วัน', fu, 'นัด', 'red', '', on('counsel') ? '#/apps/counsel?tab=overview&go=appts' : '')}
         ${Store.isAdmin() ? (() => { const n = (D().users || []).filter((u) => u.role === 'pending').length; return stat('hourglass', 'รออนุมัติ', n, 'คน', 'amber', n ? 'กดเพื่อเลือกบทบาทและอนุมัติ' : 'ไม่มีผู้รออนุมัติ', '#/teachers?role=pending'); })() : ''}
       </div>
       ${on('behavior') ? B().searchCard() : ''}
@@ -247,7 +247,7 @@
         ${Apps.stat('school', 'ครูที่ปรึกษา', count('teacher'), 'คน', 'green', `ยังไม่กำหนดห้อง ${nOf('noroom')} คน`, href('teacher'))}
         ${Apps.stat('layers', GROUPS.lead[0], nOf('lead'), 'คน', '', '', href('lead'))}
       </div>
-      <div class="card" id="tf-list"><div class="toolbar">
+      <div class="card" id="tf-list"><div class="toolbar" data-stat-sync>
         <input class="input grow" id="tf-q" placeholder="ค้นหาชื่อ / อีเมล" value="${esc(q.q || '')}">
         <select class="select" id="tf-role" aria-label="บทบาท"><option value="">ทุกบทบาท</option>${roleOpts.map(([k, l]) => `<option value="${k}" ${q.role === k ? 'selected' : ''}>${esc(l)} (${count(k)})</option>`).join('')}
           <optgroup label="กลุ่ม">${Object.entries(GROUPS).map(([k, [l]]) => `<option value="${k}" ${q.role === k ? 'selected' : ''}>${esc(l)} (${nOf(k)})</option>`).join('')}</optgroup></select>
