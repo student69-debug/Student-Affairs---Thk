@@ -143,7 +143,7 @@
           await Store.add('records', { studentId: id, ruleId: rule.id, title: rule.name, points: Number(v.points), note: v.note.trim(), at: new Date(v.at || Date.now()).toISOString(), term: Store.termKey() });
           const after = this.score(id), p = Number(v.points);
           toast(`บันทึกเรียบร้อยแล้ว · ${p < 0 ? 'ตัดคะแนน ' + Math.abs(p) : 'เพิ่มคะแนน ' + p} · ${fullName(Store.student(id))}${Store.student(id).mine ? ' · คงเหลือ ' + after : ''}`);
-          if (Store.student(id).mine && before >= Store.s.alertBelow && after < Store.s.alertBelow) setTimeout(() => toast(`คะแนนต่ำกว่า ${Store.s.alertBelow} — ถึงเกณฑ์เชิญผู้ปกครอง`), 400);
+          if (Store.student(id).mine && before >= Store.s.alertBelow && after < Store.s.alertBelow) setTimeout(() => toast(`คะแนนต่ำกว่า ${Store.s.alertBelow} — ถึงเกณฑ์เชิญผู้ปกครองทำทัณฑ์บน (ข้อ 51.4)`), 400);
           App.render();
         },
       });
@@ -186,7 +186,7 @@
         body = this.searchCard() + `<div class="grid g3">
           ${stat('users', 'นักเรียนทั้งหมด', list.length, 'คน', '')}
           ${stat('triangle-alert', 'เฝ้าระวัง', w, 'คน', 'amber', `คะแนน ${Store.s.alertBelow}–${Store.s.warnBelow - 1}`)}
-          ${stat('siren', 'เสี่ยงสูง', hi, 'คน', 'red', `ต่ำกว่า ${Store.s.alertBelow} → เชิญผู้ปกครอง`)}</div>
+          ${stat('siren', 'เสี่ยงสูง', hi, 'คน', 'red', `ต่ำกว่า ${Store.s.alertBelow} → เชิญผู้ปกครองทำทัณฑ์บน`)}</div>
           <div class="card"><div class="card-head"><h3>คะแนนคงเหลือรายคน (น้อยไปมาก)</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชั้น</th><th>คะแนน</th><th>สถานะ</th><th class="num">รายการ</th></tr></thead><tbody>
           ${list.slice(0, LIMIT).map(({ s, sc }) => { const lv = scoreLevel(sc); return `<tr class="clickable" data-action="go" data-href="#/student/${s.id}"><td class="mono">${s.id}</td><td>${esc(fullName(s))}</td><td>${klass(s)}</td><td>${meter(sc)}</td><td><span class="badge ${lv.cls}">${lv.label}</span></td><td class="num">${this.records(s.id).length}</td></tr>`; }).join('')}
           </tbody></table></div>${more(list.length, 'คน (เรียงจากคะแนนน้อยสุด)')}</div>`;
@@ -213,8 +213,8 @@
         const s = Store.s;
         body = `<form class="card" data-form="threshold" style="max-width:640px"><div class="card-head"><h3>คะแนนตั้งต้นและเกณฑ์แจ้งเตือน</h3></div><div class="card-body"><div class="form-grid">
           <div class="field full"><label>คะแนนตั้งต้นต่อภาคเรียน</label><input class="input mono" type="number" name="baseScore" value="${s.baseScore}" min="1"></div>
-          <div class="field"><label>เฝ้าระวัง เมื่อต่ำกว่า</label><input class="input mono" type="number" name="warnBelow" value="${s.warnBelow}"><span class="help">แจ้งครูที่ปรึกษา</span></div>
-          <div class="field"><label>เสี่ยงสูง เมื่อต่ำกว่า</label><input class="input mono" type="number" name="alertBelow" value="${s.alertBelow}"><span class="help">เชิญผู้ปกครอง</span></div>
+          <div class="field"><label>เฝ้าระวัง เมื่อต่ำกว่า</label><input class="input mono" type="number" name="warnBelow" value="${s.warnBelow}"><span class="help">ข้อ 51.1: ถูกตัดรวม 20 คะแนน (เหลือ 80) → หนังสือแจ้งผู้ปกครอง · ใส่ 81 จึงนับคนที่ได้ 80 พอดีด้วย</span></div>
+          <div class="field"><label>เสี่ยงสูง เมื่อต่ำกว่า</label><input class="input mono" type="number" name="alertBelow" value="${s.alertBelow}"><span class="help">ข้อ 51.4: ต่ำกว่า 60 → เชิญผู้ปกครองทำทัณฑ์บน</span></div>
           </div></div><div class="dialog-foot"><button class="btn primary" type="submit">บันทึกเกณฑ์</button></div></form>`;
       } else if (tab === 'trash') {
         body = trashView('behavior', 'บันทึกพฤติกรรม');

@@ -35,13 +35,13 @@
   const ACTIONS = ['แจ้งผู้ปกครอง', 'ว่ากล่าวตักเตือน', 'ทำทัณฑ์บน', 'ตัดคะแนนความประพฤติ', 'ทำกิจกรรมปรับเปลี่ยนพฤติกรรม', 'ส่งครูแนะแนว / ให้คำปรึกษา',
     'ตรวจปัสสาวะ', 'ยึดของกลาง', 'ส่งต่อสถานพยาบาล / บำบัด', 'แจ้งเจ้าหน้าที่ตำรวจ', 'รายงานในระบบ NISPA'];
   const STATUS = { open: ['รอดำเนินการ', 'b-warning'], follow: ['กำลังติดตาม', 'b-info'], closed: ['ปิดเรื่อง', 'b-success'] };
-  // ค่าเริ่มต้น (แก้ได้ที่แท็บ "เกณฑ์ตัดคะแนน"): อ้างอิงระเบียบของหลายโรงเรียน — สารเสพติด 30–50 คะแนน บุหรี่ 10–30 คะแนน
+  // ตามระเบียบโรงเรียน ข้อ 50 หมวด 1 (ยาเสพติด / สารมึนเมา / กัญชา) หมวด 2 (บุหรี่) หมวด 3 (แอลกอฮอล์)
   const DEFAULT_POINTS = {
-    tobacco: { suspect: 0, possess: -10, use: -20, test_positive: -20, sell: -30 },
-    alcohol: { suspect: 0, possess: -10, use: -20, test_positive: -20, sell: -30 },
-    cannabis: { suspect: 0, possess: -20, use: -30, test_positive: -30, sell: -50 },
-    narcotic: { suspect: 0, possess: -30, use: -40, test_positive: -40, sell: -50 },
-    other: { suspect: 0, possess: -20, use: -30, test_positive: -30, sell: -40 },
+    tobacco: { suspect: 0, possess: -30, use: -30, test_positive: -30, sell: -30 },
+    alcohol: { suspect: 0, possess: -20, use: -20, test_positive: -20, sell: -25 },
+    cannabis: { suspect: 0, possess: -30, use: -30, test_positive: -30, sell: -30 },
+    narcotic: { suspect: 0, possess: -30, use: -30, test_positive: -30, sell: -30 },
+    other: { suspect: 0, possess: -30, use: -30, test_positive: -30, sell: -30 },
   };
   const pointsTable = () => { const p = Store.s.drugPoints || {}; const o = {}; Object.keys(CATS).forEach((c) => { o[c] = { ...DEFAULT_POINTS[c], ...(p[c] || {}) }; }); return o; };
   const ptsFor = (cat, act) => Number((pointsTable()[cat] || {})[act] || 0);
@@ -350,7 +350,7 @@
 
     pointsHtml() {
       const p = pointsTable(), admin = Store.isAdmin();
-      return `<form class="card" id="drug-points"><div class="card-head"><h3>เกณฑ์ตัดคะแนนความประพฤติ</h3><span class="muted small">${admin ? 'แก้ตัวเลขแล้วกดบันทึก · ใส่เป็นค่าติดลบ' : 'เฉพาะผู้ดูแลระบบที่แก้ไขได้'}</span></div>
+      return `<form class="card" id="drug-points"><div class="card-head"><h3>เกณฑ์ตัดคะแนนความประพฤติ</h3><span class="muted small">ตามระเบียบโรงเรียน ข้อ 50 หมวด 1–3 · ${admin ? 'แก้ตัวเลขแล้วกดบันทึก · ใส่เป็นค่าติดลบ' : 'เฉพาะผู้ดูแลระบบที่แก้ไขได้'}</span></div>
         <div class="tbl-wrap"><table class="tbl"><thead><tr><th>ประเภท</th>${Object.values(ACTS).map((l) => `<th class="num">${esc(l)}</th>`).join('')}</tr></thead><tbody>
           ${Object.entries(CATS).map(([c, cat]) => `<tr><td>${esc(cat.label)}<div class="muted small">${esc(cat.items.join(', '))}</div></td>${Object.keys(ACTS).map((a) => `<td class="num"><input class="input mono" style="width:76px;text-align:right" type="number" min="-100" max="0" name="${c}.${a}" value="${p[c][a]}" ${admin ? '' : 'disabled'} aria-label="${esc(cat.label)} ${esc(ACTS[a])}"></td>`).join('')}</tr>`).join('')}
         </tbody></table></div>

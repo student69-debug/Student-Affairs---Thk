@@ -128,7 +128,7 @@
       version: 1,
       settings: {
         year: 2569, term: 2,
-        baseScore: 100, warnBelow: 70, alertBelow: 50,
+        baseScore: 100, warnBelow: 81, alertBelow: 60,
         apps: { care: true, counsel: true, behavior: true },
         currentUserId: 'u1',
       },
