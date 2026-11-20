@@ -326,8 +326,9 @@
       pwNotOk: 'รหัสผ่านยังไม่ครบเงื่อนไข · ดูรายการสีแดงใต้ช่องรหัสผ่าน',
       forgotT: 'ลืมรหัสผ่าน', forgotSub: 'กรอกอีเมลที่ใช้สมัคร ระบบจะส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ไปให้',
       sendLink: 'ส่งลิงก์ตั้งรหัสผ่านใหม่', back: 'กลับไปหน้าเข้าสู่ระบบ',
-      sent: (m) => `ถ้า <b>${m}</b> มีบัญชีในระบบ ลิงก์ตั้งรหัสผ่านใหม่ถูกส่งไปแล้ว เปิดอีเมล (ดูในโฟลเดอร์สแปมด้วย) แล้วกดลิงก์ภายใน 1 ชั่วโมง`,
-      mailNote: 'อีเมลส่งจากระบบ Supabase เป็นภาษาอังกฤษ · ระบบส่งอีเมลได้ไม่กี่ฉบับต่อชั่วโมง ถ้าไม่ได้รับ ติดต่อผู้ดูแลระบบ',
+      sent: (m) => `ถ้า <b>${m}</b> มีบัญชีในระบบ ลิงก์ตั้งรหัสผ่านใหม่ถูกส่งไปแล้ว เปิดอีเมลจาก <b>ระบบกิจการนักเรียน THK</b> แล้วกดลิงก์ภายใน 1 ชั่วโมง`,
+      junk: '<b>ไม่เจออีเมล?</b> ดูในโฟลเดอร์ <b>จดหมายขยะ / สแปม</b> (Junk / Spam) อีเมลจากระบบมักไปอยู่ที่นั่น เจอแล้วกด <b>"ไม่ใช่สแปม"</b> เพื่อให้ครั้งต่อไปเข้ากล่องจดหมายปกติ',
+      mailNote: 'อีเมลอาจใช้เวลา 1–2 นาที และอาจไปอยู่ในโฟลเดอร์จดหมายขยะ · ถ้าไม่ได้รับภายใน 10 นาที ติดต่อผู้ดูแลระบบ',
       newPwT: 'ตั้งรหัสผ่านใหม่', newPwSub: 'ตั้งรหัสผ่านใหม่ แล้วเข้าใช้งานได้ทันที', newPw: 'รหัสผ่านใหม่', confirmPw: 'ยืนยันรหัสผ่านใหม่',
       pwMismatch: 'รหัสผ่านทั้งสองช่องไม่ตรงกัน', savePw: 'บันทึกรหัสผ่านใหม่', pwSaved: 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว',
       linkExpired: 'ลิงก์นี้หมดอายุหรือถูกใช้ไปแล้ว กรุณาขอลิงก์ใหม่', askAgain: 'ขอลิงก์ใหม่',
@@ -360,8 +361,9 @@
       pwNotOk: 'The password does not meet the rules yet · see the red items under the password',
       forgotT: 'Reset your password', forgotSub: 'Enter the email you signed up with and we will send you a link to set a new password.',
       sendLink: 'Send reset link', back: 'Back to sign in',
-      sent: (m) => `If <b>${m}</b> has an account, a reset link is on its way. Open the email (check spam too) and use the link within 1 hour.`,
-      mailNote: 'Only a few emails can be sent per hour. If nothing arrives, contact the administrator.',
+      sent: (m) => `If <b>${m}</b> has an account, a reset link is on its way. Open the email from <b>ระบบกิจการนักเรียน THK</b> and use the link within 1 hour.`,
+      junk: '<b>Can’t find it?</b> Look in your <b>Junk / Spam</b> folder; system emails often land there. Mark it <b>"Not spam"</b> so the next one reaches your inbox.',
+      mailNote: 'The email can take 1–2 minutes and may land in Junk. If nothing arrives within 10 minutes, contact the administrator.',
       newPwT: 'Set a new password', newPwSub: 'Choose a new password and you are signed in right away.', newPw: 'New password', confirmPw: 'Confirm new password',
       pwMismatch: 'The two passwords do not match', savePw: 'Save new password', pwSaved: 'Your password has been changed',
       linkExpired: 'This link has expired or was already used. Please ask for a new one.', askAgain: 'Ask for a new link',
@@ -595,7 +597,7 @@
   function forgotScreen(sentTo = '') {
     redraw = () => forgotScreen(sentTo);
     authGate(`<form class="login auth-form" id="login-form" novalidate>${welcome(t('forgotT'), t('forgotSub'))}
-      ${sentTo ? notice('mail-check', t('sent')(esc(sentTo))) : ''}
+      ${sentTo ? notice('mail-check', t('sent')(esc(sentTo))) + notice('folder-x', t('junk'), 'warn') : ''}
       <div class="field"><label>${t('email')} <span class="req">*</span></label>${field('mail', `<input class="input" type="email" name="email" required autocomplete="email" placeholder="name@thk.ac.th" value="${esc(sentTo)}">`)}</div>
       ${submitBtn(t('sendLink'))}
       <div class="muted small">${t('mailNote')}</div>
