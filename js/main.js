@@ -287,33 +287,98 @@
 
   /* ---------- Sign-in ---------- */
   const gateEl = document.getElementById('gate');
-  function gate(html, light = false) {
+  let heroTimer = null;
+  function gate(html, light = false, auth = false) {
+    if (heroTimer) { clearInterval(heroTimer); heroTimer = null; }
     gateEl.innerHTML = '<h1 class="sr-only">ระบบกิจการนักเรียน · Student Affairs – Thk</h1>' + html;
     gateEl.classList.toggle('light', light);
+    gateEl.classList.toggle('auth-mode', auth);
     gateEl.hidden = false;
     document.querySelector('.shell').hidden = true;
     UI.refreshIcons();
   }
   const BRAND = `<div class="brand-row"><div class="brand-mark"><img src="img/logo.png?v=20261117e" alt=""></div><div><b>STUDENT AFFAIRS</b><span>กลุ่มบริหารกิจการนักเรียน · ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม</span></div></div>`;
 
+  /* ---- sign-in page: hero panel (left) + form (right) ---- */
+  const HERO_ART = [
+    // school building
+    `<svg viewBox="0 0 600 520" fill="none"><circle cx="460" cy="90" r="58" fill="#fff" opacity=".14"/><path d="M300 112V32" stroke="#fff" stroke-opacity=".55" stroke-width="4"/><path d="M302 32h52l-12 15 12 15h-52z" fill="#C70E14" opacity=".9"/>
+      <path d="M110 220 300 112l190 108z" fill="#fff" opacity=".16"/><rect x="130" y="218" width="340" height="250" rx="6" fill="#fff" opacity=".10"/><rect x="20" y="300" width="110" height="168" rx="6" fill="#fff" opacity=".07"/><rect x="470" y="280" width="120" height="188" rx="6" fill="#fff" opacity=".07"/>
+      <circle cx="300" cy="182" r="24" fill="#fff" opacity=".3"/><path d="M300 168v15l10 7" stroke="#111770" stroke-width="4" stroke-linecap="round"/>
+      ${[0, 1, 2, 3].map((r) => [0, 1, 2, 3, 4, 5].map((c) => `<rect x="${150 + c * 52}" y="${238 + r * 46}" width="34" height="28" rx="3" fill="#fff" opacity="${(r * 6 + c) % 5 === 1 ? '.45' : '.2'}"/>`).join('')).join('')}
+      <rect x="276" y="424" width="48" height="44" rx="4" fill="#fff" opacity=".3"/><path d="M0 468h600" stroke="#fff" stroke-opacity=".25" stroke-width="3"/></svg>`,
+    // dashboard
+    `<svg viewBox="0 0 600 520" fill="none"><rect x="70" y="120" width="420" height="270" rx="18" fill="#fff" opacity=".13"/><rect x="100" y="150" width="170" height="14" rx="7" fill="#fff" opacity=".35"/>
+      ${[90, 150, 120, 200, 165].map((h, i) => `<rect x="${110 + i * 50}" y="${360 - h}" width="32" height="${h}" rx="6" fill="#fff" opacity="${i === 3 ? '.6' : '.3'}"/>`).join('')}
+      <circle cx="420" cy="260" r="48" stroke="#fff" stroke-opacity=".2" stroke-width="16"/><path d="M420 212a48 48 0 0 1 45 64" stroke="#C70E14" stroke-width="16" stroke-linecap="round" opacity=".9"/>
+      <rect x="360" y="40" width="210" height="64" rx="14" fill="#fff" opacity=".2"/><circle cx="394" cy="72" r="16" fill="#fff" opacity=".55"/><path d="m386 72 6 6 11-12" stroke="#111770" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><rect x="422" y="64" width="120" height="14" rx="7" fill="#fff" opacity=".4"/>
+      <rect x="40" y="340" width="190" height="120" rx="16" fill="#fff" opacity=".16"/><path d="M62 425c30-28 50 8 80-14s40-26 66-6" stroke="#fff" stroke-opacity=".6" stroke-width="5" stroke-linecap="round"/></svg>`,
+    // parents on the phone
+    `<svg viewBox="0 0 600 520" fill="none"><rect x="330" y="60" width="190" height="370" rx="30" fill="#fff" opacity=".14"/><rect x="350" y="96" width="150" height="90" rx="14" fill="#fff" opacity=".22"/><circle cx="425" cy="141" r="26" fill="#fff" opacity=".45"/>
+      ${[0, 1, 2].map((i) => `<rect x="350" y="${206 + i * 52}" width="150" height="38" rx="10" fill="#fff" opacity=".18"/><rect x="364" y="${219 + i * 52}" width="${[90, 70, 105][i]}" height="12" rx="6" fill="#fff" opacity=".45"/>`).join('')}
+      <path d="M190 150 270 180v70c0 52-36 86-80 100-44-14-80-48-80-100v-70z" fill="#fff" opacity=".16"/><path d="m158 248 22 22 44-48" stroke="#fff" stroke-opacity=".75" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  ];
+  const HERO_CHIPS = [['clipboard-pen', 'พฤติกรรม & คะแนน'], ['hand-heart', 'ดูแลช่วยเหลือ'], ['messages-square', 'ให้คำปรึกษา'], ['cigarette-off', 'บุหรี่ / สารเสพติด'], ['bed', 'ห้องพยาบาล'], ['users', 'ผู้ปกครอง']];
+  let heroStats = null;
+  const welcome = (title, sub) => `<div class="auth-welcome"><div class="auth-logo"><img src="img/logo.png?v=20261117e" alt=""></div><h2>${title}</h2><p class="muted">${sub}</p></div>`;
+  const field = (ic, inner, eye = false) => `<div class="input-ic">${icon(ic, 'i16')}${inner}${eye ? `<button type="button" class="eye" data-eye aria-label="แสดงรหัสผ่าน">${icon('eye', 'i16')}</button>` : ''}</div>`;
+  function authGate(formHtml) {
+    gate(`<div class="auth">
+      <aside class="auth-hero">
+        <div class="auth-art" aria-hidden="true">${HERO_ART.map((a, i) => `<div class="auth-slide${i ? '' : ' on'}">${a}</div>`).join('')}</div>
+        <div class="auth-hero-top"><div class="brand-mark"><img src="img/logo.png?v=20261117e" alt=""></div><div><b>โรงเรียนธรรมศาสตร์คลองหลวงวิทยาคม</b><span>กลุ่มบริหารกิจการนักเรียน · Student Affairs</span></div></div>
+        <div class="auth-hero-body">
+          <span class="auth-pill">${icon('sparkles', 'i16')} Student Affairs – Thk</span>
+          <div class="auth-title">ระบบกิจการนักเรียน<br><em>ครบในที่เดียว</em></div>
+          <p class="auth-lead">พฤติกรรม ดูแลช่วยเหลือ ให้คำปรึกษา ห้องพยาบาล และผู้ปกครอง ข้อมูลนักเรียนเชื่อมกันทุกงาน</p>
+          <div class="auth-chips">${HERO_CHIPS.map(([ic, t]) => `<span>${icon(ic, 'i16')}${t}</span>`).join('')}</div>
+          <div class="auth-stats" id="auth-stats">${[['graduation-cap', 'students', 'นักเรียน'], ['school', 'rooms', 'ห้องเรียน'], ['users', 'staff', 'บุคลากรในระบบ']].map(([ic, k, t]) => `<div class="auth-stat">${icon(ic, 'i16')}<b data-k="${k}">–</b><span>${t}</span></div>`).join('')}</div>
+        </div>
+        <div class="auth-dots" role="group" aria-label="ภาพประกอบ">${HERO_ART.map((_, i) => `<button type="button" class="${i ? '' : 'on'}" data-slide="${i}" aria-label="ภาพที่ ${i + 1}"></button>`).join('')}</div>
+      </aside>
+      <section class="auth-side">
+        <div class="auth-side-top">${icon('shield-check', 'i16')}<span>ข้อมูลเข้ารหัส · เห็นเฉพาะส่วนที่มีสิทธิ์</span></div>
+        <div class="auth-form-wrap">${formHtml}</div>
+        <div class="auth-foot">© 2569 กลุ่มบริหารกิจการนักเรียน · ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม</div>
+      </section></div>`, false, true);
+    // slides change every 6 s (not with reduced motion); dots switch them
+    const slides = gateEl.querySelectorAll('.auth-slide'), dots = gateEl.querySelectorAll('.auth-dots button');
+    let cur = 0;
+    const show = (n) => { cur = (n + slides.length) % slides.length; slides.forEach((x, i) => x.classList.toggle('on', i === cur)); dots.forEach((x, i) => x.classList.toggle('on', i === cur)); };
+    dots.forEach((d) => d.addEventListener('click', () => show(+d.dataset.slide)));
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) heroTimer = setInterval(() => { if (!document.hidden) show(cur + 1); }, 6000);
+    // password eye buttons
+    gateEl.querySelectorAll('[data-eye]').forEach((b) => b.addEventListener('click', () => {
+      const inp = b.parentElement.querySelector('input'); const on = inp.type === 'password';
+      inp.type = on ? 'text' : 'password'; b.setAttribute('aria-label', on ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน');
+      b.innerHTML = icon(on ? 'eye-off' : 'eye', 'i16'); UI.refreshIcons();
+    }));
+    // counts (no personal data), fetched once per page load
+    const box = gateEl.querySelector('#auth-stats');
+    const fill = (st) => { if (!st) { box.hidden = true; return; } box.querySelectorAll('[data-k]').forEach((b) => { b.textContent = Number(st[b.dataset.k] || 0).toLocaleString('th-TH'); }); };
+    if (heroStats) fill(heroStats);
+    else Store.loginStats().then((st) => { heroStats = st; if (gateEl.contains(box)) fill(st); }).catch(() => fill(null));
+  }
+
+
   const PARENT_ERRORS = {
     invalid: 'รหัสนักเรียนหรือเลขประจำตัวประชาชนไม่ถูกต้อง',
     locked: 'ลองผิดหลายครั้งเกินไป กรุณารอ 1 ชั่วโมงแล้วลองใหม่ หรือติดต่อครูที่ปรึกษา',
     inactive: 'นักเรียนคนนี้ไม่ได้อยู่ในสถานะกำลังศึกษา กรุณาติดต่อโรงเรียน',
   };
-  const tabsHtml = (parent) => `<div class="login-tabs"><button type="button" class="${parent ? '' : 'on'}" data-login="in">บุคลากร</button><button type="button" class="${parent ? 'on' : ''}" data-login="parent">ผู้ปกครอง</button></div>`;
+  const tabsHtml = (parent) => `<div class="login-tabs"><button type="button" class="${parent ? '' : 'on'}" data-login="in">${icon('briefcase', 'i16')}บุคลากร</button><button type="button" class="${parent ? 'on' : ''}" data-login="parent">${icon('users', 'i16')}ผู้ปกครอง</button></div>`;
 
   // parent sign-in: student ID + the student's national ID, every time (no password to remember)
   function parentScreen(mode = 'parent', msg = '') {
-    gate(`<form class="card rule login" id="login-form" novalidate>${BRAND}${tabsHtml(true)}
-      <h2>เข้าสู่ระบบผู้ปกครอง</h2>
+    authGate(`<form class="login auth-form" id="login-form" novalidate>${welcome('สำหรับผู้ปกครอง', 'ดูข้อมูลบุตรหลาน · ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม')}${tabsHtml(true)}
       <div class="first-steps-plain muted small">ใช้ <b>รหัสนักเรียน</b> และ <b>เลขประจำตัวประชาชน 13 หลักของนักเรียน</b> เข้าได้ทุกครั้ง ไม่ต้องตั้งรหัสผ่าน</div>
       ${msg ? `<div class="notice">${icon('info', 'i16')}<span>${esc(msg)}</span></div>` : ''}
       <div id="login-err"></div>
-      <div class="field"><label>รหัสนักเรียน <span class="req">*</span></label><input class="input mono" name="studentId" required inputmode="numeric" pattern="[0-9]{5}" maxlength="5" title="รหัสนักเรียน 5 หลัก" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,5)" autocomplete="username"></div>
-      <div class="field"><label>เลขประจำตัวประชาชนของนักเรียน <span class="req">*</span></label><input class="input mono" type="password" name="cid" required inputmode="numeric" pattern="[0-9A-Za-z]{13}" maxlength="13" title="เลขประจำตัวประชาชน 13 หลัก" autocomplete="current-password" placeholder="13 หลัก">
+      <div class="field"><label>รหัสนักเรียน <span class="req">*</span></label><div class="input-ic">${icon('hash', 'i16')}<input class="input mono" name="studentId" required inputmode="numeric" pattern="[0-9]{5}" maxlength="5" title="รหัสนักเรียน 5 หลัก" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,5)" autocomplete="username"></div></div>
+      <div class="field"><label>เลขประจำตัวประชาชนของนักเรียน <span class="req">*</span></label><div class="input-ic">${icon('id-card', 'i16')}<input class="input mono" type="password" name="cid" required inputmode="numeric" pattern="[0-9A-Za-z]{13}" maxlength="13" title="เลขประจำตัวประชาชน 13 หลัก" autocomplete="current-password" placeholder="13 หลัก"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><label class="small muted" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="cid-show"> แสดงตัวเลข</label><span class="small muted" id="cid-count">0/13 หลัก</span></div></div>
-      <button class="btn primary" type="submit">เข้าสู่ระบบ</button>
+      <button class="btn primary" type="submit">เข้าสู่ระบบ ${icon('arrow-right', 'i16')}</button>
+      <a href="#" class="auth-alt" data-login="in">${icon('briefcase', 'i16')} ครูและบุคลากร เข้าสู่ระบบด้วยอีเมล</a>
     </form>`);
     const form = document.getElementById('login-form');
     bindTabs(form);
@@ -370,13 +435,13 @@
   function loginScreen(mode = 'in', msg = '') {
     if (mode === 'parent' || mode === 'activate') return parentScreen(mode, msg);
     const up = mode === 'up';
-    gate(`<form class="card rule login" id="login-form" novalidate>${BRAND}${tabsHtml(false)}
-      <h2>${up ? 'สมัครใช้งาน' : 'เข้าสู่ระบบ'}</h2>
+    authGate(`<form class="login auth-form" id="login-form" novalidate>${up ? welcome('สมัครใช้งาน', 'สำหรับครูและบุคลากร · ผู้ดูแลระบบจะอนุมัติสิทธิ์ให้') : welcome('ยินดีต้อนรับกลับ', 'เข้าสู่ระบบกิจการนักเรียน · ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม')}${tabsHtml(false)}
       ${msg ? `<div class="notice">${icon('info', 'i16')}<span>${esc(msg)}</span></div>` : ''}
-      ${up ? '<div class="field"><label>ชื่อ – นามสกุล <span class="req">*</span></label><input class="input" name="name" required placeholder="ครูสมศรี วงศ์ใหญ่" autocomplete="name"></div>' : ''}
-      <div class="field"><label>อีเมล <span class="req">*</span></label><input class="input" type="email" name="email" required autocomplete="email"></div>
-      <div class="field"><label>รหัสผ่าน <span class="req">*</span></label><input class="input" type="password" name="password" required autocomplete="${up ? 'new-password' : 'current-password'}">${up ? `<ul class="pw-rules" data-pw-rules>${PW_RULES.map(([k, t]) => `<li data-rule="${k}">${icon('circle', 'i16')}<span>${t}</span></li>`).join('')}</ul>` : ''}</div>
-      <button class="btn primary" type="submit">${up ? 'สมัครใช้งาน' : 'เข้าสู่ระบบ'}</button>
+      ${up ? `<div class="field"><label>ชื่อ – นามสกุล <span class="req">*</span></label>${field('user', '<input class="input" name="name" required placeholder="ครูสมศรี วงศ์ใหญ่" autocomplete="name">')}</div>` : ''}
+      <div class="field"><label>อีเมล <span class="req">*</span></label>${field('mail', '<input class="input" type="email" name="email" required autocomplete="email" placeholder="name@thk.ac.th">')}</div>
+      <div class="field"><label>รหัสผ่าน <span class="req">*</span></label>${field('lock', `<input class="input" type="password" name="password" required autocomplete="${up ? 'new-password' : 'current-password'}" placeholder="••••••••">`, true)}${up ? `<ul class="pw-rules" data-pw-rules>${PW_RULES.map(([k, t]) => `<li data-rule="${k}">${icon('circle', 'i16')}<span>${t}</span></li>`).join('')}</ul>` : ''}</div>
+      <button class="btn primary" type="submit">${up ? 'สมัครใช้งาน' : 'เข้าสู่ระบบ'} ${icon('arrow-right', 'i16')}</button>
+      ${up ? '' : `<a href="#" class="auth-alt" data-login="parent">${icon('users', 'i16')} ผู้ปกครองดูข้อมูลบุตรหลาน</a>`}
       <div class="muted small" style="text-align:center">${up ? 'มีบัญชีแล้ว? <a href="#" data-login="in">เข้าสู่ระบบ</a>' : 'ยังไม่มีบัญชี? <a href="#" data-login="up">สมัครใช้งาน</a> · ผู้ดูแลระบบจะอนุมัติสิทธิ์ให้'}</div>
     </form>`);
     const form = document.getElementById('login-form');

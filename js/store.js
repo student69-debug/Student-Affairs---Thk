@@ -101,6 +101,8 @@
     profile: null,
 
     async session() { return check(await sb.auth.getSession()).session; },
+    // counts for the sign-in page (no personal data; callable before sign-in)
+    async loginStats() { const { data, error } = await sb.rpc('login_stats'); return error ? null : data; },
     async signIn(email, password) { check(await sb.auth.signInWithPassword({ email, password })); },
     async signUp(name, email, password) {
       return check(await sb.auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: location.origin + location.pathname } }));
