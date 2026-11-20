@@ -293,11 +293,89 @@
     gateEl.innerHTML = '<h1 class="sr-only">ระบบกิจการนักเรียน · Student Affairs – Thk</h1>' + html;
     gateEl.classList.toggle('light', light);
     gateEl.classList.toggle('auth-mode', auth);
+    if (!auth) document.documentElement.lang = 'th';
     gateEl.hidden = false;
     document.querySelector('.shell').hidden = true;
     UI.refreshIcons();
   }
   const BRAND = `<div class="brand-row"><div class="brand-mark"><img src="img/logo.png?v=20261117e" alt=""></div><div><b>STUDENT AFFAIRS</b><span>กลุ่มบริหารกิจการนักเรียน · ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม</span></div></div>`;
+
+  /* ---- sign-in pages in Thai or English (TH/EN switch; the rest of the site stays Thai) ---- */
+  const SCHOOL_TH = 'ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม', SCHOOL_EN = 'Thammasat Klongluang Wittayakom School';
+  const L = {
+    th: {
+      school: 'โรงเรียนธรรมศาสตร์คลองหลวงวิทยาคม', dept: 'กลุ่มบริหารกิจการนักเรียน · Student Affairs',
+      title1: 'ระบบกิจการนักเรียน', title2: 'ครบในที่เดียว',
+      lead: 'พฤติกรรม ดูแลช่วยเหลือ ให้คำปรึกษา ห้องพยาบาล และผู้ปกครอง ข้อมูลนักเรียนเชื่อมกันทุกงาน',
+      chips: ['พฤติกรรม & คะแนน', 'ดูแลช่วยเหลือ', 'ให้คำปรึกษา', 'บุหรี่ / สารเสพติด', 'ห้องพยาบาล', 'ผู้ปกครอง'],
+      stats: ['นักเรียน', 'ห้องเรียน', 'บุคลากรในระบบ'], slides: 'ภาพประกอบ', slide: 'ภาพที่',
+      secure: 'ข้อมูลเข้ารหัส · เห็นเฉพาะส่วนที่มีสิทธิ์', foot: '© 2569 กลุ่มบริหารกิจการนักเรียน · ' + SCHOOL_TH, langLabel: 'ภาษา',
+      tabStaff: 'บุคลากร', tabParent: 'ผู้ปกครอง',
+      welcome: 'ยินดีต้อนรับกลับ', welcomeSub: 'เข้าสู่ระบบกิจการนักเรียน · ' + SCHOOL_TH,
+      signupT: 'สมัครใช้งาน', signupSub: 'สำหรับครูและบุคลากร · ผู้ดูแลระบบจะอนุมัติสิทธิ์ให้',
+      parentT: 'สำหรับผู้ปกครอง', parentSub: 'ดูข้อมูลบุตรหลาน · ' + SCHOOL_TH,
+      parentHow: 'ใช้ <b>รหัสนักเรียน</b> และ <b>เลขประจำตัวประชาชน 13 หลักของนักเรียน</b> เข้าได้ทุกครั้ง ไม่ต้องตั้งรหัสผ่าน',
+      studentId: 'รหัสนักเรียน', studentIdTitle: 'รหัสนักเรียน 5 หลัก', cid: 'เลขประจำตัวประชาชนของนักเรียน', cidTitle: 'เลขประจำตัวประชาชน 13 หลัก',
+      cidPh: '13 หลัก', showDigits: 'แสดงตัวเลข', digits: 'หลัก', cidLen: (n) => `เลขประจำตัวประชาชนต้องมี 13 หลัก (ตอนนี้ ${n} หลัก)`,
+      signIn: 'เข้าสู่ระบบ', signingIn: 'กำลังเข้าสู่ระบบ…', working: 'กำลังดำเนินการ…',
+      staffAlt: 'ครูและบุคลากร เข้าสู่ระบบด้วยอีเมล', parentAlt: 'ผู้ปกครองดูข้อมูลบุตรหลาน',
+      name: 'ชื่อ – นามสกุล', email: 'อีเมล', password: 'รหัสผ่าน', showPw: 'แสดงรหัสผ่าน', hidePw: 'ซ่อนรหัสผ่าน',
+      forgot: 'ลืมรหัสผ่าน?', remember: 'จดจำฉัน 30 วัน', rememberHint: 'ถ้าปิดไว้ จะออกจากระบบเมื่อปิดเบราว์เซอร์ (เหมาะกับเครื่องที่ใช้ร่วมกัน)',
+      haveAcct: 'มีบัญชีแล้ว?', noAcct: 'ยังไม่มีบัญชี?', approveNote: 'ผู้ดูแลระบบจะอนุมัติสิทธิ์ให้',
+      pwRules: ['อย่างน้อย 8 ตัวอักษร', 'มีตัวอังกฤษพิมพ์เล็ก (a–z) อย่างน้อย 1 ตัว', 'มีตัวอังกฤษพิมพ์ใหญ่ (A–Z) อย่างน้อย 1 ตัว', 'มีตัวเลข (0–9) อย่างน้อย 1 ตัว'],
+      pwNotOk: 'รหัสผ่านยังไม่ครบเงื่อนไข · ดูรายการสีแดงใต้ช่องรหัสผ่าน',
+      forgotT: 'ลืมรหัสผ่าน', forgotSub: 'กรอกอีเมลที่ใช้สมัคร ระบบจะส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ไปให้',
+      sendLink: 'ส่งลิงก์ตั้งรหัสผ่านใหม่', back: 'กลับไปหน้าเข้าสู่ระบบ',
+      sent: (m) => `ถ้า <b>${m}</b> มีบัญชีในระบบ ลิงก์ตั้งรหัสผ่านใหม่ถูกส่งไปแล้ว เปิดอีเมล (ดูในโฟลเดอร์สแปมด้วย) แล้วกดลิงก์ภายใน 1 ชั่วโมง`,
+      mailNote: 'อีเมลส่งจากระบบ Supabase เป็นภาษาอังกฤษ · ระบบส่งอีเมลได้ไม่กี่ฉบับต่อชั่วโมง ถ้าไม่ได้รับ ติดต่อผู้ดูแลระบบ',
+      newPwT: 'ตั้งรหัสผ่านใหม่', newPwSub: 'ตั้งรหัสผ่านใหม่ แล้วเข้าใช้งานได้ทันที', newPw: 'รหัสผ่านใหม่', confirmPw: 'ยืนยันรหัสผ่านใหม่',
+      pwMismatch: 'รหัสผ่านทั้งสองช่องไม่ตรงกัน', savePw: 'บันทึกรหัสผ่านใหม่', pwSaved: 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว',
+      linkExpired: 'ลิงก์นี้หมดอายุหรือถูกใช้ไปแล้ว กรุณาขอลิงก์ใหม่', askAgain: 'ขอลิงก์ใหม่',
+      signedUpMail: 'สมัครเรียบร้อย — กรุณาเปิดอีเมลแล้วกดลิงก์ยืนยัน จากนั้นเข้าสู่ระบบที่นี่',
+      signedUpT: 'สมัครเรียบร้อยแล้ว · ขั้นต่อไปตรวจอีเมล', mailSentTo: 'ระบบส่งอีเมลยืนยันไปที่',
+      signupSteps: ['เปิดกล่องจดหมายของอีเมลนี้ (ถ้าไม่เจอ ให้ดูในโฟลเดอร์ <b>สแปม / จดหมายขยะ</b> หรือแท็บ <b>โปรโมชัน</b>)', 'เปิดอีเมลเรื่อง <b>ยืนยันอีเมล</b> แล้วกดลิงก์ยืนยันในอีเมล', 'กลับมาที่หน้านี้ แล้ว <b>เข้าสู่ระบบ</b> ด้วยอีเมลและรหัสผ่านที่เพิ่งตั้ง', 'รอผู้ดูแลระบบอนุมัติสิทธิ์ แล้วจะเข้าใช้งานได้'],
+      gotIt: 'เข้าใจแล้ว', signedUpToast: 'สมัครใช้งานเรียบร้อยแล้ว · รอผู้ดูแลระบบอนุมัติสิทธิ์',
+      parentErr: { invalid: 'รหัสนักเรียนหรือเลขประจำตัวประชาชนไม่ถูกต้อง', locked: 'ลองผิดหลายครั้งเกินไป กรุณารอ 1 ชั่วโมงแล้วลองใหม่ หรือติดต่อครูที่ปรึกษา', inactive: 'นักเรียนคนนี้ไม่ได้อยู่ในสถานะกำลังศึกษา กรุณาติดต่อโรงเรียน', other: 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่' },
+    },
+    en: {
+      school: SCHOOL_EN, dept: 'Student Affairs Division',
+      title1: 'Student Affairs', title2: 'all in one place',
+      lead: 'Behaviour, student care, counselling, the nurse room and parents: every task shares one student record.',
+      chips: ['Behaviour & points', 'Student care', 'Counselling', 'Tobacco & drugs', 'Nurse room', 'Parents'],
+      stats: ['Students', 'Classrooms', 'Staff in the system'], slides: 'Illustrations', slide: 'Slide',
+      secure: 'Encrypted · you see only what your role allows', foot: '© 2026 Student Affairs Division · ' + SCHOOL_EN, langLabel: 'Language',
+      tabStaff: 'Staff', tabParent: 'Parents',
+      welcome: 'Welcome back', welcomeSub: 'Sign in to Student Affairs · ' + SCHOOL_EN,
+      signupT: 'Create an account', signupSub: 'For teachers and staff · an administrator approves your access',
+      parentT: 'For parents', parentSub: "See your child's records · " + SCHOOL_EN,
+      parentHow: "Use the <b>student ID</b> and the <b>student's 13-digit national ID</b> every time. No password needed.",
+      studentId: 'Student ID', studentIdTitle: '5-digit student ID', cid: "Student's national ID", cidTitle: '13-digit national ID',
+      cidPh: '13 digits', showDigits: 'Show digits', digits: 'digits', cidLen: (n) => `The national ID has 13 digits (you typed ${n})`,
+      signIn: 'Sign in', signingIn: 'Signing in…', working: 'Working…',
+      staffAlt: 'Teachers and staff: sign in with email', parentAlt: "Parents: see your child's records",
+      name: 'Full name', email: 'Email', password: 'Password', showPw: 'Show password', hidePw: 'Hide password',
+      forgot: 'Forgot password?', remember: 'Remember me for 30 days', rememberHint: 'If off, you are signed out when the browser closes (good for shared computers)',
+      haveAcct: 'Already have an account?', noAcct: 'No account yet?', approveNote: 'an administrator approves it',
+      pwRules: ['At least 8 characters', 'At least 1 lowercase letter (a–z)', 'At least 1 uppercase letter (A–Z)', 'At least 1 digit (0–9)'],
+      pwNotOk: 'The password does not meet the rules yet · see the red items under the password',
+      forgotT: 'Reset your password', forgotSub: 'Enter the email you signed up with and we will send you a link to set a new password.',
+      sendLink: 'Send reset link', back: 'Back to sign in',
+      sent: (m) => `If <b>${m}</b> has an account, a reset link is on its way. Open the email (check spam too) and use the link within 1 hour.`,
+      mailNote: 'Only a few emails can be sent per hour. If nothing arrives, contact the administrator.',
+      newPwT: 'Set a new password', newPwSub: 'Choose a new password and you are signed in right away.', newPw: 'New password', confirmPw: 'Confirm new password',
+      pwMismatch: 'The two passwords do not match', savePw: 'Save new password', pwSaved: 'Your password has been changed',
+      linkExpired: 'This link has expired or was already used. Please ask for a new one.', askAgain: 'Ask for a new link',
+      signedUpMail: 'Account created. Open your email, click the confirmation link, then sign in here.',
+      signedUpT: 'Account created · check your email next', mailSentTo: 'A confirmation email was sent to',
+      signupSteps: ['Open the inbox of this email (if it is not there, look in <b>Spam / Junk</b> or <b>Promotions</b>)', 'Open the email about <b>confirming your email</b> and click its link', 'Come back to this page and <b>sign in</b> with the email and password you just set', 'Wait for an administrator to approve your access'],
+      gotIt: 'Got it', signedUpToast: 'Account created · waiting for administrator approval',
+      parentErr: { invalid: 'The student ID or national ID is not correct', locked: 'Too many wrong tries. Wait 1 hour and try again, or contact the homeroom teacher', inactive: 'This student is not currently enrolled. Please contact the school', other: 'Sign-in failed. Please try again' },
+    },
+  };
+  let lang = 'th';
+  try { if (localStorage.getItem('sa-lang') === 'en') lang = 'en'; } catch (e) { /* storage blocked */ }
+  const t = (k) => (L[lang][k] !== undefined ? L[lang][k] : L.th[k]);
+  let redraw = null; // re-renders the current sign-in screen after a language change
 
   /* ---- sign-in page: hero panel (left) + form (right) ---- */
   const HERO_ART = [
@@ -318,28 +396,31 @@
       ${[0, 1, 2].map((i) => `<rect x="350" y="${206 + i * 52}" width="150" height="38" rx="10" fill="#fff" opacity=".18"/><rect x="364" y="${219 + i * 52}" width="${[90, 70, 105][i]}" height="12" rx="6" fill="#fff" opacity=".45"/>`).join('')}
       <path d="M190 150 270 180v70c0 52-36 86-80 100-44-14-80-48-80-100v-70z" fill="#fff" opacity=".16"/><path d="m158 248 22 22 44-48" stroke="#fff" stroke-opacity=".75" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   ];
-  const HERO_CHIPS = [['clipboard-pen', 'พฤติกรรม & คะแนน'], ['hand-heart', 'ดูแลช่วยเหลือ'], ['messages-square', 'ให้คำปรึกษา'], ['cigarette-off', 'บุหรี่ / สารเสพติด'], ['bed', 'ห้องพยาบาล'], ['users', 'ผู้ปกครอง']];
+  const HERO_ICONS = ['clipboard-pen', 'hand-heart', 'messages-square', 'cigarette-off', 'bed', 'users'];
   let heroStats = null;
   const welcome = (title, sub) => `<div class="auth-welcome"><div class="auth-logo"><img src="img/logo.png?v=20261117e" alt=""></div><h2>${title}</h2><p class="muted">${sub}</p></div>`;
-  const field = (ic, inner, eye = false) => `<div class="input-ic">${icon(ic, 'i16')}${inner}${eye ? `<button type="button" class="eye" data-eye aria-label="แสดงรหัสผ่าน">${icon('eye', 'i16')}</button>` : ''}</div>`;
+  const field = (ic, inner, eye = false) => `<div class="input-ic">${icon(ic, 'i16')}${inner}${eye ? `<button type="button" class="eye" data-eye aria-label="${t('showPw')}">${icon('eye', 'i16')}</button>` : ''}</div>`;
+  const notice = (ic, html, cls = '') => `<div class="notice ${cls}">${icon(ic, 'i16')}<span>${html}</span></div>`;
   function authGate(formHtml) {
+    document.documentElement.lang = lang;
     gate(`<div class="auth">
       <aside class="auth-hero">
         <div class="auth-art" aria-hidden="true">${HERO_ART.map((a, i) => `<div class="auth-slide${i ? '' : ' on'}">${a}</div>`).join('')}</div>
-        <div class="auth-hero-top"><div class="brand-mark"><img src="img/logo.png?v=20261117e" alt=""></div><div><b>โรงเรียนธรรมศาสตร์คลองหลวงวิทยาคม</b><span>กลุ่มบริหารกิจการนักเรียน · Student Affairs</span></div></div>
+        <div class="auth-hero-top"><div class="brand-mark"><img src="img/logo.png?v=20261117e" alt=""></div><div><b>${t('school')}</b><span>${t('dept')}</span></div></div>
         <div class="auth-hero-body">
           <span class="auth-pill">${icon('sparkles', 'i16')} Student Affairs – Thk</span>
-          <div class="auth-title">ระบบกิจการนักเรียน<br><em>ครบในที่เดียว</em></div>
-          <p class="auth-lead">พฤติกรรม ดูแลช่วยเหลือ ให้คำปรึกษา ห้องพยาบาล และผู้ปกครอง ข้อมูลนักเรียนเชื่อมกันทุกงาน</p>
-          <div class="auth-chips">${HERO_CHIPS.map(([ic, t]) => `<span>${icon(ic, 'i16')}${t}</span>`).join('')}</div>
-          <div class="auth-stats" id="auth-stats">${[['graduation-cap', 'students', 'นักเรียน'], ['school', 'rooms', 'ห้องเรียน'], ['users', 'staff', 'บุคลากรในระบบ']].map(([ic, k, t]) => `<div class="auth-stat">${icon(ic, 'i16')}<b data-k="${k}">–</b><span>${t}</span></div>`).join('')}</div>
+          <div class="auth-title">${t('title1')}<br><em>${t('title2')}</em></div>
+          <p class="auth-lead">${t('lead')}</p>
+          <div class="auth-chips">${HERO_ICONS.map((ic, i) => `<span>${icon(ic, 'i16')}${t('chips')[i]}</span>`).join('')}</div>
+          <div class="auth-stats" id="auth-stats">${[['graduation-cap', 'students'], ['school', 'rooms'], ['users', 'staff']].map(([ic, k], i) => `<div class="auth-stat">${icon(ic, 'i16')}<b data-k="${k}">–</b><span>${t('stats')[i]}</span></div>`).join('')}</div>
         </div>
-        <div class="auth-dots" role="group" aria-label="ภาพประกอบ">${HERO_ART.map((_, i) => `<button type="button" class="${i ? '' : 'on'}" data-slide="${i}" aria-label="ภาพที่ ${i + 1}"></button>`).join('')}</div>
+        <div class="auth-dots" role="group" aria-label="${t('slides')}">${HERO_ART.map((_, i) => `<button type="button" class="${i ? '' : 'on'}" data-slide="${i}" aria-label="${t('slide')} ${i + 1}"></button>`).join('')}</div>
       </aside>
       <section class="auth-side">
-        <div class="auth-side-top">${icon('shield-check', 'i16')}<span>ข้อมูลเข้ารหัส · เห็นเฉพาะส่วนที่มีสิทธิ์</span></div>
+        <div class="auth-side-top">${icon('shield-check', 'i16')}<span>${t('secure')}</span>
+          <div class="lang-switch" role="group" aria-label="${t('langLabel')}"><button type="button" data-lang="th" class="${lang === 'th' ? 'on' : ''}" aria-pressed="${lang === 'th'}" lang="th">TH</button><button type="button" data-lang="en" class="${lang === 'en' ? 'on' : ''}" aria-pressed="${lang === 'en'}" lang="en">EN</button></div></div>
         <div class="auth-form-wrap">${formHtml}</div>
-        <div class="auth-foot">© 2569 กลุ่มบริหารกิจการนักเรียน · ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม</div>
+        <div class="auth-foot">${t('foot')}</div>
       </section></div>`, false, true);
     // slides change every 6 s (not with reduced motion); dots switch them
     const slides = gateEl.querySelectorAll('.auth-slide'), dots = gateEl.querySelectorAll('.auth-dots button');
@@ -347,61 +428,68 @@
     const show = (n) => { cur = (n + slides.length) % slides.length; slides.forEach((x, i) => x.classList.toggle('on', i === cur)); dots.forEach((x, i) => x.classList.toggle('on', i === cur)); };
     dots.forEach((d) => d.addEventListener('click', () => show(+d.dataset.slide)));
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) heroTimer = setInterval(() => { if (!document.hidden) show(cur + 1); }, 6000);
+    // TH / EN
+    gateEl.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.lang === lang) return;
+      lang = b.dataset.lang;
+      try { localStorage.setItem('sa-lang', lang); } catch (e) { /* storage blocked */ }
+      if (redraw) redraw();
+      const again = gateEl.querySelector(`[data-lang="${lang}"]`); if (again) again.focus();
+    }));
     // password eye buttons
     gateEl.querySelectorAll('[data-eye]').forEach((b) => b.addEventListener('click', () => {
       const inp = b.parentElement.querySelector('input'); const on = inp.type === 'password';
-      inp.type = on ? 'text' : 'password'; b.setAttribute('aria-label', on ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน');
+      inp.type = on ? 'text' : 'password'; b.setAttribute('aria-label', t(on ? 'hidePw' : 'showPw'));
       b.innerHTML = icon(on ? 'eye-off' : 'eye', 'i16'); UI.refreshIcons();
     }));
     // counts (no personal data), fetched once per page load
     const box = gateEl.querySelector('#auth-stats');
-    const fill = (st) => { if (!st) { box.hidden = true; return; } box.querySelectorAll('[data-k]').forEach((b) => { b.textContent = Number(st[b.dataset.k] || 0).toLocaleString('th-TH'); }); };
+    const fill = (st) => { if (!st) { box.hidden = true; return; } box.querySelectorAll('[data-k]').forEach((b) => { b.textContent = Number(st[b.dataset.k] || 0).toLocaleString(lang === 'en' ? 'en-US' : 'th-TH'); }); };
     if (heroStats) fill(heroStats);
     else Store.loginStats().then((st) => { heroStats = st; if (gateEl.contains(box)) fill(st); }).catch(() => fill(null));
   }
 
-
-  const PARENT_ERRORS = {
-    invalid: 'รหัสนักเรียนหรือเลขประจำตัวประชาชนไม่ถูกต้อง',
-    locked: 'ลองผิดหลายครั้งเกินไป กรุณารอ 1 ชั่วโมงแล้วลองใหม่ หรือติดต่อครูที่ปรึกษา',
-    inactive: 'นักเรียนคนนี้ไม่ได้อยู่ในสถานะกำลังศึกษา กรุณาติดต่อโรงเรียน',
-  };
-  const tabsHtml = (parent) => `<div class="login-tabs"><button type="button" class="${parent ? '' : 'on'}" data-login="in">${icon('briefcase', 'i16')}บุคลากร</button><button type="button" class="${parent ? 'on' : ''}" data-login="parent">${icon('users', 'i16')}ผู้ปกครอง</button></div>`;
+  const tabsHtml = (parent) => `<div class="login-tabs"><button type="button" class="${parent ? '' : 'on'}" data-login="in">${icon('briefcase', 'i16')}${t('tabStaff')}</button><button type="button" class="${parent ? 'on' : ''}" data-login="parent">${icon('users', 'i16')}${t('tabParent')}</button></div>`;
+  const submitBtn = (label) => `<button class="btn primary" type="submit">${label} ${icon('arrow-right', 'i16')}</button>`;
+  const busy = (btn, on, label) => { btn.disabled = on; btn.innerHTML = on ? esc(t('working')) : `${esc(label)} ${icon('arrow-right', 'i16')}`; if (!on) UI.refreshIcons(); };
+  const msgText = (msg) => (typeof msg === 'function' ? msg() : msg);
 
   // parent sign-in: student ID + the student's national ID, every time (no password to remember)
   function parentScreen(mode = 'parent', msg = '') {
-    authGate(`<form class="login auth-form" id="login-form" novalidate>${welcome('สำหรับผู้ปกครอง', 'ดูข้อมูลบุตรหลาน · ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม')}${tabsHtml(true)}
-      <div class="first-steps-plain muted small">ใช้ <b>รหัสนักเรียน</b> และ <b>เลขประจำตัวประชาชน 13 หลักของนักเรียน</b> เข้าได้ทุกครั้ง ไม่ต้องตั้งรหัสผ่าน</div>
-      ${msg ? `<div class="notice">${icon('info', 'i16')}<span>${esc(msg)}</span></div>` : ''}
+    redraw = () => parentScreen(mode, msg);
+    authGate(`<form class="login auth-form" id="login-form" novalidate>${welcome(t('parentT'), t('parentSub'))}${tabsHtml(true)}
+      <div class="first-steps-plain muted small">${t('parentHow')}</div>
+      ${msg ? notice('info', esc(msgText(msg))) : ''}
       <div id="login-err"></div>
-      <div class="field"><label>รหัสนักเรียน <span class="req">*</span></label><div class="input-ic">${icon('hash', 'i16')}<input class="input mono" name="studentId" required inputmode="numeric" pattern="[0-9]{5}" maxlength="5" title="รหัสนักเรียน 5 หลัก" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,5)" autocomplete="username"></div></div>
-      <div class="field"><label>เลขประจำตัวประชาชนของนักเรียน <span class="req">*</span></label><div class="input-ic">${icon('id-card', 'i16')}<input class="input mono" type="password" name="cid" required inputmode="numeric" pattern="[0-9A-Za-z]{13}" maxlength="13" title="เลขประจำตัวประชาชน 13 หลัก" autocomplete="current-password" placeholder="13 หลัก"></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><label class="small muted" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="cid-show"> แสดงตัวเลข</label><span class="small muted" id="cid-count">0/13 หลัก</span></div></div>
-      <button class="btn primary" type="submit">เข้าสู่ระบบ ${icon('arrow-right', 'i16')}</button>
-      <a href="#" class="auth-alt" data-login="in">${icon('briefcase', 'i16')} ครูและบุคลากร เข้าสู่ระบบด้วยอีเมล</a>
+      <div class="field"><label>${t('studentId')} <span class="req">*</span></label><div class="input-ic">${icon('hash', 'i16')}<input class="input mono" name="studentId" required inputmode="numeric" pattern="[0-9]{5}" maxlength="5" title="${t('studentIdTitle')}" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,5)" autocomplete="username"></div></div>
+      <div class="field"><label>${t('cid')} <span class="req">*</span></label><div class="input-ic">${icon('id-card', 'i16')}<input class="input mono" type="password" name="cid" required inputmode="numeric" pattern="[0-9A-Za-z]{13}" maxlength="13" title="${t('cidTitle')}" autocomplete="current-password" placeholder="${t('cidPh')}"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><label class="small muted" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="cid-show"> ${t('showDigits')}</label><span class="small muted" id="cid-count">0/13 ${t('digits')}</span></div></div>
+      ${submitBtn(t('signIn'))}
+      <a href="#" class="auth-alt" data-login="in">${icon('briefcase', 'i16')} ${t('staffAlt')}</a>
     </form>`);
     const form = document.getElementById('login-form');
     bindTabs(form);
     form.querySelector('#cid-show').addEventListener('change', (e) => { form.cid.type = e.target.checked ? 'text' : 'password'; });
     // keep exactly what the server accepts: 13 letters/digits, spaces and dashes dropped (pasted "1-2345-…" still works)
     const cidCount = form.querySelector('#cid-count');
-    const cleanCid = () => { form.cid.value = form.cid.value.replace(/[^0-9A-Za-z]/g, '').slice(0, 13); const n = form.cid.value.length; cidCount.textContent = n + '/13 หลัก'; cidCount.style.color = n === 13 ? 'var(--green-700, #15803d)' : ''; };
+    const cleanCid = () => { form.cid.value = form.cid.value.replace(/[^0-9A-Za-z]/g, '').slice(0, 13); const n = form.cid.value.length; cidCount.textContent = n + '/13 ' + t('digits'); cidCount.style.color = n === 13 ? 'var(--green-700, #15803d)' : ''; };
     form.cid.addEventListener('input', cleanCid);
-    form.cid.addEventListener('paste', (e) => { const t = (e.clipboardData || window.clipboardData).getData('text'); if (t) { e.preventDefault(); form.cid.value = t; cleanCid(); } });
+    form.cid.addEventListener('paste', (e) => { const x = (e.clipboardData || window.clipboardData).getData('text'); if (x) { e.preventDefault(); form.cid.value = x; cleanCid(); } });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       cleanCid();
-      if (form.cid.value.length !== 13) { document.getElementById('login-err').innerHTML = `<div class="notice danger">${icon('alert-circle', 'i16')}<span>เลขประจำตัวประชาชนต้องมี 13 หลัก (ตอนนี้ ${form.cid.value.length} หลัก)</span></div>`; UI.refreshIcons(); form.cid.focus(); return; }
+      if (form.cid.value.length !== 13) { document.getElementById('login-err').innerHTML = notice('alert-circle', esc(t('cidLen')(form.cid.value.length)), 'danger'); UI.refreshIcons(); form.cid.focus(); return; }
       if (!form.checkValidity()) { form.reportValidity(); return; }
       const v = Object.fromEntries(new FormData(form).entries());
       const btn = form.querySelector('button[type=submit]');
-      btn.disabled = true; btn.textContent = 'กำลังเข้าสู่ระบบ…';
+      busy(btn, true); btn.textContent = t('signingIn');
       try {
         await Store.parentSignIn(v.studentId.trim(), v.cid.replace(/[\s-]/g, ''));
         boot();
       } catch (err) {
-        btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
-        document.getElementById('login-err').innerHTML = `<div class="notice danger">${icon('alert-circle', 'i16')}<span>${esc(PARENT_ERRORS[err.message] || 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่')}</span></div>`;
+        busy(btn, false, t('signIn'));
+        const pe = t('parentErr');
+        document.getElementById('login-err').innerHTML = notice('alert-circle', esc(pe[err.message] || pe.other), 'danger');
         UI.refreshIcons();
       }
     });
@@ -414,42 +502,15 @@
     }));
   }
 
-  // password rules for staff sign-up (same as the Supabase Auth policy: 8+ chars, lower + upper case letter, digit)
-  const PW_RULES = [['len', 'อย่างน้อย 8 ตัวอักษร'], ['lower', 'มีตัวอังกฤษพิมพ์เล็ก (a–z) อย่างน้อย 1 ตัว'], ['upper', 'มีตัวอังกฤษพิมพ์ใหญ่ (A–Z) อย่างน้อย 1 ตัว'], ['digit', 'มีตัวเลข (0–9) อย่างน้อย 1 ตัว']];
+  // password rules for staff (same as the Supabase Auth policy: 8+ chars, lower + upper case letter, digit)
+  const PW_KEYS = ['len', 'lower', 'upper', 'digit'];
   const pwMissing = (p) => [p.length >= 8 ? '' : 'len', /[a-z]/.test(p) ? '' : 'lower', /[A-Z]/.test(p) ? '' : 'upper', /[0-9]/.test(p) ? '' : 'digit'].filter(Boolean);
-
-  // Supabase Auth messages are English; show staff a Thai sentence that says what to do
-  function authError(m = '') {
-    if (/Invalid login/i.test(m)) return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
-    if (/not confirmed/i.test(m)) return 'ยังไม่ได้ยืนยันอีเมล — กรุณาเปิดลิงก์ในอีเมลก่อน';
-    if (/Password should contain|Password should be at least|weak.?password/i.test(m)) return 'รหัสผ่านต้องมีอย่างน้อย 8 ตัว และมีตัวอังกฤษพิมพ์เล็ก พิมพ์ใหญ่ และตัวเลข เช่น Thk12345';
-    if (/pwned|leaked|known to be weak|compromised/i.test(m)) return 'รหัสผ่านนี้ง่ายเกินไปหรือเคยรั่วไหล กรุณาตั้งรหัสผ่านใหม่';
-    if (/already registered|already exists/i.test(m)) return 'อีเมลนี้สมัครไว้แล้ว — กด "เข้าสู่ระบบ" แทน หรือติดต่อผู้ดูแลระบบ';
-    if (/email rate limit/i.test(m)) return 'ระบบส่งอีเมลยืนยันครบจำนวนต่อชั่วโมงแล้ว — กรุณาลองสมัครใหม่ในอีกประมาณ 1 ชั่วโมง หรือแจ้งผู้ดูแลระบบ';
-    if (/rate limit|too many|security purposes/i.test(m)) return 'มีการส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่ หรือติดต่อผู้ดูแลระบบ';
-    if (/invalid.*email|email.*invalid|Unable to validate email/i.test(m)) return 'รูปแบบอีเมลไม่ถูกต้อง';
-    if (/Failed to fetch|NetworkError|network/i.test(m)) return 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ กรุณาลองใหม่';
-    return 'ดำเนินการไม่สำเร็จ: ' + m;
-  }
-
-  function loginScreen(mode = 'in', msg = '') {
-    if (mode === 'parent' || mode === 'activate') return parentScreen(mode, msg);
-    const up = mode === 'up';
-    authGate(`<form class="login auth-form" id="login-form" novalidate>${up ? welcome('สมัครใช้งาน', 'สำหรับครูและบุคลากร · ผู้ดูแลระบบจะอนุมัติสิทธิ์ให้') : welcome('ยินดีต้อนรับกลับ', 'เข้าสู่ระบบกิจการนักเรียน · ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม')}${tabsHtml(false)}
-      ${msg ? `<div class="notice">${icon('info', 'i16')}<span>${esc(msg)}</span></div>` : ''}
-      ${up ? `<div class="field"><label>ชื่อ – นามสกุล <span class="req">*</span></label>${field('user', '<input class="input" name="name" required placeholder="ครูสมศรี วงศ์ใหญ่" autocomplete="name">')}</div>` : ''}
-      <div class="field"><label>อีเมล <span class="req">*</span></label>${field('mail', '<input class="input" type="email" name="email" required autocomplete="email" placeholder="name@thk.ac.th">')}</div>
-      <div class="field"><label>รหัสผ่าน <span class="req">*</span></label>${field('lock', `<input class="input" type="password" name="password" required autocomplete="${up ? 'new-password' : 'current-password'}" placeholder="••••••••">`, true)}${up ? `<ul class="pw-rules" data-pw-rules>${PW_RULES.map(([k, t]) => `<li data-rule="${k}">${icon('circle', 'i16')}<span>${t}</span></li>`).join('')}</ul>` : ''}</div>
-      <button class="btn primary" type="submit">${up ? 'สมัครใช้งาน' : 'เข้าสู่ระบบ'} ${icon('arrow-right', 'i16')}</button>
-      ${up ? '' : `<a href="#" class="auth-alt" data-login="parent">${icon('users', 'i16')} ผู้ปกครองดูข้อมูลบุตรหลาน</a>`}
-      <div class="muted small" style="text-align:center">${up ? 'มีบัญชีแล้ว? <a href="#" data-login="in">เข้าสู่ระบบ</a>' : 'ยังไม่มีบัญชี? <a href="#" data-login="up">สมัครใช้งาน</a> · ผู้ดูแลระบบจะอนุมัติสิทธิ์ให้'}</div>
-    </form>`);
-    const form = document.getElementById('login-form');
-    bindTabs(form);
-    const rulesBox = form.querySelector('[data-pw-rules]');
-    const paintRules = (showMissing) => {
-      const miss = pwMissing(form.password.value);
-      rulesBox.querySelectorAll('[data-rule]').forEach((li) => {
+  const pwRulesHtml = () => `<ul class="pw-rules" data-pw-rules>${PW_KEYS.map((k, i) => `<li data-rule="${k}">${icon('circle', 'i16')}<span>${t('pwRules')[i]}</span></li>`).join('')}</ul>`;
+  function bindRules(form, input) {
+    const box = form.querySelector('[data-pw-rules]');
+    const paint = (showMissing) => {
+      const miss = pwMissing(input.value);
+      box.querySelectorAll('[data-rule]').forEach((li) => {
         const ok = !miss.includes(li.dataset.rule);
         li.className = ok ? 'ok' : (showMissing ? 'bad' : '');
         li.querySelector('svg, i').outerHTML = icon(ok ? 'circle-check' : (showMissing ? 'circle-x' : 'circle'), 'i16');
@@ -457,35 +518,141 @@
       UI.refreshIcons();
       return miss;
     };
-    if (rulesBox) form.password.addEventListener('input', () => paintRules(false));
+    input.addEventListener('input', () => paint(false));
+    return paint;
+  }
+
+  // Supabase Auth messages are English; show a sentence that says what to do
+  const AUTH_ERRORS = [
+    [/Invalid login/i, 'อีเมลหรือรหัสผ่านไม่ถูกต้อง', 'Wrong email or password'],
+    [/not confirmed/i, 'ยังไม่ได้ยืนยันอีเมล — กรุณาเปิดลิงก์ในอีเมลก่อน', 'Your email is not confirmed yet. Open the link in the email first'],
+    [/different from the old/i, 'รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านเดิม', 'The new password must be different from the old one'],
+    [/Password should contain|Password should be at least|weak.?password/i, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัว และมีตัวอังกฤษพิมพ์เล็ก พิมพ์ใหญ่ และตัวเลข เช่น Thk12345', 'Use at least 8 characters with a lowercase letter, an uppercase letter and a digit, e.g. Thk12345'],
+    [/pwned|leaked|known to be weak|compromised/i, 'รหัสผ่านนี้ง่ายเกินไปหรือเคยรั่วไหล กรุณาตั้งรหัสผ่านใหม่', 'This password is too common or has leaked. Please choose another'],
+    [/already registered|already exists/i, 'อีเมลนี้สมัครไว้แล้ว — กด "เข้าสู่ระบบ" แทน หรือติดต่อผู้ดูแลระบบ', 'This email already has an account. Sign in instead, or contact the administrator'],
+    [/email rate limit/i, 'ระบบส่งอีเมลครบจำนวนต่อชั่วโมงแล้ว — กรุณาลองใหม่ในอีกประมาณ 1 ชั่วโมง หรือแจ้งผู้ดูแลระบบ', 'The hourly email limit has been reached. Try again in about an hour, or contact the administrator'],
+    [/rate limit|too many|security purposes/i, 'มีการส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่ หรือติดต่อผู้ดูแลระบบ', 'Too many requests. Wait a moment and try again, or contact the administrator'],
+    [/session missing|expired|invalid.*(token|flow)/i, 'ลิงก์นี้หมดอายุหรือถูกใช้ไปแล้ว กรุณาขอลิงก์ใหม่', 'This link has expired or was already used. Please ask for a new one'],
+    [/invalid.*email|email.*invalid|Unable to validate email/i, 'รูปแบบอีเมลไม่ถูกต้อง', 'That email address is not valid'],
+    [/Failed to fetch|NetworkError|network/i, 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ กรุณาลองใหม่', 'No internet connection. Please try again'],
+  ];
+  function authError(m = '') {
+    const hit = AUTH_ERRORS.find(([re]) => re.test(m));
+    if (hit) return lang === 'en' ? hit[2] : hit[1];
+    return (lang === 'en' ? 'Something went wrong: ' : 'ดำเนินการไม่สำเร็จ: ') + m;
+  }
+
+  function loginScreen(mode = 'in', msg = '') {
+    if (mode === 'parent' || mode === 'activate') return parentScreen(mode, msg);
+    if (mode === 'forgot') return forgotScreen();
+    redraw = () => loginScreen(mode, msg);
+    const up = mode === 'up';
+    authGate(`<form class="login auth-form" id="login-form" novalidate>${up ? welcome(t('signupT'), t('signupSub')) : welcome(t('welcome'), t('welcomeSub'))}${tabsHtml(false)}
+      ${msg ? notice('info', esc(msgText(msg))) : ''}
+      ${up ? `<div class="field"><label>${t('name')} <span class="req">*</span></label>${field('user', '<input class="input" name="name" required placeholder="ครูสมศรี วงศ์ใหญ่" autocomplete="name">')}</div>` : ''}
+      <div class="field"><label>${t('email')} <span class="req">*</span></label>${field('mail', '<input class="input" type="email" name="email" required autocomplete="email" placeholder="name@thk.ac.th">')}</div>
+      <div class="field"><div class="field-head"><label>${t('password')} <span class="req">*</span></label>${up ? '' : `<a href="#" data-login="forgot">${t('forgot')}</a>`}</div>${field('lock', `<input class="input" type="password" name="password" required autocomplete="${up ? 'new-password' : 'current-password'}" placeholder="••••••••">`, true)}${up ? pwRulesHtml() : ''}</div>
+      ${up ? '' : `<label class="auth-remember" title="${t('rememberHint')}"><input type="checkbox" name="remember" ${Store.remembers() ? 'checked' : ''}><span class="sw" aria-hidden="true"></span><span>${t('remember')}</span></label>`}
+      ${submitBtn(up ? t('signupT') : t('signIn'))}
+      ${up ? '' : `<a href="#" class="auth-alt" data-login="parent">${icon('users', 'i16')} ${t('parentAlt')}</a>`}
+      <div class="muted small" style="text-align:center">${up ? `${t('haveAcct')} <a href="#" data-login="in">${t('signIn')}</a>` : `${t('noAcct')} <a href="#" data-login="up">${t('signupT')}</a> · ${t('approveNote')}`}</div>
+    </form>`);
+    const form = document.getElementById('login-form');
+    bindTabs(form);
+    const paintRules = up ? bindRules(form, form.password) : null;
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!form.checkValidity()) { form.reportValidity(); return; }
-      if (up && paintRules(true).length) { UI.toast('รหัสผ่านยังไม่ครบเงื่อนไข · ดูรายการสีแดงใต้ช่องรหัสผ่าน'); form.password.focus(); return; }
+      if (up && paintRules(true).length) { UI.toast(t('pwNotOk')); form.password.focus(); return; }
       const v = Object.fromEntries(new FormData(form).entries());
       const btn = form.querySelector('button[type=submit]');
-      btn.disabled = true; btn.textContent = 'กำลังดำเนินการ…';
+      busy(btn, true);
       try {
         if (up) {
+          Store.setRemember(true);
           const res = await Store.signUp(v.name.trim(), v.email.trim(), v.password);
           if (!res.session) {
-            loginScreen('in', 'สมัครเรียบร้อย — กรุณาเปิดอีเมลแล้วกดลิงก์ยืนยัน จากนั้นเข้าสู่ระบบที่นี่');
-            UI.dialog({ title: 'สมัครเรียบร้อยแล้ว · ขั้นต่อไปตรวจอีเมล', size: 'sm',
-              body: `<div class="signup-done"><div class="notice">${icon('mail-check', 'i16')}<span>ระบบส่งอีเมลยืนยันไปที่ <span class="mail">${UI.esc(v.email.trim())}</span></span></div>
-                <ol><li>เปิดกล่องจดหมายของอีเมลนี้ (ถ้าไม่เจอ ให้ดูในโฟลเดอร์ <b>สแปม / จดหมายขยะ</b> หรือแท็บ <b>โปรโมชัน</b>)</li>
-                <li>เปิดอีเมลเรื่อง <b>ยืนยันอีเมล</b> แล้วกดลิงก์ยืนยันในอีเมล</li>
-                <li>กลับมาที่หน้านี้ แล้ว <b>เข้าสู่ระบบ</b> ด้วยอีเมลและรหัสผ่านที่เพิ่งตั้ง</li>
-                <li>รอผู้ดูแลระบบอนุมัติสิทธิ์ แล้วจะเข้าใช้งานได้</li></ol></div>`,
-              footer: '<button type="button" class="btn primary" data-close>เข้าใจแล้ว</button>' });
+            loginScreen('in', () => t('signedUpMail'));
+            UI.dialog({ title: t('signedUpT'), size: 'sm',
+              body: `<div class="signup-done">${notice('mail-check', `${t('mailSentTo')} <span class="mail">${UI.esc(v.email.trim())}</span>`)}
+                <ol>${t('signupSteps').map((s) => `<li>${s}</li>`).join('')}</ol></div>`,
+              footer: `<button type="button" class="btn primary" data-close>${t('gotIt')}</button>` });
             return;
           }
-          UI.toast('สมัครใช้งานเรียบร้อยแล้ว · รอผู้ดูแลระบบอนุมัติสิทธิ์');
+          UI.toast(t('signedUpToast'));
         } else {
-          await Store.signIn(v.email.trim(), v.password);
+          await Store.signIn(v.email.trim(), v.password, !!form.remember.checked);
         }
         boot();
       } catch (err) {
-        btn.disabled = false; btn.textContent = up ? 'สมัครใช้งาน' : 'เข้าสู่ระบบ';
+        busy(btn, false, up ? t('signupT') : t('signIn'));
+        UI.toast(authError(err.message));
+      }
+    });
+  }
+
+  // forgot password: email a reset link (Supabase never says whether the address has an account)
+  function forgotScreen(sentTo = '') {
+    redraw = () => forgotScreen(sentTo);
+    authGate(`<form class="login auth-form" id="login-form" novalidate>${welcome(t('forgotT'), t('forgotSub'))}
+      ${sentTo ? notice('mail-check', t('sent')(esc(sentTo))) : ''}
+      <div class="field"><label>${t('email')} <span class="req">*</span></label>${field('mail', `<input class="input" type="email" name="email" required autocomplete="email" placeholder="name@thk.ac.th" value="${esc(sentTo)}">`)}</div>
+      ${submitBtn(t('sendLink'))}
+      <div class="muted small">${t('mailNote')}</div>
+      <a href="#" class="auth-alt" data-login="in">${icon('arrow-left', 'i16')} ${t('back')}</a>
+    </form>`);
+    const form = document.getElementById('login-form');
+    bindTabs(form);
+    form.email.focus();
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      const btn = form.querySelector('button[type=submit]');
+      busy(btn, true);
+      try {
+        await Store.resetPassword(form.email.value.trim());
+        forgotScreen(form.email.value.trim());
+      } catch (err) {
+        busy(btn, false, t('sendLink'));
+        UI.toast(authError(err.message));
+      }
+    });
+  }
+
+  // back from the reset link: choose a new password (the link signed the user in for this)
+  function recoveryScreen(session) {
+    redraw = () => recoveryScreen(session);
+    if (!session) {
+      authGate(`<div class="login auth-form" id="login-form">${welcome(t('newPwT'), '')}${notice('alert-circle', esc(t('linkExpired')), 'danger')}
+        <button type="button" class="btn primary" data-login="forgot">${t('askAgain')}</button>
+        <a href="#" class="auth-alt" data-login="in">${icon('arrow-left', 'i16')} ${t('back')}</a></div>`);
+      Store.endRecovery();
+      bindTabs(document.getElementById('login-form'));
+      return;
+    }
+    authGate(`<form class="login auth-form" id="login-form" novalidate>${welcome(t('newPwT'), t('newPwSub'))}
+      ${session.user && session.user.email ? `<div class="muted small">${icon('mail', 'i16')} ${esc(session.user.email)}</div>` : ''}
+      <div class="field"><label>${t('newPw')} <span class="req">*</span></label>${field('lock', '<input class="input" type="password" name="password" required autocomplete="new-password" placeholder="••••••••">', true)}${pwRulesHtml()}</div>
+      <div class="field"><label>${t('confirmPw')} <span class="req">*</span></label>${field('lock', '<input class="input" type="password" name="confirm" required autocomplete="new-password" placeholder="••••••••">', true)}</div>
+      ${submitBtn(t('savePw'))}
+    </form>`);
+    const form = document.getElementById('login-form');
+    const paintRules = bindRules(form, form.password);
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      if (paintRules(true).length) { UI.toast(t('pwNotOk')); form.password.focus(); return; }
+      if (form.password.value !== form.confirm.value) { UI.toast(t('pwMismatch')); form.confirm.focus(); return; }
+      const btn = form.querySelector('button[type=submit]');
+      busy(btn, true);
+      try {
+        await Store.updatePassword(form.password.value);
+        Store.setRemember(true);
+        history.replaceState(null, '', location.pathname + '#/');
+        UI.toast(t('pwSaved'));
+        boot();
+      } catch (err) {
+        busy(btn, false, t('savePw'));
         UI.toast(authError(err.message));
       }
     });
@@ -503,6 +670,7 @@
   async function boot() {
     try {
       const session = await Store.session();
+      if (Store.recovery()) return recoveryScreen(session);
       if (!session) return loginScreen(/^#\/?parent/.test(location.hash) ? 'parent' : 'in');
       const p = await Store.loadProfile();
       if (p && p.role === 'parent') return Parent.render(gate);

@@ -2,7 +2,23 @@
    Store.data เก็บสำเนาข้อมูลในหน่วยความจำ (รูปแบบ camelCase) ให้หน้าต่าง ๆ อ่านแบบ synchronous
    ทุกการเขียนส่งไปฐานข้อมูลก่อน แล้วโหลดตารางนั้นใหม่ */
 (function () {
-  const sb = window.supabase.createClient(SA_CONFIG.supabaseUrl, SA_CONFIG.supabaseKey);
+  // "remember me": on = session kept in localStorage for 30 days from sign-in; off = sessionStorage (gone when the browser closes)
+  const ls = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked */ } },
+  };
+  const remembers = () => ls.get('sa-remember') !== '0';
+  const authStorage = {
+    getItem(k) { try { return (remembers() ? localStorage : sessionStorage).getItem(k); } catch (e) { return null; } },
+    setItem(k, v) { try { (remembers() ? localStorage : sessionStorage).setItem(k, v); } catch (e) { /* storage blocked */ } },
+    removeItem(k) { try { localStorage.removeItem(k); } catch (e) { /* */ } try { sessionStorage.removeItem(k); } catch (e) { /* */ } },
+  };
+  const REMEMBER_DAYS = 30;
+  // a password-reset link lands here with type=recovery; keep the flag across the one-time version reload
+  const ss = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { if (v == null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch (e) { /* */ } } };
+  if (/type=recovery/.test(location.hash + location.search)) ss.set('sa-recovery', '1');
+  const sb = window.supabase.createClient(SA_CONFIG.supabaseUrl, SA_CONFIG.supabaseKey, { auth: { storage: authStorage } });
+  sb.auth.onAuthStateChange((ev) => { if (ev === 'PASSWORD_RECOVERY') ss.set('sa-recovery', '1'); });
 
   // [ชื่อในแอป, ชื่อคอลัมน์ในฐานข้อมูล]
   const MAPS = {
@@ -100,14 +116,29 @@
     data: null,
     profile: null,
 
-    async session() { return check(await sb.auth.getSession()).session; },
+    async session() {
+      const s = check(await sb.auth.getSession()).session;
+      if (s && remembers() && !this.recovery()) {
+        const at = Number(ls.get('sa-login-at')) || 0;
+        if (!at) ls.set('sa-login-at', String(Date.now())); // signed in before this rule: count 30 days from now
+        else if (Date.now() - at > REMEMBER_DAYS * 864e5) { await sb.auth.signOut({ scope: 'local' }); return null; }
+      }
+      return s;
+    },
+    remembers,
+    setRemember(on) { ls.set('sa-remember', on ? '1' : '0'); ls.set('sa-login-at', String(Date.now())); },
     // counts for the sign-in page (no personal data; callable before sign-in)
     async loginStats() { const { data, error } = await sb.rpc('login_stats'); return error ? null : data; },
-    async signIn(email, password) { check(await sb.auth.signInWithPassword({ email, password })); },
+    async signIn(email, password, remember = true) { this.setRemember(remember); check(await sb.auth.signInWithPassword({ email, password })); },
+    // forgot password: Supabase emails a link back to this page (it never says whether the email has an account)
+    async resetPassword(email) { check(await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname })); },
+    recovery: () => ss.get('sa-recovery') === '1',
+    async updatePassword(password) { check(await sb.auth.updateUser({ password })); ss.set('sa-recovery', null); },
+    endRecovery() { ss.set('sa-recovery', null); },
     async signUp(name, email, password) {
       return check(await sb.auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: location.origin + location.pathname } }));
     },
-    async signOut() { const wasParent = this.profile && this.profile.role === 'parent'; await sb.auth.signOut(); location.hash = wasParent ? '#/parent' : '#/'; location.reload(); },
+    async signOut() { const wasParent = this.profile && this.profile.role === 'parent'; ss.set('sa-recovery', null); await sb.auth.signOut(); location.hash = wasParent ? '#/parent' : '#/'; location.reload(); },
 
     /* ---- parents ---- */
     parentEmail: (studentId) => 'p' + String(studentId).trim() + '@parents.thk-student-affairs.invalid',
@@ -119,6 +150,7 @@
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.token) throw new Error(body.error || 'server');
+      this.setRemember(true);
       check(await sb.auth.verifyOtp({ token_hash: body.token, type: 'email' }));
     },
     async parentView() { return check(await sb.rpc('parent_view')); },
