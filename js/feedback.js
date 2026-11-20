@@ -32,8 +32,8 @@
           <button class="icon-btn" type="button" data-fb="close" aria-label="ปิด">${icon('x', 'i16')}</button></div>
         <form id="fb-form" class="fb-body">
           <div class="chips fb-kinds" role="radiogroup" aria-label="ประเภท">${Object.entries(KINDS).map(([k, [l, ic]]) => `<button type="button" role="radio" class="chip${k === kind ? ' on' : ''}" aria-checked="${k === kind}" data-fb-kind="${k}">${icon(ic, 'i16')}${l}</button>`).join('')}</div>
-          <textarea class="input" id="fb-msg" rows="4" maxlength="2000" required placeholder="เช่น อยากให้มีปุ่มพิมพ์ใบเตือนผู้ปกครองในหน้าพฤติกรรม" aria-label="ข้อความ"></textarea>
-          <div class="fb-meta muted small"><span id="fb-page"></span><span id="fb-count">0/2000</span></div>
+          <textarea class="input" id="fb-msg" rows="4" maxlength="5000" required placeholder="เช่น อยากให้มีปุ่มพิมพ์ใบเตือนผู้ปกครองในหน้าพฤติกรรม" aria-label="ข้อความ"></textarea>
+          <div class="fb-meta muted small"><span id="fb-page"></span><span id="fb-count">0/5,000</span></div>
           <div class="muted small">${icon('shield', 'i16')} ไม่ต้องใส่ชื่อหรือเลขประจำตัวนักเรียน</div>
           <button class="btn primary" type="submit" id="fb-send">${icon('send', 'i16')}ส่งข้อความ</button>
         </form>
@@ -78,7 +78,7 @@
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !panel.hidden) { open(false); fab.focus(); } });
     document.addEventListener('pointerdown', (e) => { if (!panel.hidden && !wrap.contains(e.target) && !e.target.closest('.dialog-backdrop,.toasts')) open(false); });
     window.addEventListener('hashchange', () => { if (!panel.hidden) wrap.querySelector('#fb-page').textContent = 'จากหน้า: ' + pageName(pageNow()); });
-    msg.addEventListener('input', () => { wrap.querySelector('#fb-count').textContent = msg.value.length + '/2000'; });
+    msg.addEventListener('input', () => { wrap.querySelector('#fb-count').textContent = msg.value.length + '/5,000'; });
     wrap.querySelector('#fb-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const text = msg.value.trim();
@@ -88,7 +88,7 @@
       try {
         await send(kind, text, pageNow());
         msg.value = '';
-        wrap.querySelector('#fb-count').textContent = '0/2000';
+        wrap.querySelector('#fb-count').textContent = '0/5,000';
         toast('ส่งข้อความแล้ว ขอบคุณครับ/ค่ะ ทีมพัฒนาจะนำไปปรับปรุงระบบ');
         open(false);
       } catch (err) { toast('ส่งไม่สำเร็จ: ' + err.message); } finally { btn.disabled = false; }
