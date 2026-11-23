@@ -320,6 +320,9 @@
       signIn: 'เข้าสู่ระบบ', signingIn: 'กำลังเข้าสู่ระบบ…', working: 'กำลังดำเนินการ…',
       staffAlt: 'ครูและบุคลากร เข้าสู่ระบบด้วยอีเมล', parentAlt: 'ผู้ปกครองดูข้อมูลบุตรหลาน',
       name: 'ชื่อ – นามสกุล', email: 'อีเมล', password: 'รหัสผ่าน', showPw: 'แสดงรหัสผ่าน', hidePw: 'ซ่อนรหัสผ่าน',
+      or: 'หรือ', google: 'เข้าสู่ระบบด้วยบัญชี Google', googleUp: 'สมัครด้วยบัญชี Google', googleGo: 'กำลังไปที่ Google…',
+      googleOff: 'ยังไม่ได้เปิดการเข้าสู่ระบบด้วย Google — ใช้อีเมลและรหัสผ่านไปก่อน หรือแจ้งผู้ดูแลระบบ',
+      googleFail: 'เข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองใหม่ หรือใช้อีเมลและรหัสผ่าน',
       forgot: 'ลืมรหัสผ่าน?', remember: 'จดจำฉัน 30 วัน', rememberHint: 'ถ้าปิดไว้ จะออกจากระบบเมื่อปิดเบราว์เซอร์ (เหมาะกับเครื่องที่ใช้ร่วมกัน)',
       haveAcct: 'มีบัญชีแล้ว?', noAcct: 'ยังไม่มีบัญชี?', approveNote: 'ผู้ดูแลระบบจะอนุมัติสิทธิ์ให้',
       pwRules: ['อย่างน้อย 8 ตัวอักษร', 'มีตัวอังกฤษพิมพ์เล็ก (a–z) อย่างน้อย 1 ตัว', 'มีตัวอังกฤษพิมพ์ใหญ่ (A–Z) อย่างน้อย 1 ตัว', 'มีตัวเลข (0–9) อย่างน้อย 1 ตัว'],
@@ -355,6 +358,9 @@
       signIn: 'Sign in', signingIn: 'Signing in…', working: 'Working…',
       staffAlt: 'Teachers and staff: sign in with email', parentAlt: "Parents: see your child's records",
       name: 'Full name', email: 'Email', password: 'Password', showPw: 'Show password', hidePw: 'Hide password',
+      or: 'or', google: 'Sign in with Google', googleUp: 'Sign up with Google', googleGo: 'Opening Google…',
+      googleOff: 'Google sign-in is not turned on yet. Use your email and password, or contact the administrator.',
+      googleFail: 'Google sign-in did not work. Please try again, or use your email and password.',
       forgot: 'Forgot password?', remember: 'Remember me for 30 days', rememberHint: 'If off, you are signed out when the browser closes (good for shared computers)',
       haveAcct: 'Already have an account?', noAcct: 'No account yet?', approveNote: 'an administrator approves it',
       pwRules: ['At least 8 characters', 'At least 1 lowercase letter (a–z)', 'At least 1 uppercase letter (A–Z)', 'At least 1 digit (0–9)'],
@@ -452,6 +458,8 @@
   }
 
   const tabsHtml = (parent) => `<div class="login-tabs"><button type="button" class="${parent ? '' : 'on'}" data-login="in">${icon('briefcase', 'i16')}${t('tabStaff')}</button><button type="button" class="${parent ? 'on' : ''}" data-login="parent">${icon('users', 'i16')}${t('tabParent')}</button></div>`;
+  const GOOGLE_G = '<svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
+  const googleBtn = (up) => `<div class="auth-or"><span>${t('or')}</span></div><button type="button" class="btn auth-google" data-google><span class="g">${GOOGLE_G}</span><span>${t(up ? 'googleUp' : 'google')}</span></button>`;
   const submitBtn = (label) => `<button class="btn primary" type="submit">${label} ${icon('arrow-right', 'i16')}</button>`;
   const busy = (btn, on, label) => { btn.disabled = on; btn.innerHTML = on ? esc(t('working')) : `${esc(label)} ${icon('arrow-right', 'i16')}`; if (!on) UI.refreshIcons(); };
   const msgText = (msg) => (typeof msg === 'function' ? msg() : msg);
@@ -556,12 +564,19 @@
       <div class="field"><div class="field-head"><label>${t('password')} <span class="req">*</span></label>${up ? '' : `<a href="#" data-login="forgot">${t('forgot')}</a>`}</div>${field('lock', `<input class="input" type="password" name="password" required autocomplete="${up ? 'new-password' : 'current-password'}" placeholder="••••••••">`, true)}${up ? pwRulesHtml() : ''}</div>
       ${up ? '' : `<label class="auth-remember" title="${t('rememberHint')}"><input type="checkbox" name="remember" ${Store.remembers() ? 'checked' : ''}><span class="sw" aria-hidden="true"></span><span>${t('remember')}</span></label>`}
       ${submitBtn(up ? t('signupT') : t('signIn'))}
+      ${googleBtn(up)}
       ${up ? '' : `<a href="#" class="auth-alt" data-login="parent">${icon('users', 'i16')} ${t('parentAlt')}</a>`}
       <div class="muted small" style="text-align:center">${up ? `${t('haveAcct')} <a href="#" data-login="in">${t('signIn')}</a>` : `${t('noAcct')} <a href="#" data-login="up">${t('signupT')}</a> · ${t('approveNote')}`}</div>
     </form>`);
     const form = document.getElementById('login-form');
     bindTabs(form);
     const paintRules = up ? bindRules(form, form.password) : null;
+    form.querySelector('[data-google]').addEventListener('click', async (e) => {
+      const b = e.currentTarget, label = b.innerHTML;
+      b.disabled = true; b.querySelector('span:last-child').textContent = t('googleGo');
+      try { await Store.signInWithGoogle(form.remember ? !!form.remember.checked : true); }
+      catch (err) { b.disabled = false; b.innerHTML = label; UI.toast(err.message === 'google-off' ? t('googleOff') : authError(err.message)); }
+    });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!form.checkValidity()) { form.reportValidity(); return; }
@@ -671,6 +686,11 @@
 
   async function boot() {
     try {
+      const back = new URLSearchParams(location.hash.replace(/^#\/?/, '') + '&' + location.search.slice(1));
+      if (back.get('error_description') || back.get('error')) {
+        history.replaceState(null, '', location.pathname + '#/');
+        return loginScreen('in', () => t('googleFail'));
+      }
       const session = await Store.session();
       if (Store.recovery()) return recoveryScreen(session);
       if (!session) return loginScreen(/^#\/?parent/.test(location.hash) ? 'parent' : 'in');

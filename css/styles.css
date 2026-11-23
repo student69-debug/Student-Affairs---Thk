@@ -617,3 +617,10 @@ a.chip{color:inherit;text-decoration:none}
 .auth-remember input:checked + .sw::after{transform:translateX(16px)}
 .auth-remember input:focus-visible + .sw{box-shadow:var(--focus-ring)}
 @media (max-width:900px){.auth-side-top{justify-content:flex-start}}
+/* "Sign in with Google" (23 Nov 2026) */
+.auth-or{display:flex;align-items:center;gap:12px;color:var(--ink-400);font-size:13px}
+.auth-or::before,.auth-or::after{content:'';flex:1;height:1px;background:var(--ink-200)}
+.auth-form .btn.auth-google{height:48px;gap:10px;font:500 15px var(--font-display);background:var(--navy-900);color:var(--white);border:0;border-radius:var(--radius-md)}
+.auth-form .btn.auth-google:hover{background:var(--navy-800)}
+.auth-form .btn.auth-google:disabled{opacity:.7;cursor:progress}
+.auth-google .g{width:28px;height:28px;border-radius:50%;background:var(--white);display:grid;place-items:center;flex:none}

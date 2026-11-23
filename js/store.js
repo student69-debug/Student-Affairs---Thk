@@ -130,6 +130,23 @@
     // counts for the sign-in page (no personal data; callable before sign-in)
     async loginStats() { const { data, error } = await sb.rpc('login_stats'); return error ? null : data; },
     async signIn(email, password, remember = true) { this.setRemember(remember); check(await sb.auth.signInWithPassword({ email, password })); },
+    // public auth settings (which sign-in providers are on); fetched once
+    async authSettings() {
+      if (this._authSettings) return this._authSettings;
+      try { const r = await fetch(SA_CONFIG.supabaseUrl + '/auth/v1/settings', { headers: { apikey: SA_CONFIG.supabaseKey } }); this._authSettings = await r.json(); } catch (e) { return {}; }
+      return this._authSettings;
+    },
+    // Google sign-in: leaves the page for Google and comes back signed in (a new account waits for approval like any sign-up).
+    // Google refuses to show inside a frame (the school domain frames this site), so a framed page moves the whole tab.
+    async signInWithGoogle(remember = true) {
+      const st = await this.authSettings();
+      if (!(st.external && st.external.google)) throw new Error('google-off');
+      this.setRemember(remember);
+      const framed = window.top !== window.self;
+      const { data, error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname, skipBrowserRedirect: framed, queryParams: { prompt: 'select_account' } } });
+      if (error) throw new Error(error.message);
+      if (framed && data && data.url) { try { window.top.location.href = data.url; } catch (e) { window.open(data.url, '_blank', 'noopener'); } }
+    },
     // forgot password: Supabase emails a link back to this page (it never says whether the email has an account)
     async resetPassword(email) { check(await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname })); },
     recovery: () => ss.get('sa-recovery') === '1',
