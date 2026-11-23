@@ -223,7 +223,15 @@
       const path = studentId + '.jpg';
       check(await sb.storage.from('student-photos').upload(path, blob, { upsert: true, contentType: 'image/jpeg', cacheControl: '3600' }));
       this._photoUrls.delete(path);
+      this.driveSync('student-photos', path);
       return path;
+    },
+    // copy of each new photo to the school Google Drive (folder per app / year / room); runs in the background,
+    // a failure never blocks saving (it is logged in private.drive_sync_log)
+    driveSync(bucket, path) {
+      sb.functions.invoke('drive-sync', { body: { bucket, path } })
+        .then(({ error }) => { if (error) console.warn('drive-sync', path, error.message); })
+        .catch((e) => console.warn('drive-sync', path, e));
     },
 
     async loadProfile() {
@@ -325,6 +333,7 @@
     async uploadEvidence(caseId, blob) {
       const path = `${caseId}/${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}.jpg`;
       check(await sb.storage.from('drug-evidence').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '3600' }));
+      this.driveSync('drug-evidence', path);
       return path;
     },
     async removeEvidence(paths) { if (paths.length) check(await sb.storage.from('drug-evidence').remove(paths)); paths.forEach((p) => this._evUrls.delete(p)); },

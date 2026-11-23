@@ -12,3 +12,7 @@ node_modules/
 # documents the user drops here (regulations etc.) stay local
 *.docx
 ~$*
+
+# Google OAuth client secrets / any downloaded credentials
+client_secret*.json
+*credentials*.json
