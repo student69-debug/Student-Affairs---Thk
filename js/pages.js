@@ -185,6 +185,7 @@
         <div class="actions no-print">
           ${on('behavior') ? `<button class="btn accent" data-action="behavior-record" data-student="${s.id}">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}
           ${on('counsel') && Store.seesAll() ? `<button class="btn secondary" data-action="counsel-record" data-student="${s.id}">${icon('message-square-plus')}บันทึกให้คำปรึกษา</button>` : ''}
+          ${Store.canPhoto(s) ? `<button class="btn secondary" data-action="student-photo" data-id="${s.id}">${icon('camera')}${s.photoPath ? 'เปลี่ยนรูปถ่าย' : 'เพิ่มรูปถ่าย'}</button>` : ''}
           <button class="btn ghost" data-action="print">${icon('printer')}พิมพ์รายงาน</button></div></div>
 
       <div class="grid g-auto">${apps.map((a) => { const m = a.summary(s.id); return `<a class="card app-card ${a.rule}" href="#/apps/${a.id}" title="เปิดแอป${esc(a.name)}">

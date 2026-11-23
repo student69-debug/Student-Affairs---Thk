@@ -458,6 +458,18 @@
     seesAll() { const r = this.profile && this.profile.role; return r === 'admin' || r === 'counselor'; },
     roomsOf(userId) { return (this.data.teacherRooms || []).filter((t) => t.userId === userId).sort((a, b) => a.grade - b.grade || a.room - b.room); },
     myRooms() { return this.roomsOf(this.profile.id); },
+    // may change this student's photo: admin, grade head of the grade, homeroom teacher of the room (checked again in the database)
+    canPhoto(s) {
+      if (!s || !this.profile) return false;
+      if (this.isAdmin()) return true;
+      if (this.profile.role === 'grade_head' && this.myGrades().includes(Number(s.grade))) return true;
+      return this.myRooms().some((t) => Number(t.grade) === Number(s.grade) && Number(t.room) === Number(s.room));
+    },
+    async setStudentPhoto(id, blob) {
+      await this.uploadPhoto(id, blob);
+      check(await sb.rpc('set_student_photo', { p_id: id }));
+      await this.refresh('students');
+    },
     gradesOf(userId) { return (this.data.teacherGrades || []).filter((t) => t.userId === userId).map((t) => t.grade).sort(); },
     myGrades() { return this.gradesOf(this.profile.id); },
     // e.g. 'ระดับชั้น ม.2 · ห้อง ม.1/3'

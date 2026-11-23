@@ -111,6 +111,23 @@
       run: (pw) => Store.deleteItem('health', el.dataset.id, pw),
       onDone: (r) => { UI.toast(r === 'ok' ? 'ลบรายการแล้ว · เก็บไว้ 30 วัน ที่แท็บ "ที่ลบไว้" ของระบบดูแลช่วยเหลือ' : 'ไม่พบรายการนี้'); render(); } }),
     'registry-edit': (el) => Pages.studentDialog(el.dataset.id),
+    // student photo: admin, grade head, or the homeroom teacher of the room (database checks again)
+    'student-photo': (el) => {
+      const s = Store.student(el.dataset.id);
+      if (!Store.canPhoto(s)) { UI.toast('เปลี่ยนรูปได้เฉพาะนักเรียนในห้องที่ปรึกษาหรือระดับชั้นที่คุณดูแล'); return; }
+      UI.dialog({ title: s.photoPath ? 'เปลี่ยนรูปถ่ายนักเรียน' : 'เพิ่มรูปถ่ายนักเรียน', size: 'sm', submitLabel: 'บันทึกรูป',
+        body: `<div><b>${UI.esc(UI.fullName(s))}</b> <span class="muted">${UI.klass(s)}</span></div>
+          <div class="field"><label>รูปถ่าย <span class="req">*</span></label><input class="input" type="file" name="photoFile" accept="image/*" required style="padding-top:6px"><span class="help">ระบบย่อรูปให้อัตโนมัติ · เก็บสำเนาใน Google Drive ของงานกิจการนักเรียน</span></div>
+          <img class="photo-preview" alt="" hidden>`,
+        onSubmit: async (v, form) => {
+          const file = form.photoFile.files[0];
+          if (!file) { UI.toast('เลือกรูปก่อน'); return false; }
+          try { await Store.setStudentPhoto(s.id, await UI.shrinkImage(file, 400, 0.82)); UI.toast('บันทึกรูปถ่ายแล้ว'); render(); }
+          catch (err) { UI.toast('บันทึกรูปไม่สำเร็จ: ' + err.message); return false; }
+        } });
+      const inp = document.querySelector('#dialog-root [name=photoFile]'), img = document.querySelector('#dialog-root .photo-preview');
+      inp.addEventListener('change', () => { const f = inp.files[0]; if (f) { img.src = URL.createObjectURL(f); img.hidden = false; } });
+    },
     'registry-status': (el) => Pages.statusDialog(el.dataset.id),
     'registry-delete': (el) => Pages.deleteDialog(el.dataset.id),
     'item-restore': (el) => {
