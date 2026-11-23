@@ -31,6 +31,24 @@
   const dayDiff = (d) => Math.round((new Date(d + 'T00:00') - new Date(today() + 'T00:00')) / 864e5);
   const apptText = (c) => fmtDate(c.nextAppt) + (c.nextTime ? ' · ' + c.nextTime + ' น.' : '');
   const sessionDates = (c) => c.sessions.filter((s) => s.date).map((s) => s.date);
+  const timeText = (d, t) => fmtDate(d) + (t ? ' · ' + t + ' น.' : '');
+
+  /* appointment outcome (user, 23 Nov 2026): met = a session recorded after the appointment was set (even before its date) */
+  function apptState(c) {
+    if (!c.nextAppt || c.plan === CLOSED) return null;
+    if (sessionDates(c).length > (c.apptAfter || 0)) return 'met';
+    if (c.apptStatus === 'missed') return 'missed';
+    const dd = dayDiff(c.nextAppt);
+    if (dd < 0) return 'overdue';
+    if (dd === 0) return 'today';
+    return c.apptStatus === 'moved' ? 'moved' : 'upcoming';
+  }
+  const APPT = { met: ['พบแล้ว · ยังไม่ได้นัดต่อ', 'b-success'], missed: ['ขาดนัด · รอนัดใหม่', 'b-orange'], overdue: ['เลยกำหนด · ยังไม่มีผล', 'b-danger'],
+    today: ['วันนี้', 'b-warning'], moved: ['เลื่อนนัดแล้ว', 'b-info'], upcoming: ['', 'b-neutral'] };
+  const apptBadge = (c) => { const st = apptState(c); if (!st) return '—'; const [l, cls] = APPT[st]; return `<span class="badge ${cls}">${apptText(c)}${l ? ' · ' + l : ''}</span>`; };
+  const caseLog = (id) => (D().apptLog || []).filter((x) => x.caseId === id);
+  // missed appointments since the last recorded session
+  const missedRun = (c) => { const last = sessionDates(c).sort().pop() || ''; return caseLog(c.id).filter((x) => x.action === 'missed' && x.at.slice(0, 10) >= last).length; };
 
   function cases(sid) { return (D().cases || []).filter((c) => !sid || c.studentId === sid); }
   function progress(sid) { return (D().progress || []).filter((p) => !sid || p.studentId === sid); }
@@ -54,6 +72,7 @@
       cases(sid).forEach((c) => {
         ev.push({ app: 'counsel', at: c.openDate + 'T08:00:00', studentId: c.studentId, by: ownerName(c.owner), dot: 'counsel', ic: 'folder-open', title: `เปิดเคสให้คำปรึกษา ${kBadges(c.types)} ${sevBadge(c.severity)}`, note: '' });
         c.sessions.filter((s) => s.date).forEach((s) => ev.push({ app: 'counsel', at: s.date + 'T09:00:00', studentId: c.studentId, by: ownerName(c.owner), dot: 'counsel', ic: 'message-circle', title: `ให้คำปรึกษาครั้งที่ ${s.no}`, note: '' }));
+        caseLog(c.id).forEach((x) => ev.push({ app: 'counsel', at: x.at, studentId: c.studentId, by: x.by, dot: 'counsel', ic: x.action === 'missed' ? 'calendar-x' : 'calendar-clock', title: x.action === 'missed' ? `ไม่มาตามนัด ${x.from ? fmtDate(x.from) : ''}` : `เลื่อนนัด ${x.from ? fmtDate(x.from) : ''} → ${timeText(x.to, x.timeTo)}`, note: esc(x.note) }));
       });
     } else {
       progress(sid).forEach((p) => p.sessionDates.forEach((d, i) => ev.push({ app: 'counsel', at: d + 'T09:00:00', studentId: p.studentId, by: p.ownerName, dot: 'counsel', ic: 'message-circle', title: `พบครูแนะแนวครั้งที่ ${i + 1}`, note: '' })));
@@ -72,9 +91,9 @@
   function caseTable(list, showStudent = true) {
     if (!list.length) return empty('ยังไม่มีเคส', 'folder-open');
     return `<div class="tbl-wrap"><table class="tbl"><thead><tr>${showStudent ? '<th>นักเรียน</th>' : ''}<th>เปิดเคส</th><th>ประเภทปัญหา</th><th>ความรุนแรง</th><th>แผน</th><th class="num">ครั้ง</th><th>นัดถัดไป</th><th>ผู้รับผิดชอบ</th></tr></thead><tbody>
-      ${list.map((c) => { const due = c.nextAppt && c.plan !== CLOSED ? dayDiff(c.nextAppt) : null;
+      ${list.map((c) => {
         return `<tr class="clickable" data-action="go" data-href="#/apps/counsel?case=${c.id}">${showStudent ? `<td>${sLink(c.studentId)}</td>` : ''}<td>${fmtDate(c.openDate)}</td><td>${kBadges(c.types) || '—'}</td><td>${sevBadge(c.severity)}</td><td>${planBadge(c.plan)}</td><td class="num">${sessionDates(c).length}</td>
-        <td>${c.nextAppt && c.plan !== CLOSED ? `<span class="${due < 0 ? 'pts-neg' : ''}">${apptText(c)}${due < 0 ? ' (เลยกำหนด)' : due === 0 ? ' (วันนี้)' : ''}</span>` : '—'}</td><td>${esc(ownerName(c.owner))}</td></tr>`; }).join('')}
+        <td>${apptBadge(c)}</td><td>${esc(ownerName(c.owner))}</td></tr>`; }).join('')}
       </tbody></table></div>`;
   }
 
@@ -122,25 +141,28 @@
   function cardsHtml() {
     const all = cases(), o = open(all);
     const m = new Date(), monthStart = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}-01`;
-    const appts = o.filter((c) => c.nextAppt), soon = appts.filter((c) => dayDiff(c.nextAppt) <= 7);
+    const appts = o.filter((c) => { const st = apptState(c); return st && st !== 'met'; }), soon = appts.filter((c) => ['today', 'upcoming', 'moved'].includes(apptState(c)) && dayDiff(c.nextAppt) <= 7);
     const mineOwner = o.filter((c) => c.owner === Store.user().email).length;
     return `<div class="grid g4">
         ${Apps.stat('folder-open', 'เคสที่ยังเปิด', o.length, 'เคส', '', `ของฉัน ${mineOwner} เคส`, '#/apps/counsel?tab=cases&status=open')}
         ${Apps.stat('siren', 'ควรพบผู้เชี่ยวชาญ', o.filter((c) => c.severity === 'ควรพบผู้เชี่ยวชาญ').length, 'เคส', 'red', '', '#/apps/counsel?tab=cases&status=open&sev=' + encodeURIComponent('ควรพบผู้เชี่ยวชาญ'))}
-        ${Apps.stat('calendar-clock', 'นัดภายใน 7 วัน', soon.length, 'นัด', 'amber', `เลยกำหนด ${appts.filter((c) => dayDiff(c.nextAppt) < 0).length}`, '#/apps/counsel?tab=overview&go=appts')}
+        ${Apps.stat('calendar-clock', 'นัดภายใน 7 วัน', soon.length, 'นัด', 'amber', `เลยกำหนด ยังไม่มีผล ${appts.filter((c) => apptState(c) === 'overdue').length} · ขาดนัด ${appts.filter((c) => apptState(c) === 'missed').length}`, '#/apps/counsel?tab=overview&go=appts')}
         ${Apps.stat('folder-plus', 'เปิดเคสเดือนนี้', all.filter((c) => c.openDate >= monthStart).length, 'เคส', 'green', '', '#/apps/counsel?tab=cases&from=' + monthStart)}</div>`;
   }
 
   function overview() {
     const all = cases(), o = open(all);
-    const appts = o.filter((c) => c.nextAppt).sort((a, b) => ((a.nextAppt + (a.nextTime || '99')) < (b.nextAppt + (b.nextTime || '99')) ? -1 : 1));
+    const appts = o.filter((c) => { const st = apptState(c); return st && st !== 'met'; }).sort((a, b) => ((a.nextAppt + (a.nextTime || '99')) < (b.nextAppt + (b.nextTime || '99')) ? -1 : 1));
+    const metNoNext = o.filter((c) => apptState(c) === 'met');
     const close = o.filter((c) => c.severity !== 'ปลอดภัย').sort((a, b) => SEV.indexOf(b.severity) - SEV.indexOf(a.severity));
     const kcount = KTYPES.map(([k, l]) => [k, l, o.filter((c) => c.types.includes(k)).length]);
     const kmax = Math.max(1, ...kcount.map((x) => x[2]));
     return `
       <div class="grid g-main">
-        <div class="card" id="appts"><div class="card-head"><h3>นัดหมายที่ต้องติดตาม</h3></div>${appts.length ? `<div class="list">${appts.slice(0, 12).map((c) => { const s = Store.student(c.studentId), dd = dayDiff(c.nextAppt);
-          return `<a class="list-row" href="#/apps/counsel?case=${c.id}"><div class="grow"><div class="t">${esc(fullName(s))} <span class="muted small">${s ? klass(s) : ''}</span></div><div class="s">${kBadges(c.types)} · ${esc(ownerName(c.owner))}</div></div><span class="badge ${dd < 0 ? 'b-danger' : dd <= 2 ? 'b-warning' : 'b-info'}">${apptText(c)}${dd < 0 ? ' เลยกำหนด' : dd === 0 ? ' วันนี้' : ''}</span></a>`; }).join('')}</div>` : empty('ไม่มีนัดหมาย', 'calendar')}</div>
+        <div class="card" id="appts"><div class="card-head"><h3>นัดหมายที่ต้องติดตาม</h3><span class="muted small">บันทึกการพบแล้ว นัดจะหายจากรายการเอง</span></div>${appts.length ? `<div class="list">${appts.slice(0, 20).map((c) => { const s = Store.student(c.studentId), miss = missedRun(c);
+          return `<div class="list-row appt-row"><a class="grow" href="#/apps/counsel?case=${c.id}"><div class="t">${esc(fullName(s))} <span class="muted small">${s ? klass(s) : ''}</span></div><div class="s">${kBadges(c.types)} · ${esc(ownerName(c.owner))}</div>${miss >= 2 ? `<div class="appt-warn">${icon('triangle-alert', 'i16')} ขาดนัด ${miss} ครั้งติดกัน · ควรประสานครูที่ปรึกษาหรือผู้ปกครอง</div>` : ''}</a>
+            <div class="appt-side">${apptBadge(c)}<div class="appt-btns no-print"><button class="btn sm secondary" data-action="appt-meet" data-id="${c.id}">${icon('check', 'i16')}พบแล้ว</button><button class="btn sm ghost" data-action="appt-move" data-id="${c.id}">${icon('calendar-clock', 'i16')}เลื่อนนัด</button><button class="btn sm ghost" data-action="appt-missed" data-id="${c.id}">${icon('calendar-x', 'i16')}ไม่มาตามนัด</button></div></div></div>`; }).join('')}</div>` : empty('ไม่มีนัดหมายที่รอผล', 'calendar')}
+          ${metNoNext.length ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">${icon('circle-check', 'i16')} พบแล้วแต่ยังไม่ได้นัดต่อ ${metNoNext.length} เคส: ${metNoNext.slice(0, 6).map((c) => `<a href="#/apps/counsel?case=${c.id}">${esc(fullName(Store.student(c.studentId)))}</a>`).join(', ')}${metNoNext.length > 6 ? ' …' : ''} — เปิดเคสเพื่อกำหนดนัดใหม่ หรือเปลี่ยนแผนเป็นยุติ</div>` : ''}</div>
         <div class="card"><div class="card-head"><h3>จำนวนเคสตามประเภทปัญหา</h3><span class="muted small">เคสที่ยังเปิด</span></div><div class="card-body kbars">
           ${kcount.map(([k, l, n]) => `<div class="kbar" title="${esc(l)}"><span class="k">${k}</span><span class="l">${esc(l)}</span><span class="bar"><i style="width:${(n / kmax) * 100}%"></i></span><span class="n">${n}</span></div>`).join('')}</div></div>
       </div>
@@ -215,15 +237,21 @@
   function editorPage(q) {
     const existing = q.case !== 'new' && cases().find((c) => c.id === q.case);
     if (q.case !== 'new' && !existing) return { title: 'ไม่พบเคส', html: `<div class="card">${empty('ไม่พบเคสนี้ หรืออาจถูกลบแล้ว', 'folder-x')}</div>` };
-    if (!draft || draft._key !== q.case + (q.student || '')) {
+    if (!draft || draft._key !== q.case + (q.student || '') + (q.meet || '')) {
       draft = existing ? JSON.parse(JSON.stringify(existing)) : { id: null, studentId: q.student || '', openDate: today(), types: [], severity: 'ปลอดภัย', plan: 'นัดหมายครั้งถัดไป', nextAppt: '', owner: Store.user().email, consent: STEPS.map(() => false), sessions: [blankSession()] };
-      draft._key = q.case + (q.student || '');
+      draft._key = q.case + (q.student || '') + (q.meet || '');
+      if (existing && q.meet) {
+        if (draft.sessions.length < MAX_SESS) draft.sessions.push(blankSession()); else toast(`บันทึกได้สูงสุด ${MAX_SESS} ครั้งต่อเคส — แก้บันทึกครั้งล่าสุดแทน`);
+        draft.nextAppt = ''; draft.nextTime = ''; draft._meet = true;
+      }
     }
     const c = draft;
     const s = c.studentId && Store.student(c.studentId);
     const counsellors = D().counsellors || [];
     const ownerOpts = counsellors.some((x) => x.email === c.owner) || !c.owner ? counsellors : counsellors.concat([{ email: c.owner, name: c.owner }]);
+    const log = existing ? caseLog(existing.id) : [];
     const html = `<form id="case-form" class="case-form" novalidate>
+      ${c._meet ? `<div class="notice">${icon('check', 'i16')}<span><b>บันทึกการพบ</b> · กรอกบันทึกครั้งล่าสุด (วันนี้) ด้านล่าง แล้วกำหนด <b>นัดหมายครั้งถัดไป</b> หรือเว้นว่างถ้าไม่มีนัดต่อ / เปลี่ยนแผนเป็น "ยุติให้คำปรึกษา" ถ้าจบเคส แล้วกด บันทึกเคส</span></div>` : ''}
       <div class="card rule"><div class="card-head"><h3>${existing ? 'เคสให้คำปรึกษา' : 'เปิดเคสใหม่'}</h3>${existing ? `<span class="muted small">แก้ไขล่าสุด ${fmtDate(existing.updatedAt, true)}</span>` : ''}</div>
         <div class="card-body"><div class="form-grid">
           ${existing ? `<div class="field full"><label>นักเรียน</label><div class="t" style="font:500 17px var(--font-display)">${sLink(c.studentId)} <span class="mono muted small">${esc(c.studentId)}</span></div></div>`
@@ -232,10 +260,11 @@
           <div class="field"><label>ผู้รับผิดชอบเคส</label><select class="select" name="owner">${ownerOpts.map((x) => `<option value="${esc(x.email)}" ${x.email === c.owner ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
           <div class="field"><label>ระดับความรุนแรง</label><div class="radio-row" style="min-height:40px">${SEV.map((v) => `<label><input type="radio" name="severity" value="${v}" ${c.severity === v ? 'checked' : ''}> ${sevBadge(v)}</label>`).join('')}</div></div>
           <div class="field"><label>แผนการดำเนินงาน</label><select class="select" name="plan">${PLANS.map((v) => `<option ${c.plan === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-          <div class="field"><label>นัดหมายครั้งถัดไป (วันที่ · เวลา)</label><div class="appt-dt"><input class="input" type="date" name="nextAppt" value="${esc(c.nextAppt)}"><input class="input" type="time" name="nextTime" step="300" value="${esc(c.nextTime || '')}" aria-label="เวลานัด"></div></div>
+          <div class="field"><label>นัดหมายครั้งถัดไป (วันที่ · เวลา) ${existing && !c._meet && apptState(existing) ? apptBadge(existing) : ''}</label><div class="appt-dt"><input class="input" type="date" name="nextAppt" value="${esc(c.nextAppt)}"><input class="input" type="time" name="nextTime" step="300" value="${esc(c.nextTime || '')}" aria-label="เวลานัด"></div></div>
           <div class="field full"><label>ประเภทปัญหา (รหัส K)</label><div class="kgrid">${KTYPES.map(([k, l]) => `<label class="kchk"><input type="checkbox" name="k" value="${k}" ${c.types.includes(k) ? 'checked' : ''}><b>${k}</b> ${esc(l)}</label>`).join('')}</div></div>
         </div></div></div>
 
+      ${log.length ? `<details class="card"><summary class="card-head"><h3>ประวัตินัดหมาย</h3><span class="muted small">เลื่อน / ขาดนัด ${log.length} ครั้ง</span></summary><div class="list">${log.map((x) => `<div class="list-row"><span class="badge ${x.action === 'missed' ? 'b-orange' : 'b-info'}">${x.action === 'missed' ? 'ไม่มาตามนัด' : 'เลื่อนนัด'}</span><div class="grow"><div class="t" style="font-size:14px">${x.from ? timeText(x.from, x.timeFrom) : '—'}${x.to ? ' → ' + timeText(x.to, x.timeTo) : ''}</div><div class="s">${esc(x.note)}</div></div><span class="muted small">${fmtDate(x.at, true)} · ${esc(x.by)}</span></div>`).join('')}</div></details>` : ''}
       <details class="card" ${existing ? '' : 'open'}><summary class="card-head"><h3>ขั้นตอนก่อนเริ่มให้คำปรึกษา</h3><span class="muted small">${c.consent.filter(Boolean).length}/${STEPS.length}</span></summary>
         <div class="card-body checks">${STEPS.map((t, i) => `<label><input type="checkbox" name="consent${i}" ${c.consent[i] ? 'checked' : ''}> ${i + 1}. ${esc(t)}</label>`).join('')}</div></details>
 
@@ -256,7 +285,8 @@
           <button type="submit" class="btn primary">${icon('save', 'i16')}บันทึกเคส</button>
         </div></div>
     </form>`;
-    return { title: existing ? 'เคส · ' + fullName(Store.student(existing.studentId)) : 'เปิดเคสใหม่', html, after: bindEditor };
+    const meet = c._meet; delete c._meet;
+    return { title: existing ? 'เคส · ' + fullName(Store.student(existing.studentId)) : 'เปิดเคสใหม่', html, after: () => { bindEditor(); if (meet) { const last = [...document.querySelectorAll('#case-form .session')].pop(); if (last) { last.scrollIntoView({ block: 'start' }); const t = last.querySelector('textarea'); if (t) t.focus({ preventScroll: true }); } } } };
   }
 
   function collect(form) {
@@ -434,9 +464,30 @@
     </div>`;
   }
 
+  function apptDialog(id, action) {
+    const c = cases().find((x) => x.id === id);
+    if (!c || !isC()) { toast('ทำได้เฉพาะครูแนะแนวและผู้ดูแลระบบ'); return; }
+    const s = Store.student(c.studentId), moved = action === 'moved', miss = missedRun(c);
+    dialog({ title: moved ? 'เลื่อนนัด' : 'ไม่มาตามนัด', size: 'sm', submitLabel: moved ? 'บันทึกการเลื่อนนัด' : 'บันทึกการขาดนัด',
+      body: `<div><b>${esc(fullName(s))}</b> <span class="muted">${s ? klass(s) : ''}</span> · นัดเดิม ${apptText(c)}</div>
+        ${!moved && miss >= 1 ? `<div class="notice warn">${icon('triangle-alert', 'i16')}<span>ครั้งนี้จะเป็นการขาดนัดครั้งที่ ${miss + 1} ติดกัน ควรประสานครูที่ปรึกษาหรือผู้ปกครอง</span></div>` : ''}
+        <div class="field"><label>${moved ? 'เหตุผลที่เลื่อน' : 'หมายเหตุ'} <span class="req">*</span></label><textarea class="textarea" name="note" required maxlength="500" placeholder="${moved ? 'เช่น นักเรียนติดสอบ / ครูติดประชุม' : 'เช่น ไม่มาโรงเรียน / ลืมนัด / ติดต่อไม่ได้'}" style="min-height:70px"></textarea></div>
+        <div class="field"><label>${moved ? 'วันนัดใหม่' : 'นัดใหม่ (ถ้ามี)'} ${moved ? '<span class="req">*</span>' : ''}</label><div class="appt-dt"><input class="input" type="date" name="date" min="${today()}" ${moved ? 'required' : ''}><input class="input" type="time" name="time" step="300" aria-label="เวลานัดใหม่"></div>
+          ${moved ? '' : '<span class="help">เว้นว่างได้ รายการจะขึ้นว่า "ขาดนัด · รอนัดใหม่" จนกว่าจะนัดใหม่</span>'}</div>`,
+      onSubmit: async (v) => {
+        await Store.apptAction(id, action, v.note.trim(), v.date || null, v.time || null);
+        toast(moved ? `เลื่อนนัดเป็น ${fmtDate(v.date)} แล้ว` : 'บันทึกการขาดนัดแล้ว');
+        App.render();
+      } });
+  }
+
   window.CounselApp = {
     id: 'counsel', name: 'ให้คำปรึกษา', short: 'ให้คำปรึกษา', icon: 'messages-square', rule: 'rule',
     summary, events, studentTab, openRecord, page, cases, progress, KTYPES,
     resetDraft() { draft = null; },
+    // quick appointment outcomes from the overview list (counsellors and admins; checked again in the database)
+    apptMeet(id) { draft = null; location.hash = '#/apps/counsel?case=' + id + '&meet=1'; },
+    apptMove(id) { apptDialog(id, 'moved'); },
+    apptMissed(id) { apptDialog(id, 'missed'); },
   };
 })();

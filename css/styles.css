@@ -626,3 +626,13 @@ a.chip{color:inherit;text-decoration:none}
 .auth-google .g{width:28px;height:28px;border-radius:50%;background:var(--white);display:grid;place-items:center;flex:none}
 /* student photo dialog preview (23 Nov 2026) */
 .photo-preview{display:block;width:120px;height:160px;object-fit:cover;border-radius:var(--radius-md);border:1px solid var(--ink-200);margin-top:4px}
+
+/* counselling appointment outcomes (23 Nov 2026) */
+.b-orange{background:#f9ece7;color:#9a3412}
+.appt-row{align-items:flex-start}
+.appt-row > a.grow{color:inherit;text-decoration:none}
+.appt-row > a.grow:hover .t{color:var(--navy-700);text-decoration:underline}
+.appt-side{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:none}
+.appt-btns{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.appt-warn{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:13px;color:var(--red-700)}
+@media (max-width:640px){.appt-row{flex-wrap:wrap}.appt-side{align-items:flex-start;width:100%}.appt-btns{justify-content:flex-start}}

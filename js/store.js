@@ -62,10 +62,11 @@
   }
 
   /* ---- counselling cases: full content for counsellors/admins, progress for homeroom teachers / grade heads ---- */
-  const CASE_COLS = 'id,student_id,open_date,problem_types,severity,plan,next_appt,next_appt_time,owner_email,consent,updated_at,sessions:counsel_case_sessions(session_no,session_date,note_a,note_b,note_c,note_d,checklist)';
+  const CASE_COLS = 'id,student_id,open_date,problem_types,severity,plan,next_appt,next_appt_time,appt_status,appt_after_session,owner_email,consent,updated_at,sessions:counsel_case_sessions(session_no,session_date,note_a,note_b,note_c,note_d,checklist)';
   const caseFrom = (r) => ({
     id: r.id, studentId: r.student_id, openDate: r.open_date, types: r.problem_types || [], severity: r.severity, plan: r.plan,
     nextAppt: r.next_appt || '', nextTime: (r.next_appt_time || '').slice(0, 5), owner: r.owner_email || '', consent: r.consent || [], updatedAt: r.updated_at,
+    apptStatus: r.appt_status || 'scheduled', apptAfter: r.appt_after_session || 0,
     sessions: (r.sessions || []).sort((a, b) => a.session_no - b.session_no)
       .map((s) => ({ no: s.session_no, date: s.session_date || '', notes: [s.note_a, s.note_b, s.note_c, s.note_d], check: s.checklist || [] })),
   });
@@ -80,6 +81,12 @@
     },
     async progress() { return (await paged((a, b) => sb.rpc('case_progress').range(a, b))).map(progressFrom); },
     async counsellors() { return check(await sb.rpc('counsellor_list')); },
+    // moved / missed appointments of counselling cases (counsellors and admins)
+    async apptLog() {
+      if (!Store.seesAll()) return [];
+      return (await paged((a, b) => sb.from('counsel_appt_log').select('id,case_id,at,action,appt_from,time_from,appt_to,time_to,note,by_name').order('at', { ascending: false }).range(a, b)))
+        .map((r) => ({ id: r.id, caseId: r.case_id, at: r.at, action: r.action, from: r.appt_from || '', timeFrom: (r.time_from || '').slice(0, 5), to: r.appt_to || '', timeTo: (r.time_to || '').slice(0, 5), note: r.note || '', by: r.by_name || '' }));
+    },
     // students resting in the nurse room right now (every staff member; no symptoms)
     async nurseNow() { return (check(await sb.rpc('nurse_now')) || []).map((r) => ({ id: r.id, studentId: r.student_id, at: r.at, period: r.period || '', by: r.by_name || '' })); },
     // everyone involved in each incident (directory info only, so it works across rooms)
@@ -101,7 +108,7 @@
 
   // ตำแหน่งของแต่ละชนิดข้อมูลใน Store.data
   const SLOT = {
-    students: ['students'], history: ['history'], users: ['users'], cases: ['cases'], progress: ['progress'], counsellors: ['counsellors'], subjects: ['subjects'],
+    students: ['students'], history: ['history'], users: ['users'], cases: ['cases'], apptLog: ['apptLog'], progress: ['progress'], counsellors: ['counsellors'], subjects: ['subjects'],
     health: ['care', 'health'], incidents: ['behavior', 'incidents'], incidentPeople: ['behavior', 'people'],
     teacherRooms: ['teacherRooms'], teacherGrades: ['teacherGrades'], gradeStaff: ['gradeStaff'], rules: ['behavior', 'rules'], records: ['behavior', 'records'],
     screenings: ['care', 'screenings'], visits: ['care', 'visits'], needs: ['care', 'needs'], referrals: ['care', 'referrals'], drugs: ['drugs'], nurse: ['nurse'], nurseNow: ['nurseNow'],
@@ -248,7 +255,7 @@
         behavior: {}, care: {}, history: [] };
       this.data.gradeStaff = [];
       this.data.subjects = [];
-      const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'incidents', 'incidentPeople', 'cases', 'progress', 'counsellors', 'screenings', 'visits', 'needs', 'referrals', 'health', 'drugs', 'nurse', 'nurseNow'];
+      const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'incidents', 'incidentPeople', 'cases', 'apptLog', 'progress', 'counsellors', 'screenings', 'visits', 'needs', 'referrals', 'health', 'drugs', 'nurse', 'nurseNow'];
       if (!this.isAdmin() && this.profile.role === 'grade_head') kinds.push('history'); // own grades only (row level security)
       if (this.isAdmin()) {
         kinds.push('history', 'gradeStaff', 'subjects');
@@ -368,9 +375,16 @@
     },
 
     /* ---- counselling cases ---- */
+    async apptAction(caseId, action, note, date, time) {
+      const r = check(await sb.rpc('counsel_appt_action', { p_case: caseId, p_action: action, p_note: note, p_date: date || null, p_time: (date && time) || null }));
+      await this.refresh('cases', 'apptLog', 'progress');
+      return r;
+    },
     async saveCase(c) {
       const row = { student_id: c.studentId, open_date: c.openDate || null, problem_types: c.types || [], severity: c.severity, plan: c.plan,
-        next_appt: c.nextAppt || null, next_appt_time: (c.nextAppt && c.nextTime) || null, owner_email: c.owner || null, consent: Array.from({ length: 8 }, (_, i) => !!(c.consent && c.consent[i])) };
+        next_appt: c.nextAppt || null, next_appt_time: (c.nextAppt && c.nextTime) || null, owner_email: c.owner || null, consent: Array.from({ length: 8 }, (_, i) => !!(c.consent && c.consent[i])),
+        // sessions already recorded when this appointment is set; a later session = the appointment was met (the database keeps it unless the date changes)
+        appt_after_session: Math.min(50, (c.sessions || []).filter((s) => s.date).length) };
       if (c.legacyId) row.legacy_id = c.legacyId;
       let id = c.id;
       if (id) check(await sb.from('counsel_cases').update(row).eq('id', id));
