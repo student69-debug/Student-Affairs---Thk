@@ -107,7 +107,7 @@
           <div class="field full"><label>พฤติกรรม <span class="req">*</span></label><select class="select" name="rule" required>
             ${ruleGroups(rules).map(([cat, list]) => `<optgroup label="${esc(cat)}">${opt(list)}</optgroup>`).join('')}</select>
             <span class="help" data-rule-info>${esc(ruleInfo(rules[0]))}</span></div>
-          <div class="field"><label>คะแนน <span class="req">*</span></label><input class="input mono" type="number" name="points" required value="${rules[0] ? rules[0].points : 0}"><span class="help">ติดลบ = ตัดคะแนน</span></div>
+          <div class="field"><label>คะแนน <span class="req">*</span></label><input class="input mono" type="number" name="points" required value="${rules[0] ? rules[0].points : 0}"><span class="help">ติดลบ = ตัดคะแนน · ลดได้ แต่ไม่เกินที่ระเบียบกำหนด</span></div>
           <div class="field"><label>วันที่ / เวลาที่เกิดเหตุ</label><input class="input" type="datetime-local" name="at" value="${localInput()}"></div>
           ${restoreOnly ? '' : `<label class="full inc-toggle"><input type="checkbox" name="multi"> <span><b>เหตุการณ์ที่มีนักเรียนหลายคน</b> (เช่น ทะเลาะวิวาท) — ลงผู้ก่อเหตุและผู้ร่วมกระทำพร้อมกัน</span></label>
           <div class="full inc-box" hidden>
@@ -148,13 +148,17 @@
         },
       });
       const sel = d.form.rule, pts = d.form.points;
+      // same limits as the database: keep the rule's sign, may reduce but not exceed it (discretion rules up to 100)
+      const limits = () => { const r = D().behavior.rules.find((x) => x.id === sel.value); if (!r) return [-100, 100]; const cap = r.level === 'ดุลยพินิจ' ? 100 : Math.abs(r.points); return r.points < 0 ? [-cap, -1] : [1, cap]; };
+      const applyLimits = (inp) => { const [mn, mx] = limits(); inp.min = mn; inp.max = mx; inp.title = `คะแนน ${mn} ถึง ${mx}`; };
+      applyLimits(pts);
       const multi = d.form.multi, box = d.form.querySelector('.inc-box'), list = d.form.querySelector('.inc-people');
       const addRow = () => {
         const row = document.createElement('div');
         row.className = 'inc-row';
         row.innerHTML = `<input class="input" data-f="sid" list="dl-students" placeholder="พิมพ์รหัสหรือชื่อนักเรียน" autocomplete="off">
           <select class="select" data-f="role"><option>ผู้ก่อเหตุ</option><option>ผู้ร่วมกระทำ</option></select>
-          <input class="input mono" type="number" data-f="pts" value="${pts.value}" title="คะแนน">
+          <input class="input mono" type="number" data-f="pts" value="${pts.value}" min="${pts.min}" max="${pts.max}" title="คะแนน ${pts.min} ถึง ${pts.max}">
           <button type="button" class="icon-btn" data-inc="del" title="เอาออก">${icon('x', 'i16')}</button>`;
         list.appendChild(row);
         UI.refreshIcons();
@@ -164,7 +168,8 @@
       sel.addEventListener('change', () => {
         pts.value = sel.selectedOptions[0].dataset.p;
         d.form.querySelector('[data-rule-info]').textContent = sel.selectedOptions[0].dataset.info || '';
-        list && list.querySelectorAll('[data-f=pts]').forEach((x) => { x.value = pts.value; });
+        applyLimits(pts);
+        list && list.querySelectorAll('[data-f=pts]').forEach((x) => { x.value = pts.value; applyLimits(x); });
         if (/ทะเลาะ|วิวาท/.test(sel.selectedOptions[0].textContent)) setMulti(true); // fights usually involve more than one student
       });
       if (multi) {

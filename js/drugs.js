@@ -178,6 +178,7 @@
         if (!f.substance.value || !Object.values(CATS).some((c) => c.items.includes(f.substance.value)) || !CATS[cat].items.includes(f.substance.value)) f.substance.value = CATS[cat].items[0];
         f.level.value = levelFromAct(act);
         f.points.value = ptsFor(cat, act);
+        f.points.min = Math.min(0, ptsFor(cat, act)); // the database caps the deduction at the school table too
         const cut = f.querySelector('input[name=actions][value="ตัดคะแนนความประพฤติ"]');
         if (cut) cut.checked = Number(f.points.value) < 0;
       };
