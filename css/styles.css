@@ -445,6 +445,13 @@ details.card>summary::-webkit-details-marker{display:none}
 .signup-done ol{margin:10px 0 0;padding-left:22px;display:grid;gap:6px}
 .signup-done .mail{font-weight:600;color:var(--navy-800);word-break:break-all}
 .pending-steps{text-align:left;margin:4px 0 0;padding-left:22px;display:grid;gap:6px;color:var(--ink-700);font-size:14px}
+.pending-form{text-align:left;gap:14px}
+.pending-form .field{margin:0}
+.pending-form .btn.block{width:100%;justify-content:center}
+.pending-form .actions{justify-content:center}
+.pending-req{background:var(--ink-50,#f5f6fa);border:1px solid var(--ink-200);border-radius:10px;padding:12px 16px;display:grid;gap:4px;width:100%;text-align:left}
+.req-line{margin-top:4px;font-size:13px;color:var(--ink-700)}
+.req-line .badge{margin-left:4px}
 .icon-btn.danger{color:var(--red-700)}
 .icon-btn.danger:hover{background:var(--red-50)}
 .bsearch .card-head h3{display:flex;align-items:center;gap:8px}

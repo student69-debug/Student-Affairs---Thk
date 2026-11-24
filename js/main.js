@@ -184,6 +184,7 @@
       await Store.importSample(); await Store.load(); UI.toast('นำเข้าข้อมูลตัวอย่างแล้ว'); render();
     }),
     'room-edit': (el) => Pages.roomDialog(el.dataset.id),
+    'user-approve': (el) => Pages.approveRequest(el.dataset.id),
     'apps-edit': (el) => Pages.appsDialog(el.dataset.id),
     'api-issue': () => ApiKeys.issueDialog(),
     'api-revoke': (el) => ApiKeys.revoke(el.dataset.id, el.dataset.name),
@@ -695,13 +696,75 @@
     });
   }
 
-  function pendingScreen(p) {
-    gate(`<div class="card rule login" style="text-align:center;align-items:center">${BRAND}${icon('hourglass', 'i28')}<h2>สมัครเรียบร้อย · รอผู้ดูแลระบบอนุมัติ</h2>
-      <p class="muted" style="margin:0">บัญชี <b>${esc(p ? p.email : '')}</b> สมัครเรียบร้อยแล้ว ไม่ต้องทำอะไรเพิ่ม</p>
-      <ol class="pending-steps"><li>แจ้งผู้ดูแลระบบ (งานกิจการนักเรียน) ว่าสมัครแล้ว</li><li>เมื่อได้รับอนุมัติ กด <b>ตรวจสอบอีกครั้ง</b> หรือเข้าสู่ระบบใหม่ด้วยอีเมลและรหัสผ่านเดิม</li></ol>
-      <div class="actions"><button class="btn secondary" id="gate-retry">ตรวจสอบอีกครั้ง</button><button class="btn ghost" id="gate-out">ออกจากระบบ</button></div></div>`);
-    document.getElementById('gate-retry').addEventListener('click', boot);
-    document.getElementById('gate-out').addEventListener('click', () => Store.signOut());
+  // waiting for approval: the new staff member says who they are (Thai name as in the school list, duty, rooms / grades)
+  // so the admin can approve with one click; nothing here grants access (profile_request only fills profiles.request)
+  function pendingScreen(p, editing = false) {
+    const rq = p && p.request;
+    const thai = (s) => /[ก-๙]/.test(s || '');
+    const buttons = `<div class="actions"><button class="btn secondary" type="button" id="gate-retry">${icon('refresh-cw', 'i16')}ตรวจสอบอีกครั้ง</button><button class="btn ghost" type="button" id="gate-out">ออกจากระบบ</button></div>`;
+    const bindCommon = () => {
+      document.getElementById('gate-retry').addEventListener('click', boot);
+      document.getElementById('gate-out').addEventListener('click', () => Store.signOut());
+    };
+    if (rq && !editing) {
+      gate(`<div class="card rule login" style="text-align:center;align-items:center">${BRAND}${icon('hourglass', 'i28')}<h2>ส่งข้อมูลแล้ว · รอผู้ดูแลระบบอนุมัติ</h2>
+        <p class="muted" style="margin:0">บัญชี <b>${esc(p.email || '')}</b></p>
+        <div class="pending-req"><div><b>${esc(rq.name)}</b></div><div>${esc(Pages.requestText(rq))}</div>${rq.note ? `<div class="muted small">${esc(rq.note)}</div>` : ''}</div>
+        <ol class="pending-steps"><li>ผู้ดูแลระบบจะตรวจชื่อกับรายชื่อครูของโรงเรียน แล้วอนุมัติพร้อมกำหนดห้อง / ระดับชั้นให้</li><li>เมื่อได้รับอนุมัติ กด <b>ตรวจสอบอีกครั้ง</b> หรือเข้าสู่ระบบใหม่</li></ol>
+        <button class="btn ghost sm" type="button" id="req-edit">${icon('pencil', 'i16')}แก้ไขข้อมูลที่ส่ง</button>
+        ${buttons}</div>`);
+      document.getElementById('req-edit').addEventListener('click', () => pendingScreen(p, true));
+      return bindCommon();
+    }
+    const v = rq || { name: thai(p && p.name) ? p.name : '', duty: '', rooms: [], grades: [], note: '' };
+    gate(`<form class="card rule login pending-form" id="req-form" novalidate>${BRAND}
+      <div style="text-align:center">${icon('user-check', 'i28')}<h2 style="margin:6px 0 4px">ยืนยันตัวตนครู</h2>
+        <p class="muted small" style="margin:0">บัญชี <b>${esc(p ? p.email : '')}</b> สมัครแล้ว · กรอกข้อมูลด้านล่างเพื่อให้ผู้ดูแลระบบอนุมัติและกำหนดห้องให้ถูกต้อง</p></div>
+      <div class="field"><label>ชื่อ – นามสกุล (ภาษาไทย ตามรายชื่อของโรงเรียน) <span class="req">*</span></label>
+        <input class="input" name="name" required maxlength="100" value="${esc(v.name)}" placeholder="เช่น นางสาวสมศรี วงศ์ใหญ่" autocomplete="name"></div>
+      <div class="field"><label>หน้าที่ <span class="req">*</span></label>
+        <select class="select" name="duty" required><option value="">— เลือกหน้าที่ —</option>${Object.entries(Pages.DUTIES).map(([k, [l]]) => `<option value="${k}" ${v.duty === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
+      <div class="field" data-for="rooms"><label>ห้องที่ปรึกษา <span class="req" data-req-rooms>*</span></label>
+        <input class="input" name="rooms" inputmode="text" value="${esc(Pages.roomText(v.rooms || []))}" placeholder="เช่น 1/2 หรือ 5/24, 5/25">
+        <span class="help">ชั้น/ห้อง · หลายห้องคั่นด้วยจุลภาค</span></div>
+      <div class="field" data-for="grades"><label>ระดับชั้นที่ดูแล <span class="req">*</span></label>
+        <div class="radio-row">${[1, 2, 3, 4, 5, 6].map((g) => `<label><input type="checkbox" name="g${g}" ${(v.grades || []).includes(g) ? 'checked' : ''}> ม.${g}</label>`).join('')}</div></div>
+      <div class="field"><label>หมายเหตุถึงผู้ดูแลระบบ</label><input class="input" name="note" maxlength="300" value="${esc(v.note || '')}" placeholder="เช่น กลุ่มสาระ / ตำแหน่ง / เบอร์ติดต่อ (ไม่บังคับ)"></div>
+      <button class="btn primary block" type="submit">${icon('send', 'i16')}ส่งข้อมูลให้ผู้ดูแลระบบ</button>
+      ${rq ? '<button class="btn ghost sm" type="button" id="req-cancel">ยกเลิกการแก้ไข</button>' : ''}
+      ${buttons}</form>`);
+    const f = document.getElementById('req-form');
+    const sync = () => {
+      const d = f.duty.value;
+      f.querySelector('[data-for=rooms]').hidden = !(d === 'homeroom' || d === 'inspector');
+      f.querySelector('[data-req-rooms]').hidden = d !== 'homeroom';
+      f.querySelector('[data-for=grades]').hidden = d !== 'grade_head';
+    };
+    f.duty.addEventListener('change', sync); sync();
+    if (rq) document.getElementById('req-cancel').addEventListener('click', () => pendingScreen(p));
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = f.name.value.trim().replace(/\s+/g, ' '), duty = f.duty.value;
+      if (!thai(name) || name.length < 4) { UI.toast('กรอกชื่อ – นามสกุลภาษาไทยตามรายชื่อของโรงเรียน'); f.name.focus(); return; }
+      if (!duty) { UI.toast('เลือกหน้าที่'); f.duty.focus(); return; }
+      let rooms = [];
+      if (duty === 'homeroom' || duty === 'inspector') {
+        const r = Pages.parseRooms(f.rooms.value);
+        if (r.bad.length) { UI.toast('รูปแบบห้องไม่ถูกต้อง: ' + r.bad.join(', ') + ' (เช่น 1/2)'); f.rooms.focus(); return; }
+        if (duty === 'homeroom' && !r.rooms.length) { UI.toast('ระบุห้องที่ปรึกษาอย่างน้อย 1 ห้อง'); f.rooms.focus(); return; }
+        rooms = r.rooms;
+      }
+      const grades = duty === 'grade_head' ? [1, 2, 3, 4, 5, 6].filter((g) => f['g' + g].checked) : [];
+      if (duty === 'grade_head' && !grades.length) { UI.toast('เลือกระดับชั้นที่ดูแลอย่างน้อย 1 ระดับ'); return; }
+      const btn = f.querySelector('button[type=submit]');
+      btn.disabled = true;
+      try {
+        const np = await Store.profileRequest({ name, duty, rooms, grades, note: f.note.value.trim() });
+        UI.toast('ส่งข้อมูลแล้ว');
+        pendingScreen(np);
+      } catch (err) { btn.disabled = false; UI.toast(err.message); }
+    });
+    bindCommon();
   }
 
   async function boot() {
