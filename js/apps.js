@@ -34,14 +34,18 @@
 
   /* การ์ดค้นหาแบบเดียวกันทุกแอป: ระดับชั้น · ประเภท · ตั้งแต่วันที่ · ถึงวันที่ → เปิดผลในแท็บรายการของแอป */
   const optList = (list, sel) => list.map(([k, l]) => `<option value="${esc(k)}" ${String(k) === String(sel ?? '') ? 'selected' : ''}>${esc(l)}</option>`).join('');
-  const gradeOpts = (sel = '') => {
-    const grades = [...new Set(Store.activeStudents().map((s) => String(s.grade)))].sort((a, b) => a.localeCompare(b, 'th', { numeric: true }));
+  // only the grades this person may see in the app (homeroom teachers: own rooms' grades; grade heads: own grades);
+  // the database decides what rows come back anyway — this keeps the dropdown from offering grades with nothing to show
+  const scopeAll = (app) => { const r = Store.user() && Store.user().role; return Store.seesAll() || (r === 'inspector' && ['behavior', 'drugs', 'nurse'].includes(app)); };
+  const gradeOpts = (sel = '', app = 'behavior') => {
+    const inScope = (s) => scopeAll(app) || s.mine || (app === 'behavior' && s.taught);
+    const grades = [...new Set(Store.activeStudents().filter(inScope).map((s) => String(s.grade)))].sort((a, b) => a.localeCompare(b, 'th', { numeric: true }));
     return '<option value="">ทุกระดับชั้น</option>' + optList(grades.map((g) => [g, 'ม.' + g]), sel);
   };
   function searchCard({ id, title, hint = 'ดูว่ามีกี่ราย ใครบ้าง', typeLabel, typeHtml, q = {} }) {
     return `<form class="card bsearch no-print" data-search="${id}"><div class="card-head"><h3>${icon('search', 'i16')} ${esc(title)}</h3><span class="muted small">${esc(hint)}</span></div>
       <div class="card-body bsearch-row">
-        <div class="field"><label>ระดับชั้น</label><select class="select" name="grade">${gradeOpts(q.grade)}</select></div>
+        <div class="field"><label>ระดับชั้น</label><select class="select" name="grade">${gradeOpts(q.grade, id)}</select></div>
         <div class="field grow"><label>${esc(typeLabel)}</label><select class="select" name="type">${typeHtml}</select></div>
         <div class="field"><label>ตั้งแต่วันที่</label><input class="input" type="date" name="from" value="${esc(q.from || '')}"></div>
         <div class="field"><label>ถึงวันที่</label><input class="input" type="date" name="to" value="${esc(q.to || '')}"></div>
@@ -249,7 +253,7 @@
         + ruleGroups(rules).map(([cat, list]) => `<optgroup label="${esc(cat)}">${list.map((r) => opt(r.name, ruleLabel(r))).join('')}</optgroup>`).join('')
         + (other.length ? `<optgroup label="อื่น ๆ (จากบันทึกเดิม)">${other.map((x) => opt(x, x)).join('')}</optgroup>` : '');
     },
-    gradeOptions(selected = '') { return gradeOpts(selected); },
+    gradeOptions(selected = '', app = 'behavior') { return gradeOpts(selected, app); },
     // การ์ดค้นหาบนหน้าแรก → เปิดผลในแท็บรายการบันทึก (สรุปรายคน)
     // สรุปภาพรวมของแอป (ตามสิทธิ์ผู้ใช้)
     dashHtml(students) {
@@ -507,6 +511,6 @@
     get: (id) => ALL.find((a) => a.id === id),
     enabled: () => ALL.filter((a) => Store.s.apps[a.id] !== false && Store.appOk(a.id)),
     events: (sid) => window.Apps.enabled().flatMap((a) => a.events(sid)).sort(byDate),
-    stat, markStats, sLink, tabsBar, trashView, searchCard, bindSearch, hashOf, optList,
+    stat, markStats, sLink, tabsBar, trashView, searchCard, bindSearch, hashOf, optList, gradeOpts,
   };
 })();

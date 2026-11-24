@@ -203,7 +203,7 @@
         <select class="select" id="cf-sev" aria-label="ระดับความรุนแรง"><option value="">ทุกระดับความรุนแรง</option>${Apps.optList(SEV.map((s) => [s, s]), q.sev)}</select>
         <input type="hidden" id="cf-sfrom" value="${/^\d{4}-\d{2}-\d{2}$/.test(q.sfrom || '') ? q.sfrom : ''}">
         <select class="select" id="cf-k" aria-label="ประเภทปัญหา"><option value="">ทุกประเภทปัญหา</option>${Apps.optList(KTYPES.map(([k, l]) => [k, k + ' ' + l]), q.k)}</select>
-        <select class="select" id="cf-grade" aria-label="ระดับชั้น">${Apps.get('behavior').gradeOptions(q.grade || '')}</select>
+        <select class="select" id="cf-grade" aria-label="ระดับชั้น">${Apps.get('behavior').gradeOptions(q.grade || '', 'counsel')}</select>
         <span class="bf-dates"><input class="input" type="date" id="cf-from" title="เปิดเคสตั้งแต่วันที่" aria-label="เปิดเคสตั้งแต่วันที่" value="${esc(q.from || '')}"><span class="muted">–</span><input class="input" type="date" id="cf-to" title="เปิดเคสถึงวันที่" aria-label="เปิดเคสถึงวันที่" value="${esc(q.to || '')}"></span>
         <select class="select" id="cf-owner" aria-label="ผู้รับผิดชอบ"><option value="">ทุกผู้รับผิดชอบ</option><option value="${esc(Store.user().email)}">เคสของฉัน</option>${(D().counsellors || []).filter((c) => c.email !== Store.user().email).map((c) => `<option value="${esc(c.email)}">${esc(c.name)}</option>`).join('')}</select>
       </div><div id="cf-out"></div></div>`;

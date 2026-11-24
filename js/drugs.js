@@ -275,14 +275,13 @@
 
     recordsHtml(q) {
       const opt = (list, sel) => list.map(([k, l]) => `<option value="${esc(k)}" ${String(k) === String(sel || '') ? 'selected' : ''}>${esc(l)}</option>`).join('');
-      const grades = [...new Set(Store.activeStudents().map((s) => String(s.grade)))].sort();
       return `<div class="card"><div class="toolbar no-print">
           <input class="input grow" id="dr-q" placeholder="ค้นหาชื่อ / รหัสนักเรียน / สาร" value="${esc(q.q || '')}">
           <select class="select" id="dr-term" aria-label="ภาคเรียน"><option value="">ทุกภาคเรียน</option>${opt(terms().map((x) => [x, 'ภาคเรียน ' + x]), q.term === 'all' ? '' : q.term ?? Store.termKey())}</select>
           <select class="select" id="dr-cat" aria-label="ประเภท"><option value="">ทุกประเภท</option>${opt(Object.entries(CATS).map(([k, c]) => [k, c.label]), q.cat)}</select>
           <select class="select" id="dr-level" aria-label="กลุ่ม"><option value="">ทุกกลุ่ม</option>${opt(Object.entries(LEVELS).map(([k, [l]]) => [k, l]).concat([['use,addict', LEVELS.use[0] + ' / ' + LEVELS.addict[0]]]), q.level)}</select>
           <select class="select" id="dr-status" aria-label="สถานะ"><option value="">ทุกสถานะ</option><option value="active" ${q.status === 'active' ? 'selected' : ''}>ยังไม่ปิดเรื่อง</option>${opt(Object.entries(STATUS).map(([k, [l]]) => [k, l]), q.status)}</select>
-          <select class="select" id="dr-grade" aria-label="ระดับชั้น"><option value="">ทุกระดับชั้น</option>${opt(grades.map((g) => [g, 'ม.' + g]), q.grade)}</select>
+          <select class="select" id="dr-grade" aria-label="ระดับชั้น">${Apps.gradeOpts(q.grade, 'drugs')}</select>
           <span class="bf-dates"><input class="input" type="date" id="dr-from" title="ตั้งแต่วันที่" aria-label="ตั้งแต่วันที่" value="${esc(q.from || '')}"><span class="muted">–</span><input class="input" type="date" id="dr-to" title="ถึงวันที่" aria-label="ถึงวันที่" value="${esc(q.to || '')}"></span>
         </div><div id="dr-out"></div></div>`;
     },
