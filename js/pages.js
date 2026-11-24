@@ -213,7 +213,7 @@
     if (!list.length) return empty('ไม่พบครูตามเงื่อนไข', 'search-x');
     return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ชื่อ</th><th>บทบาท</th><th>สิทธิ์</th><th>ห้องที่ปรึกษา</th><th>แอปที่ใช้ได้</th>${admin ? '<th></th>' : ''}</tr></thead><tbody>
         ${list.map((u) => `<tr><td>${esc(u.name)} ${u.id === Store.user().id ? '<span class="badge b-navy">คุณ</span>' : ''}<div class="muted small">${esc(u.email || '')}</div>
-          ${admin && u.role === 'pending' ? requestCell(u) + (u.request && DUTIES[u.request.duty] && DUTIES[u.request.duty][1] ? `<div class="req-line"><button class="btn primary sm" data-action="user-approve" data-id="${u.id}">${icon('user-check', 'i16')}อนุมัติตามคำขอ</button> <span class="muted small">หรือเลือกบทบาทเองในช่องถัดไป</span></div>` : '') : ''}</td>
+          ${admin && u.role === 'pending' ? requestCell(u) + (canApprove(u) ? `<div class="req-line"><button class="btn primary sm" data-action="user-approve" data-id="${u.id}">${icon('user-check', 'i16')}อนุมัติ</button> <span class="muted small">หรือเลือกบทบาทเองในช่องถัดไป</span></div>` : '') : ''}</td>
           <td>${admin && u.id !== Store.user().id ? `<select class="select" style="height:32px;width:auto" data-user-role="${u.id}" aria-label="บทบาทของ ${esc(u.name)}">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${k === u.role ? 'selected' : ''}>${v}</option>`).join('')}</select>` : ROLES[u.role]}</td>
           <td class="muted small">${u.role === 'admin' ? 'ทะเบียนกลาง · ตั้งค่า · ทุกแอป · เนื้อหาลับ' : u.role === 'counselor' ? 'ทุกแอป · เนื้อหาลับของการให้คำปรึกษา' : u.role === 'teacher' ? 'ค้นหา/บันทึกพฤติกรรมได้ทุกคน · รายละเอียดเฉพาะห้องที่ปรึกษา' : u.role === 'grade_head' ? 'ค้นหา/บันทึกพฤติกรรมได้ทุกคน · รายละเอียดทุกห้องในระดับชั้นที่ดูแล (ไม่เห็นเนื้อหาลับ)' : u.role === 'inspector' ? 'ดู/บันทึกพฤติกรรมได้ทั้งโรงเรียน · รายละเอียดอื่นเฉพาะห้องที่ปรึกษา (ถ้ามี)' : 'ยังเข้าถึงข้อมูลไม่ได้'}</td>
           <td>${u.role === 'admin' || u.role === 'counselor' ? '<span class="muted small">ทุกห้อง</span>' : u.role === 'grade_head' ? `<div class="chips">${Store.gradesOf(u.id).map((g) => `<span class="badge b-navy">ระดับ ม.${g}</span>`).join('') || '<span class="badge b-warning">ยังไม่กำหนดระดับ</span>'}${admin ? `<button class="icon-btn" title="กำหนดระดับชั้น" data-action="grade-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : u.role === 'teacher' || u.role === 'inspector' ? `<div class="chips">${Store.roomsOf(u.id).map((t) => `<span class="badge b-info">ม.${t.grade}/${t.room}</span>`).join('') || (u.role === 'inspector' ? '<span class="muted small">ไม่มี (ไม่บังคับ)</span>' : '<span class="badge b-warning">ยังไม่กำหนด</span>')}${admin ? `<button class="icon-btn" title="กำหนดห้องที่ปรึกษา" data-action="room-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : '—'}</td>
@@ -616,43 +616,47 @@
     if (link) link.addEventListener('click', (e) => { e.preventDefault(); const gs = link.dataset.fillGrades.split(',').map(Number); [1, 2, 3, 4, 5, 6].forEach((g) => { document.querySelector(`.dialog input[name=g${g}]`).checked = gs.includes(g); }); });
   }
 
-  // what a pending account asked for + whether the name matches the school's lists (admin view)
+  // what to grant a pending account: from the duty it chose (older requests) or, since 24 Nov 2026, by matching
+  // its Thai name with the grade-head list (→ grade head + grades) and the advisor list (→ homeroom teacher + rooms)
+  const roomOk = ([g, r]) => D().students.some((s) => s.status === 'studying' && Number(s.grade) === g && Number(s.room) === r);
+  function planFor(u) {
+    const rq = u && u.request;
+    if (!rq) return null;
+    if (rq.duty) {
+      const role = DUTIES[rq.duty] ? DUTIES[rq.duty][1] : '';
+      return { role, rooms: (role === 'teacher' || role === 'inspector') ? (rq.rooms || []).filter(roomOk) : [], grades: role === 'grade_head' ? (rq.grades || []) : [], asked: true };
+    }
+    const grades = gradesByName(rq.name);
+    if (grades.length) return { role: 'grade_head', rooms: [], grades };
+    const rooms = roomsByName(rq.name);
+    if (rooms.length) return { role: 'teacher', rooms, grades: [] };
+    return { role: '', rooms: [], grades: [] };
+  }
+  const planText = (pl) => [ROLES[pl.role] || '', pl.rooms.length ? 'ห้อง ' + pl.rooms.map(([g, r]) => 'ม.' + g + '/' + r).join(', ') : '',
+    pl.grades.length ? 'ระดับ ' + pl.grades.map((g) => 'ม.' + g).join(', ') : ''].filter(Boolean).join(' · ');
+  // admin view of a pending account: what it sent and what the name matched
   function requestCell(u) {
     const rq = u.request;
-    if (!rq) return `<div class="req-line"><span class="badge b-neutral">ยังไม่ได้กรอกข้อมูลยืนยันตัวตน</span></div>`;
-    const ok = (yes, text) => `<span class="badge ${yes ? 'b-success' : 'b-danger'}">${yes ? '✓' : '✗'} ${esc(text)}</span>`;
-    let checks = '';
-    if (rq.duty === 'homeroom' || (rq.duty === 'inspector' && (rq.rooms || []).length)) {
-      const named = roomsByName(rq.name).map(([g, r]) => g + '/' + r);
-      checks = (rq.rooms || []).map(([g, r]) => {
-        const exists = D().students.some((s) => s.status === 'studying' && Number(s.grade) === g && Number(s.room) === r);
-        return !exists ? ok(false, `ไม่มีห้อง ม.${g}/${r} ในทะเบียน`) : ok(named.includes(g + '/' + r), named.includes(g + '/' + r) ? `ชื่อตรงกับครูที่ปรึกษา ม.${g}/${r}` : `ชื่อไม่ตรงกับครูที่ปรึกษา ม.${g}/${r}`);
-      }).join(' ');
-      if (rq.duty === 'homeroom' && named.length && !named.every((k) => (rq.rooms || []).some(([g, r]) => g + '/' + r === k))) checks += ` <span class="badge b-info">ในรายชื่อเป็นครูที่ปรึกษา ${named.map((k) => 'ม.' + k).join(', ')}</span>`;
-    } else if (rq.duty === 'grade_head') {
-      const named = gradesByName(rq.name);
-      checks = (rq.grades || []).map((g) => ok(named.includes(g), named.includes(g) ? `ชื่อตรงกับรายชื่อระดับ ม.${g}` : `ไม่พบชื่อในรายชื่อระดับ ม.${g}`)).join(' ');
-    } else if (rq.duty === 'counselor' || rq.duty === 'inspector') {
-      checks = '<span class="badge b-warning">บทบาทพิเศษ · ตรวจสอบตัวบุคคลก่อนอนุมัติ</span>';
-    }
-    return `<div class="req-line">${icon('id-card', 'i16')} ขอเป็น <b>${esc(requestText(rq))}</b>${rq.note ? ` <span class="muted">· ${esc(rq.note)}</span>` : ''}</div>${checks ? `<div class="req-line chips">${checks}</div>` : ''}`;
+    if (!rq) return `<div class="req-line"><span class="badge b-neutral">ยังไม่ได้กรอกชื่อยืนยันตัวตน</span></div>`;
+    const pl = planFor(u);
+    const sent = rq.duty ? `ขอเป็น <b>${esc(requestText(rq))}</b>` : `ชื่อที่กรอก <b>${esc(rq.name)}</b>`;
+    const match = pl.role
+      ? `<span class="badge b-success">✓ ${pl.asked ? 'อนุมัติตามคำขอได้' : 'พบในรายชื่อ'}: ${esc(planText(pl))}</span>`
+      : `<span class="badge b-warning">✗ ไม่พบชื่อนี้ในรายชื่อครูที่ปรึกษา / หัวหน้าระดับ · ตรวจการสะกด หรือเลือกบทบาทเอง (เช่น ครูประจำวิชา)</span>`;
+    return `<div class="req-line">${icon('id-card', 'i16')} ${sent}${rq.note ? ` <span class="muted">· ${esc(rq.note)}</span>` : ''}</div><div class="req-line chips">${match}</div>`;
   }
-  // one click: role from the duty + the rooms / grades asked for (admin-only RPCs check it again)
+  const canApprove = (u) => { const pl = planFor(u); return !!(pl && pl.role); };
+  // one click: role + rooms / grades from the plan (admin-only RPCs check it again)
   function approveRequest(userId) {
     const u = D().users.find((x) => x.id === userId);
-    const rq = u && u.request;
-    if (!rq || !DUTIES[rq.duty] || !DUTIES[rq.duty][1]) { UI.toast('คำขอนี้ไม่ได้ระบุบทบาท · เลือกบทบาทในตารางเอง'); return; }
-    const role = DUTIES[rq.duty][1];
-    // rooms that are not in the register are left out (the admin can add them later with the pencil button)
-    const rooms = (role === 'teacher' || role === 'inspector') ? (rq.rooms || []).filter(([g, r]) => D().students.some((s) => s.status === 'studying' && Number(s.grade) === g && Number(s.room) === r)) : [];
-    const grades = role === 'grade_head' ? (rq.grades || []) : [];
-    const skipped = (rq.rooms || []).length - rooms.length;
-    const what = [rooms.length ? 'ห้อง ' + rooms.map(([g, r]) => 'ม.' + g + '/' + r).join(', ') : '', grades.length ? 'ระดับ ' + grades.map((g) => 'ม.' + g).join(', ') : ''].filter(Boolean).join(' · ');
-    UI.confirmDialog('อนุมัติตามคำขอ', `อนุมัติ <b>${esc(rq.name)}</b> เป็น <b>${esc(ROLES[role])}</b>${what ? ' · ' + esc(what) : ''} ?${skipped && (role === 'teacher' || role === 'inspector') ? `<br><span class="muted small">ไม่กำหนดห้องที่ไม่มีในทะเบียน ${skipped} ห้อง</span>` : ''}${role === 'counselor' || role === 'inspector' ? '<br><span class="muted small">บทบาทนี้เห็นข้อมูลนักเรียนทั้งโรงเรียนในบางแอป ตรวจสอบตัวบุคคลแล้วหรือยัง</span>' : ''}`, 'อนุมัติ', async () => {
-      await Store.update('users', u.id, { role });
-      if (rooms.length) await Store.setRooms(u.id, rooms);
-      if (grades.length) await Store.setGrades(u.id, grades);
-      UI.toast('อนุมัติแล้ว · ' + rq.name); App.render();
+    const pl = planFor(u);
+    if (!pl || !pl.role) { UI.toast('ไม่พบชื่อในรายชื่อ · เลือกบทบาทในตารางเอง'); return; }
+    const name = u.request.name;
+    UI.confirmDialog('อนุมัติ', `อนุมัติ <b>${esc(name)}</b> เป็น <b>${esc(planText(pl))}</b> ?${pl.role === 'counselor' || pl.role === 'inspector' ? '<br><span class="muted small">บทบาทนี้เห็นข้อมูลนักเรียนทั้งโรงเรียนในบางแอป ตรวจสอบตัวบุคคลแล้วหรือยัง</span>' : ''}`, 'อนุมัติ', async () => {
+      await Store.update('users', u.id, { role: pl.role });
+      if (pl.rooms.length) await Store.setRooms(u.id, pl.rooms);
+      if (pl.grades.length) await Store.setGrades(u.id, pl.grades);
+      UI.toast('อนุมัติแล้ว · ' + name); App.render();
     });
   }
 
