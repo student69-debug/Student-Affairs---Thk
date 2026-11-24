@@ -643,3 +643,5 @@ a.chip{color:inherit;text-decoration:none}
 .appt-btns{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
 .appt-warn{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:13px;color:var(--red-700)}
 @media (max-width:640px){.appt-row{flex-wrap:wrap}.appt-side{align-items:flex-start;width:100%}.appt-btns{justify-content:flex-start}}
+
+.input.static-val{display:flex;align-items:center;background:var(--ink-50,#f5f6fa);color:var(--navy-800,#111770);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:120px}

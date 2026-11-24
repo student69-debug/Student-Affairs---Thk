@@ -37,15 +37,26 @@
   // only the grades this person may see in the app (homeroom teachers: own rooms' grades; grade heads: own grades);
   // the database decides what rows come back anyway — this keeps the dropdown from offering grades with nothing to show
   const scopeAll = (app) => { const r = Store.user() && Store.user().role; return Store.seesAll() || (r === 'inspector' && ['behavior', 'drugs', 'nurse'].includes(app)); };
-  const gradeOpts = (sel = '', app = 'behavior') => {
-    const inScope = (s) => scopeAll(app) || s.mine || (app === 'behavior' && s.taught);
-    const grades = [...new Set(Store.activeStudents().filter(inScope).map((s) => String(s.grade)))].sort((a, b) => a.localeCompare(b, 'th', { numeric: true }));
-    return '<option value="">ทุกระดับชั้น</option>' + optList(grades.map((g) => [g, 'ม.' + g]), sel);
+  const scopeStudents = (app) => Store.activeStudents().filter((s) => scopeAll(app) || s.mine || (app === 'behavior' && s.taught));
+  const scopeGrades = (app) => [...new Set(scopeStudents(app).map((s) => String(s.grade)))].sort((a, b) => a.localeCompare(b, 'th', { numeric: true }));
+  const gradeOpts = (sel = '', app = 'behavior') => '<option value="">ทุกระดับชั้น</option>' + optList(scopeGrades(app).map((g) => [g, 'ม.' + g]), sel);
+  // nothing to choose (user, 24 Nov 2026: "ครูที่ปรึกษา ม.1/2 ก็เห็นแค่นี้พอ ไม่ต้องให้เลือก"): one grade or none in scope →
+  // the picker is replaced by a fixed label of the rooms / grade the person looks after; returns '' when there is a choice
+  const gradeLock = (app = 'behavior') => {
+    if (scopeAll(app)) return '';
+    const grades = scopeGrades(app);
+    if (grades.length > 1) return '';
+    if (!grades.length) return 'ยังไม่มีห้องที่ดูแล';
+    if (Store.user().role === 'grade_head' && Store.myGrades().map(String).includes(grades[0])) return 'ม.' + grades[0] + ' (ทั้งระดับ)';
+    const rooms = [...new Set(scopeStudents(app).map((s) => Number(s.room)))].sort((a, b) => a - b);
+    return rooms.map((r) => 'ม.' + grades[0] + '/' + r).join(', ');
   };
   function searchCard({ id, title, hint = 'ดูว่ามีกี่ราย ใครบ้าง', typeLabel, typeHtml, q = {} }) {
+    const lock = gradeLock(id);
     return `<form class="card bsearch no-print" data-search="${id}"><div class="card-head"><h3>${icon('search', 'i16')} ${esc(title)}</h3><span class="muted small">${esc(hint)}</span></div>
       <div class="card-body bsearch-row">
-        <div class="field"><label>ระดับชั้น</label><select class="select" name="grade">${gradeOpts(q.grade, id)}</select></div>
+        ${lock ? `<div class="field"><label>ห้องที่ดูแล</label><div class="input static-val" title="${esc(lock)}">${esc(lock)}</div><input type="hidden" name="grade" value=""></div>`
+          : `<div class="field"><label>ระดับชั้น</label><select class="select" name="grade">${gradeOpts(q.grade, id)}</select></div>`}
         <div class="field grow"><label>${esc(typeLabel)}</label><select class="select" name="type">${typeHtml}</select></div>
         <div class="field"><label>ตั้งแต่วันที่</label><input class="input" type="date" name="from" value="${esc(q.from || '')}"></div>
         <div class="field"><label>ถึงวันที่</label><input class="input" type="date" name="to" value="${esc(q.to || '')}"></div>
@@ -284,7 +295,7 @@
           <input class="input grow" id="bf-q" placeholder="ค้นหาชื่อ / รหัสนักเรียน" value="${esc(q.q || '')}">
           <select class="select" id="bf-title" aria-label="ประเภทพฤติกรรม">${this.typeOptions(q.type || '')}</select>
           <select class="select" id="bf-term" aria-label="ภาคเรียน"><option value="">ทุกภาคเรียน (ย้อนหลังทั้งหมด)</option>${terms.map((x) => `<option value="${esc(x)}" ${x === cur && !dated ? 'selected' : ''}>ภาคเรียน ${esc(x)}${x === cur ? ' (ปัจจุบัน)' : ''}</option>`).join('')}</select>
-          <select class="select" id="bf-grade" aria-label="ระดับชั้น">${this.gradeOptions(q.grade || '')}</select>
+          <select class="select" id="bf-grade" aria-label="ระดับชั้น" ${Apps.gradeLock('behavior') ? 'hidden' : ''}>${this.gradeOptions(q.grade || '')}</select>
           <span class="bf-dates"><input class="input" type="date" id="bf-from" title="ตั้งแต่วันที่" aria-label="ตั้งแต่วันที่" value="${esc(q.from || '')}"><span class="muted">–</span><input class="input" type="date" id="bf-to" title="ถึงวันที่" aria-label="ถึงวันที่" value="${esc(q.to || '')}"></span>
           <select class="select" id="bf-view" aria-label="รูปแบบการแสดง"><option value="list">แสดงรายรายการ</option><option value="people" ${q.view === 'people' ? 'selected' : ''}>สรุปรายคน</option></select>
         </div><div id="bf-out"></div></div>`;
@@ -511,6 +522,6 @@
     get: (id) => ALL.find((a) => a.id === id),
     enabled: () => ALL.filter((a) => Store.s.apps[a.id] !== false && Store.appOk(a.id)),
     events: (sid) => window.Apps.enabled().flatMap((a) => a.events(sid)).sort(byDate),
-    stat, markStats, sLink, tabsBar, trashView, searchCard, bindSearch, hashOf, optList, gradeOpts,
+    stat, markStats, sLink, tabsBar, trashView, searchCard, bindSearch, hashOf, optList, gradeOpts, gradeLock,
   };
 })();

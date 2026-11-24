@@ -234,7 +234,7 @@
           <select class="select" id="nv-term" aria-label="ภาคเรียน"><option value="">ทุกภาคเรียน</option>${opt(terms().map((x) => [x, 'ภาคเรียน ' + x]), q.term === 'all' ? '' : q.term ?? Store.termKey())}</select>
           <select class="select" id="nv-group" aria-label="อาการ"><option value="">ทุกอาการ</option>${opt(Object.entries(GROUPS), q.group)}</select>
           <select class="select" id="nv-out" aria-label="ผล"><option value="">ทุกผล</option>${opt(Object.entries(OUTCOMES).map(([k, [l]]) => [k, l]).concat([['home,hospital', OUTCOMES.home[0] + ' / ' + OUTCOMES.hospital[0]]]), q.outcome)}</select>
-          <select class="select" id="nv-grade" aria-label="ระดับชั้น">${Apps.gradeOpts(q.grade, 'nurse')}</select>
+          <select class="select" id="nv-grade" aria-label="ระดับชั้น" ${Apps.gradeLock('nurse') ? 'hidden' : ''}>${Apps.gradeOpts(q.grade, 'nurse')}</select>
           <span class="bf-dates"><input class="input" type="date" id="nv-from" title="ตั้งแต่วันที่" aria-label="ตั้งแต่วันที่" value="${esc(q.from || '')}"><span class="muted">–</span><input class="input" type="date" id="nv-to" title="ถึงวันที่" aria-label="ถึงวันที่" value="${esc(q.to || '')}"></span>
           <button class="btn ghost sm" id="nv-csv">${icon('download', 'i16')}CSV</button>
         </div><div id="nv-out-list"></div></div>`;
