@@ -2,57 +2,118 @@
 (function () {
   const { esc, fmtDate, icon, signed, empty } = UI;
 
-  function scoreBlock(c) {
+  // plain-language level for parents (teachers' own thresholds are not exposed here; share of the base score)
+  function level(score, base) {
+    const pct = (score / base) * 100;
+    if (score > base) return { key: 'great', label: 'ดีเยี่ยม', text: 'ได้คะแนนความดีเพิ่มจากคะแนนตั้งต้น', ic: 'award' };
+    if (pct >= 100) return { key: 'great', label: 'ดีมาก', text: 'ยังไม่ถูกหักคะแนนในภาคเรียนนี้', ic: 'smile' };
+    if (pct >= 80) return { key: 'good', label: 'ดี', text: 'ถูกหักคะแนนเล็กน้อย ช่วยกันดูแลต่อไป', ic: 'thumbs-up' };
+    if (pct >= 60) return { key: 'watch', label: 'ควรดูแล', text: 'ถูกหักคะแนนหลายครั้ง ควรพูดคุยกับนักเรียน', ic: 'eye' };
+    return { key: 'risk', label: 'ต้องติดตามใกล้ชิด', text: 'คะแนนต่ำ กรุณาติดต่อครูที่ปรึกษา', ic: 'triangle-alert' };
+  }
+  // "วันนี้ 11:02 น." / "เมื่อวาน" / "3 วันก่อน" next to the full date
+  function when(at) {
+    const d = new Date(at), today = new Date(); today.setHours(0, 0, 0, 0);
+    const day = new Date(d); day.setHours(0, 0, 0, 0);
+    const n = Math.round((today - day) / 864e5);
+    const rel = n === 0 ? 'วันนี้' : n === 1 ? 'เมื่อวาน' : n > 1 && n < 7 ? n + ' วันก่อน' : '';
+    return (rel ? `<b>${rel}</b> · ` : '') + fmtDate(at, true);
+  }
+
+  function ring(score, base, lv) {
+    const r = 52, c = 2 * Math.PI * r;
+    const frac = Math.max(0, Math.min(1, score / base));
+    return `<svg class="pv-ring lv-${lv.key}" viewBox="0 0 128 128" role="img" aria-label="คะแนน ${score} จาก ${base}">
+      <circle cx="64" cy="64" r="${r}" class="track"/>
+      <circle cx="64" cy="64" r="${r}" class="fill" stroke-dasharray="${(c * frac).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 64 64)"/>
+      <text x="64" y="66" class="num">${score}</text><text x="64" y="88" class="of">จาก ${base}</text></svg>`;
+  }
+
+  function scoreCard(c) {
     const base = c.baseScore || 100;
-    const pct = Math.max(0, Math.min(100, (c.score / base) * 100));
-    // same thresholds teachers use are not exposed to parents; colour by share of base score
-    const color = pct >= 70 ? 'var(--green-600)' : pct >= 50 ? 'var(--amber-500)' : 'var(--red-700)';
-    return `<div class="card-body pv-score">
-      <div class="muted small">คะแนนพฤติกรรม ภาคเรียนที่ ${esc(c.term)}</div>
-      <div class="pv-big">${c.score}<small>/${base}</small></div>
-      <div class="meter"><div class="bar"><i style="width:${pct}%;background:${color}"></i></div></div></div>`;
+    const plus = c.behavior.filter((r) => r.points > 0), minus = c.behavior.filter((r) => r.points < 0);
+    const sum = (l) => l.reduce((a, r) => a + r.points, 0);
+    const lv = level(c.score, base);
+    return `<div class="card pv-scorecard">
+      <div class="pv-score-top">
+        ${ring(c.score, base, lv)}
+        <div class="pv-score-txt">
+          <div class="muted small">คะแนนความประพฤติ · ภาคเรียนที่ ${esc(c.term)}</div>
+          <div class="pv-level lv-${lv.key}">${icon(lv.ic, 'i16')}${lv.label}</div>
+          <div class="pv-level-text">${lv.text}</div>
+          <div class="pv-calc">เริ่มต้น <b>${base}</b>${plus.length ? ` <span class="pos">+${sum(plus)}</span>` : ''}${minus.length ? ` <span class="neg">${signed(sum(minus))}</span>` : ''} = <b>${c.score}</b></div>
+        </div>
+      </div>
+      <div class="pv-tiles">
+        <div class="pv-tile pos">${icon('star', 'i20')}<div><b>${plus.length ? '+' + sum(plus) : '0'}</b><span>ความดี ${plus.length} ครั้ง</span></div></div>
+        <div class="pv-tile neg">${icon('circle-minus', 'i20')}<div><b>${minus.length ? signed(sum(minus)) : '0'}</b><span>ถูกหักคะแนน ${minus.length} ครั้ง</span></div></div>
+      </div></div>`;
   }
 
-  function behaviorList(c) {
-    if (!c.behavior.length) return empty('ยังไม่มีรายการพฤติกรรมในภาคเรียนนี้', 'smile');
-    return `<div class="list">${c.behavior.map((r) => `<div class="list-row">
-      <span class="${r.points >= 0 ? 'pts-pos' : 'pts-neg'}" style="min-width:44px">${signed(r.points)}</span>
-      <div class="grow"><div class="t">${esc(r.title)}</div><div class="s">${fmtDate(r.at, true)}${r.note ? ' · ' + esc(r.note) : ''}</div></div></div>`).join('')}</div>`;
+  function behaviorCard(c) {
+    const rows = c.behavior;
+    const nPlus = rows.filter((r) => r.points > 0).length, nMinus = rows.filter((r) => r.points < 0).length;
+    const item = (r) => `<li class="pv-item ${r.points > 0 ? 'pos' : r.points < 0 ? 'neg' : ''}" data-kind="${r.points > 0 ? 'pos' : r.points < 0 ? 'neg' : 'zero'}">
+      <span class="pv-dot">${icon(r.points > 0 ? 'thumbs-up' : r.points < 0 ? 'circle-alert' : 'minus', 'i16')}</span>
+      <div class="grow"><div class="t">${esc(r.title)}</div><div class="s">${when(r.at)}${r.note ? `<br>${esc(r.note)}` : ''}</div></div>
+      <span class="pv-pts">${signed(r.points)}</span></li>`;
+    return `<div class="card pv-behavior"><div class="card-head"><h3>${icon('list-checks', 'i16')} บันทึกพฤติกรรม</h3><span class="muted small">${rows.length} รายการ</span></div>
+      ${rows.length ? `<div class="pv-filter" role="tablist">
+          <button class="on" data-pv-filter="all">ทั้งหมด ${rows.length}</button>
+          <button data-pv-filter="pos" ${nPlus ? '' : 'disabled'}>ความดี ${nPlus}</button>
+          <button data-pv-filter="neg" ${nMinus ? '' : 'disabled'}>ถูกหักคะแนน ${nMinus}</button></div>
+        <ul class="pv-list">${rows.map(item).join('')}</ul>`
+        : empty('ยังไม่มีบันทึกพฤติกรรมในภาคเรียนนี้', 'smile')}</div>`;
   }
 
-  function childCard(c) {
-    const name = `${c.prefix}${c.first} ${c.last}`;
-    const parts = [];
-    parts.push(`<div class="card rule profile">
-      ${c.photoPath ? `<img class="avatar lg" data-photo="${esc(c.photoPath)}" alt="" style="object-fit:cover">` : `<div class="avatar lg">${esc(c.first.slice(0, 1))}</div>`}
-      <div class="who"><h2>${esc(name)}</h2>
-        <div class="kv"><span><b>รหัส</b><span class="mono">${esc(c.id)}</span></span><span><b>ชั้น</b>ม.${c.grade}/${c.room} เลขที่ ${c.no}</span>
-        ${c.advisor ? `<span><b>ครูที่ปรึกษา</b>${esc(c.advisor)}</span>` : ''}</div></div></div>`);
-
-    if ('score' in c) {
-      parts.push(`<div class="card">${scoreBlock(c)}<div class="card-head" style="border-top:1px solid var(--ink-200)"><h3>รายการพฤติกรรม</h3><span class="muted small">${c.behavior.length} รายการ</span></div>${behaviorList(c)}</div>`);
-    }
-
-    const extra = [];
+  function careCard(c) {
+    const tiles = [];
+    const tile = (ic, title, value, tone, sub) => `<div class="pv-care ${tone}">${icon(ic, 'i20')}<div class="grow"><div class="t">${title}</div><div class="v">${value}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div></div>`;
     if ('screening' in c) {
       const s = c.screening;
       const txt = !s ? 'ยังไม่มีผลคัดกรอง'
         : s.result === 'normal' ? 'ปกติ'
         : s.result === 'contact' ? 'ครูที่ปรึกษาจะติดต่อผู้ปกครอง'
         : UI.SCREEN[s.result] ? UI.SCREEN[s.result][0] : s.result;
-      extra.push(`<div class="list-row">${icon('clipboard-check')}<div class="grow"><div class="t">ผลคัดกรองล่าสุด</div><div class="s">${s ? fmtDate(s.at) + (s.tool ? ' · ' + esc(s.tool) : '') : '—'}</div></div><span class="badge ${!s ? 'b-neutral' : s.result === 'normal' ? 'b-success' : 'b-info'}">${esc(txt)}</span></div>`);
+      tiles.push(tile('clipboard-check', 'ผลคัดกรองล่าสุด', esc(txt), !s ? 'muted' : s.result === 'normal' ? 'ok' : 'info', s ? fmtDate(s.at) + (s.tool ? ' · ' + esc(s.tool) : '') : ''));
     }
     if ('visits' in c) {
-      extra.push(`<div class="list-row">${icon('house')}<div class="grow"><div class="t">การเยี่ยมบ้าน</div><div class="s">${c.visits.length ? c.visits.map((v) => fmtDate(v.at) + (v.note ? ' · ' + esc(v.note) : '')).join('<br>') : 'ยังไม่มีการเยี่ยมบ้าน'}</div></div></div>`);
+      const v = c.visits;
+      tiles.push(tile('house', 'การเยี่ยมบ้าน', v.length ? `เยี่ยมแล้ว ${v.length} ครั้ง` : 'ยังไม่มีการเยี่ยมบ้าน', v.length ? 'ok' : 'muted',
+        v.length ? v.map((x) => fmtDate(x.at) + (x.note ? ' · ' + esc(x.note) : '')).join('<br>') : ''));
     }
     if ('counsel' in c) {
-      extra.push(`<div class="list-row">${icon('messages-square')}<div class="grow"><div class="t">การพบครูแนะแนว</div><div class="s">${c.counsel.length ? c.counsel.length + ' ครั้ง · ล่าสุด ' + fmtDate(c.counsel[0].at) : 'ยังไม่มี'}</div></div></div>`);
+      tiles.push(tile('messages-square', 'การพบครูแนะแนว', c.counsel.length ? c.counsel.length + ' ครั้ง' : 'ยังไม่มี', c.counsel.length ? 'info' : 'muted', c.counsel.length ? 'ล่าสุด ' + fmtDate(c.counsel[0].at) : ''));
     }
     if ('health' in c) {
-      extra.push(`<div class="list-row">${icon('thermometer')}<div class="grow"><div class="t">บันทึกสุขภาพที่โรงเรียน</div><div class="s">${c.health.length ? c.health.slice(0, 10).map((h) => fmtDate(h.at) + ' · ' + esc(h.symptom) + (h.referred ? ' (ส่งต่อ)' : '')).join('<br>') : 'ไม่มี'}</div></div></div>`);
+      tiles.push(tile('thermometer', 'บันทึกสุขภาพที่โรงเรียน', c.health.length ? c.health.length + ' ครั้ง' : 'ไม่มี', c.health.length ? 'info' : 'muted',
+        c.health.slice(0, 10).map((h) => fmtDate(h.at) + ' · ' + esc(h.symptom) + (h.referred ? ' (ส่งต่อ)' : '')).join('<br>')));
     }
-    if (extra.length) parts.push(`<div class="card"><div class="card-head"><h3>การดูแลช่วยเหลือ</h3></div><div class="list">${extra.join('')}</div></div>`);
-    return parts.join('');
+    return tiles.length ? `<div class="card"><div class="card-head"><h3>${icon('heart-handshake', 'i16')} การดูแลช่วยเหลือ</h3></div><div class="pv-cares">${tiles.join('')}</div></div>` : '';
+  }
+
+  function childCard(c) {
+    const name = `${c.prefix}${c.first} ${c.last}`;
+    const parts = [];
+    parts.push(`<div class="pv-hero">
+      ${c.photoPath ? `<img class="pv-photo" data-photo="${esc(c.photoPath)}" alt="">` : `<div class="pv-photo">${esc(c.first.slice(0, 1))}</div>`}
+      <div class="grow"><h2>${esc(name)}</h2>
+        <div class="pv-chips"><span>${icon('school', 'i16')}ม.${c.grade}/${c.room} เลขที่ ${c.no}</span><span>${icon('hash', 'i16')}${esc(c.id)}</span></div>
+        ${c.advisor ? `<div class="pv-adv">${icon('user-round', 'i16')}ครูที่ปรึกษา: ${esc(c.advisor)}</div>` : ''}</div></div>`);
+    if ('score' in c) parts.push(scoreCard(c), behaviorCard(c));
+    parts.push(careCard(c));
+    return `<section class="pv-child">${parts.join('')}</section>`;
+  }
+
+  // filter chips above the behaviour list (all / good deeds / deductions)
+  function bindFilters(root) {
+    root.querySelectorAll('.pv-behavior').forEach((card) => {
+      card.querySelectorAll('[data-pv-filter]').forEach((b) => b.addEventListener('click', () => {
+        card.querySelectorAll('[data-pv-filter]').forEach((x) => x.classList.toggle('on', x === b));
+        const k = b.dataset.pvFilter;
+        card.querySelectorAll('.pv-item').forEach((li) => { li.hidden = k !== 'all' && li.dataset.kind !== k; });
+      }));
+    });
   }
 
   async function render(gate) {
@@ -65,11 +126,12 @@
     if (!v || v.error) body = `<div class="card">${empty('โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่', 'wifi-off')}</div>`;
     else if (!v.enabled) body = `<div class="card">${empty('ระบบสำหรับผู้ปกครองปิดใช้งานชั่วคราว', 'lock')}</div>`;
     else if (!v.students.length) body = `<div class="card">${empty('บัญชีนี้ยังไม่ได้เชื่อมกับนักเรียน กรุณาติดต่อครูที่ปรึกษา', 'user-x')}</div>`;
-    else body = v.students.map(childCard).join('<div style="height:8px"></div>');
+    else body = v.students.map(childCard).join('');
     gate(`<div class="pv">${head}<main class="pv-main">${body}
-      <p class="muted small" style="text-align:center;margin:8px 0 0">ข้อมูลจากกลุ่มบริหารกิจการนักเรียน · หากข้อมูลไม่ถูกต้องกรุณาติดต่อครูที่ปรึกษา</p></main></div>`, true);
+      <p class="pv-foot">${icon('info', 'i16')}ข้อมูลจากกลุ่มบริหารกิจการนักเรียน · หากข้อมูลไม่ถูกต้องหรือมีข้อสงสัย กรุณาติดต่อครูที่ปรึกษา</p></main></div>`, true);
     document.getElementById('pv-out').addEventListener('click', () => Store.signOut());
     UI.hydratePhotos(document.getElementById('gate'));
+    bindFilters(document.getElementById('gate'));
   }
 
   window.Parent = { render };
