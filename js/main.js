@@ -368,6 +368,8 @@
       signedUpMail: 'สมัครเรียบร้อย — กรุณาเปิดอีเมลแล้วกดลิงก์ยืนยัน จากนั้นเข้าสู่ระบบที่นี่',
       signedUpT: 'สมัครเรียบร้อยแล้ว · ขั้นต่อไปตรวจอีเมล', mailSentTo: 'ระบบส่งอีเมลยืนยันไปที่',
       signupSteps: ['เปิดกล่องจดหมายของอีเมลนี้ (ถ้าไม่เจอ ให้ดูในโฟลเดอร์ <b>สแปม / จดหมายขยะ</b> หรือแท็บ <b>โปรโมชัน</b>)', 'เปิดอีเมลเรื่อง <b>ยืนยันอีเมล</b> แล้วกดลิงก์ยืนยันในอีเมล', 'กลับมาที่หน้านี้ แล้ว <b>เข้าสู่ระบบ</b> ด้วยอีเมลและรหัสผ่านที่เพิ่งตั้ง', 'รอผู้ดูแลระบบอนุมัติสิทธิ์ แล้วจะเข้าใช้งานได้'],
+      memberT: 'อีเมลนี้เป็นสมาชิกแล้ว', memberIs: 'มีบัญชีในระบบแล้ว ไม่ต้องสมัครใหม่', cancel: 'ยกเลิก',
+      memberHint: 'อีเมลนี้มีบัญชีแล้ว · ถ้าเคยสมัครด้วย Google ให้กดปุ่ม "เข้าสู่ระบบด้วยบัญชี Google" · ถ้าจำรหัสผ่านไม่ได้ ให้กด "ลืมรหัสผ่าน?"',
       gotIt: 'เข้าใจแล้ว', signedUpToast: 'สมัครใช้งานเรียบร้อยแล้ว · รอผู้ดูแลระบบอนุมัติสิทธิ์',
       parentErr: { invalid: 'รหัสนักเรียนหรือเลขประจำตัวประชาชนไม่ถูกต้อง', locked: 'ลองผิดหลายครั้งเกินไป กรุณารอ 1 ชั่วโมงแล้วลองใหม่ หรือติดต่อครูที่ปรึกษา', inactive: 'นักเรียนคนนี้ไม่ได้อยู่ในสถานะกำลังศึกษา กรุณาติดต่อโรงเรียน', other: 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่' },
     },
@@ -406,6 +408,8 @@
       signedUpMail: 'Account created. Open your email, click the confirmation link, then sign in here.',
       signedUpT: 'Account created · check your email next', mailSentTo: 'A confirmation email was sent to',
       signupSteps: ['Open the inbox of this email (if it is not there, look in <b>Spam / Junk</b> or <b>Promotions</b>)', 'Open the email about <b>confirming your email</b> and click its link', 'Come back to this page and <b>sign in</b> with the email and password you just set', 'Wait for an administrator to approve your access'],
+      memberT: 'You already have an account', memberIs: 'already has an account. No need to sign up again.', cancel: 'Cancel',
+      memberHint: 'This email already has an account · if you signed up with Google, use "Sign in with Google" · if you forgot the password, use "Forgot password?"',
       gotIt: 'Got it', signedUpToast: 'Account created · waiting for administrator approval',
       parentErr: { invalid: 'The student ID or national ID is not correct', locked: 'Too many wrong tries. Wait 1 hour and try again, or contact the homeroom teacher', inactive: 'This student is not currently enrolled. Please contact the school', other: 'Sign-in failed. Please try again' },
     },
@@ -582,15 +586,23 @@
     return (lang === 'en' ? 'Something went wrong: ' : 'ดำเนินการไม่สำเร็จ: ') + m;
   }
 
-  function loginScreen(mode = 'in', msg = '') {
+  // the address already has an account: this is Supabase's own answer to the sign-up, there is no address lookup of ours that strangers could call
+  function memberDialog(email) {
+    const d = UI.dialog({ title: t('memberT'), size: 'sm',
+      body: `<div class="signup-done">${notice('user-check', `<span class="mail">${esc(email)}</span> ${t('memberIs')}`)}<p class="muted small" style="margin:0">${t('memberHint')}</p></div>`,
+      footer: `<button type="button" class="btn ghost" data-close>${t('cancel')}</button><button type="submit" class="btn primary">${icon('log-in', 'i16')}${t('signIn')}</button>`,
+      onSubmit: () => { d.close(); loginScreen('in', () => t('memberHint'), email); return false; } });
+  }
+
+  function loginScreen(mode = 'in', msg = '', email = '') {
     if (mode === 'parent' || mode === 'activate') return parentScreen(mode, msg);
     if (mode === 'forgot') return forgotScreen();
-    redraw = () => loginScreen(mode, msg);
+    redraw = () => loginScreen(mode, msg, email);
     const up = mode === 'up';
     authGate(`<form class="login auth-form" id="login-form" novalidate>${up ? welcome(t('signupT'), t('signupSub')) : welcome(t('welcome'), t('welcomeSub'))}${tabsHtml(false)}
       ${msg ? notice('info', esc(msgText(msg))) : ''}
       ${up ? `<div class="field"><label>${t('name')} <span class="req">*</span></label>${field('user', '<input class="input" name="name" required placeholder="ครูสมศรี วงศ์ใหญ่" autocomplete="name">')}</div>` : ''}
-      <div class="field"><label>${t('email')} <span class="req">*</span></label>${field('mail', '<input class="input" type="email" name="email" required autocomplete="email" placeholder="name@thk.ac.th">')}</div>
+      <div class="field"><label>${t('email')} <span class="req">*</span></label>${field('mail', `<input class="input" type="email" name="email" required autocomplete="email" placeholder="name@thk.ac.th" value="${esc(email)}">`)}</div>
       <div class="field"><div class="field-head"><label>${t('password')} <span class="req">*</span></label>${up ? '' : `<a href="#" data-login="forgot">${t('forgot')}</a>`}</div>${field('lock', `<input class="input" type="password" name="password" required autocomplete="${up ? 'new-password' : 'current-password'}" placeholder="••••••••">`, true)}${up ? pwRulesHtml() : ''}</div>
       ${up ? '' : `<label class="auth-remember" title="${t('rememberHint')}"><input type="checkbox" name="remember" ${Store.remembers() ? 'checked' : ''}><span class="sw" aria-hidden="true"></span><span>${t('remember')}</span></label>`}
       ${submitBtn(up ? t('signupT') : t('signIn'))}
@@ -600,6 +612,7 @@
     </form>`);
     const form = document.getElementById('login-form');
     bindTabs(form);
+    if (email) form.password.focus();
     const paintRules = up ? bindRules(form, form.password) : null;
     form.querySelector('[data-google]').addEventListener('click', async (e) => {
       const b = e.currentTarget, label = b.innerHTML;
@@ -618,6 +631,8 @@
         if (up) {
           Store.setRemember(true);
           const res = await Store.signUp(v.name.trim(), v.email.trim(), v.password);
+          // with "Confirm email" on, Supabase answers an existing address with an account that has no identities instead of an error
+          if (res.user && res.user.identities && !res.user.identities.length) throw new Error('already registered');
           if (!res.session) {
             loginScreen('in', () => t('signedUpMail'));
             UI.dialog({ title: t('signedUpT'), size: 'sm',
@@ -633,7 +648,8 @@
         boot();
       } catch (err) {
         busy(btn, false, up ? t('signupT') : t('signIn'));
-        UI.toast(authError(err.message));
+        if (up && /already registered|already exists/i.test(err.message)) memberDialog(v.email.trim());
+        else UI.toast(authError(err.message));
       }
     });
   }
