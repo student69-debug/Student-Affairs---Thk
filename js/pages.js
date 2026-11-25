@@ -632,14 +632,42 @@
   }
 
   // what to suggest for a pending account: match its Thai name with the grade-head list (→ grade head + grades) and the advisor list (→ homeroom teacher + rooms)
+  function planByName(name) {
+    const grades = gradesByName(name);
+    if (grades.length) return { role: 'grade_head', rooms: [], grades };
+    const rooms = roomsByName(name);
+    if (rooms.length) return { role: 'teacher', rooms, grades: [] };
+    return { role: '', rooms: [], grades: [] };
+  }
+  // number of letters to add, remove or change to turn a into b
+  function letterDiff(a, b) {
+    let row = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+      const next = [i];
+      for (let j = 1; j <= b.length; j++) next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      row = next;
+    }
+    return row[b.length];
+  }
+  // people on the school's lists whose name is at most 3 letters away from a misspelt one (any two real names differ by 6 or more, checked 25 Nov 2026);
+  // compared with and without the title, so a misspelt title is found too
+  function nearNames(name) {
+    const squeeze = (n) => n.split(' ').join('');
+    const people = new Map();
+    const add = (n) => { const key = normName(n); if (key && !people.has(key)) people.set(key, n.trim()); };
+    (D().gradeStaff || []).forEach((x) => add(x.name));
+    new Set(D().students.filter((s) => s.status === 'studying' && s.advisor).map((s) => s.advisor)).forEach((a) => a.split(',').forEach(add));
+    return [...people].map(([key, official]) => ({ name: official, diff: Math.min(letterDiff(normName(name), key), letterDiff(squeeze(name), squeeze(official))), max: Math.min(3, Math.floor(key.length / 4)) }))
+      .filter((x) => x.diff <= x.max).sort((a, b) => a.diff - b.diff);
+  }
   function planFor(u) {
     const rq = u && u.request;
     if (!rq) return null;
-    const grades = gradesByName(rq.name);
-    if (grades.length) return { role: 'grade_head', rooms: [], grades };
-    const rooms = roomsByName(rq.name);
-    if (rooms.length) return { role: 'teacher', rooms, grades: [] };
-    return { role: '', rooms: [], grades: [] };
+    const exact = planByName(rq.name);
+    if (exact.role) return exact;
+    const near = nearNames(rq.name);
+    // only one person may be that close; otherwise the admin decides
+    return near.length === 1 ? { ...planByName(near[0].name), fixedName: near[0].name, diff: near[0].diff } : { ...exact, near };
   }
   const planText = (pl) => [ROLES[pl.role] || '', pl.rooms.length ? 'ห้อง ' + pl.rooms.map(([g, r]) => 'ม.' + g + '/' + r).join(', ') : '',
     pl.grades.length ? 'ระดับ ' + pl.grades.map((g) => 'ม.' + g).join(', ') : ''].filter(Boolean).join(' · ');
@@ -648,7 +676,11 @@
     const rq = u.request;
     if (!rq) return `<div class="req-line"><span class="badge b-neutral">ยังไม่ได้กรอกชื่อยืนยันตัวตน</span></div>`;
     const pl = planFor(u);
-    const match = pl.role
+    const match = pl.fixedName
+      ? `<span class="badge b-warning">สะกดไม่ตรง · น่าจะเป็น ${esc(pl.fixedName)} (ต่าง ${pl.diff} ตัวอักษร)</span> <span class="badge b-info">${esc(planText(pl))}</span>`
+      : pl.near && pl.near.length
+      ? `<span class="badge b-warning">ใกล้เคียงหลายชื่อ: ${pl.near.map((x) => esc(x.name)).join(', ')} · เลือกบทบาทเอง</span>`
+      : pl.role
       ? `<span class="badge b-info">ชื่อตรงกับรายชื่อ: ${esc(planText(pl))}</span>`
       : `<span class="badge b-warning">✗ ไม่พบชื่อนี้ในรายชื่อครูที่ปรึกษา / หัวหน้าระดับ · ตรวจการสะกด หรือเลือกบทบาทเอง (เช่น ครูประจำวิชา)</span>`;
     return `<div class="req-line">${icon('id-card', 'i16')} ชื่อที่กรอก <b>${esc(rq.name)}</b></div><div class="req-line chips">${match}${schoolMail(u) ? '' : '<span class="badge b-danger">ไม่ใช่อีเมลโรงเรียน</span>'}</div>`;
@@ -660,10 +692,10 @@
     const u = D().users.find((x) => x.id === userId);
     const pl = planFor(u);
     if (!pl || !pl.role) { UI.toast('ไม่พบชื่อในรายชื่อ · เลือกบทบาทในตารางเอง'); return; }
-    const name = u.request.name;
+    const name = pl.fixedName || u.request.name;
     // a matching name is not proof of identity (anyone can type it): the admin confirms the person
-    UI.confirmDialog('อนุมัติ', `อนุมัติ <b>${esc(name)}</b> (<b>${esc(u.email || '')}</b>) เป็น <b>${esc(planText(pl))}</b> ?<br><br>${schoolMail(u) ? '' : '<b style="color:var(--red-700)">ไม่ใช่อีเมลโรงเรียน</b> · '}ชื่อที่ตรงกันไม่ใช่หลักฐานยืนยันตัว กรุณายืนยันกับครูเจ้าของชื่อก่อนว่าเป็นผู้สมัครเอง`, 'อนุมัติ', async () => {
-      await Store.update('users', u.id, { role: pl.role });
+    UI.confirmDialog('อนุมัติ', `อนุมัติ <b>${esc(name)}</b> (<b>${esc(u.email || '')}</b>) เป็น <b>${esc(planText(pl))}</b> ?<br><br>${pl.fixedName ? `ชื่อที่กรอก <b>${esc(u.request.name)}</b> สะกดไม่ตรงกับรายชื่อ (ต่าง ${pl.diff} ตัวอักษร) ระบบจะแก้ชื่อในบัญชีให้ตรงกับรายชื่อ<br><br>` : ''}${schoolMail(u) ? '' : '<b style="color:var(--red-700)">ไม่ใช่อีเมลโรงเรียน</b> · '}ชื่อที่ตรงกันไม่ใช่หลักฐานยืนยันตัว กรุณายืนยันกับครูเจ้าของชื่อก่อนว่าเป็นผู้สมัครเอง`, 'อนุมัติ', async () => {
+      await Store.update('users', u.id, { role: pl.role, ...(pl.fixedName && { name }) });
       if (pl.rooms.length) await Store.setRooms(u.id, pl.rooms);
       if (pl.grades.length) await Store.setGrades(u.id, pl.grades);
       UI.toast('อนุมัติแล้ว · ' + name); App.render();
@@ -811,5 +843,5 @@
     });
   }
 
-  window.Pages = { home, search, student, registry, teachers, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES, approveRequest, importRows, backupDialog };
+  window.Pages = { home, search, student, registry, teachers, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES, approveRequest, planFor, importRows, backupDialog };
 })();

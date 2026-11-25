@@ -108,6 +108,22 @@ const tests = {
     await assert.rejects(open(sample('cases').replace('2026-11-03', '3/11/2026')), /open_date/);
     await assert.rejects(open(sample('cases').replace('2026-11-03', '2569-11-03')), /open_date/);
   },
+  'sign-up: a misspelt name finds its one owner, never a guess between two': () => {
+    Store.data.gradeStaff = [{ grade: 5, title: 'หัวหน้าระดับ', name: 'นายธนากร แสงทองดี' }];
+    Object.assign(Store.data.students[0], { advisor: 'นางสาวสมศรี วงศ์ใหญ่,นายประเสริฐ ก้องเกียรติ' });
+    const plan = (name) => Pages.planFor({ request: { name } });
+    assert.equal(plan('นางสาวสมศรี  วงศ์ใหญ่').fixedName, undefined);
+    for (const n of ['นางสาวสมศริ วงศ์ใหย', 'สมศริ วงศ์ใหย', 'นางสางสมศรี วงศ์ใหญ่', 'นางสาว สมศรี วงค์ใหญ่']) {
+      const p = plan(n);
+      assert.deepEqual([p.role, p.fixedName, JSON.stringify(p.rooms)], ['teacher', 'นางสาวสมศรี วงศ์ใหญ่', '[[4,12]]'], n);
+    }
+    assert.deepEqual([plan('ธนากร แสงทองดื').role, plan('ธนากร แสงทองดื').grades[0]], ['grade_head', 5]);
+    for (const n of ['สมศรี', 'สมหญิง วงศ์ใหญ่', 'นางสาวพรทิพย์ ใจงาม', '']) assert.equal(plan(n).role, '', n);
+    Store.data.students[0].advisor += ',นางสาวสมศรา วงศ์ใหญ่';
+    const two = plan('สมศรู วงศ์ใหญ่');
+    assert.deepEqual([two.role, two.near.length], ['', 2]);
+    assert.equal(Pages.planFor({ request: null }), null);
+  },
   'earlier terms: only for admin, grade head and inspector, never a later term': () => {
     for (const [role, n] of [['admin', 1], ['grade_head', 1], ['inspector', 1], ['teacher', 0], ['counselor', 0]]) {
       Store.profile.role = role;
