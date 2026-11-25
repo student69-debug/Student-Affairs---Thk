@@ -168,6 +168,23 @@ const tests = {
     await Store.saveHealth({ student_id: '30001' });
     assert.equal(Store.data.nurseHealth.length, 0);
   },
+  'nurse vitals: limits, old visits keep their temperature, values are escaped': () => {
+    const t = ctx.NurseApp._test;
+    for (const [k, v, f] of [['temp', 37.4, ''], ['temp', 37.5, '↑'], ['pulse', 100, ''], ['pulse', 101, '↑'], ['pulse', 59, '↓'], ['sys', 130, '↑'], ['dia', 59, '↓'], ['spo2', 94, '↓'], ['spo2', 100, '']]) assert.equal(t.flag(k, v), f, k + v);
+    assert.equal(t.measures({ at: 'a', temp: 38, vitals: null })[0].temp, 38);
+    assert.equal(t.measures({ temp: null, vitals: null }).length, 0);
+    assert.ok(!t.vitalChips({ sys: '<b>', dia: 1, pulse: '<i>' }).includes('<b>'));
+    assert.ok(t.badBp({ sys: '120', dia: '' })); assert.ok(t.badBp({ sys: '80', dia: '120' })); assert.ok(!t.badBp({ sys: '120', dia: '80' })); assert.ok(!t.badBp({}));
+  },
+  'nurse follow-up: weekends move to Monday, an unchanged appointment is not sent again': () => {
+    const t = ctx.NurseApp._test, wed = new Date(2026, 10, 25, 9);
+    assert.deepEqual([1, 3, 4, 7].map((n) => t.dayAdd(n, wed)), ['2026-11-26', '2026-11-30', '2026-11-30', '2026-12-02']);
+    const x = { followAt: '2026-11-30', followFor: 'ล้างแผล' };
+    assert.deepEqual(Object.keys(t.followVals({ followDate: '2026-11-30', followFor: 'ล้างแผล ' }, x)), []);
+    assert.deepEqual(Object.keys(t.followVals({ followDate: '', followFor: '' }, x)), []);
+    assert.equal(t.followVals({ followDate: '2026-12-01', followFor: '' }, x).follow_date, '2026-12-01');
+    assert.ok(t.isDue({ status: 'missed', at: '2999-01-01' })); assert.ok(!t.isDue({ status: 'scheduled', at: '2999-01-01' }));
+  },
   'earlier terms: only for admin, grade head and inspector, never a later term': () => {
     for (const [role, n] of [['admin', 1], ['grade_head', 1], ['inspector', 1], ['teacher', 0], ['counselor', 0]]) {
       Store.profile.role = role;

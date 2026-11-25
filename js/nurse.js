@@ -32,6 +32,10 @@
   const ALLERGY_KINDS = { drug: 'ยา', food: 'อาหาร', other: 'อื่น ๆ' };
   const SEVERITY = { unknown: 'ไม่ทราบระดับ', mild: 'เล็กน้อย', moderate: 'ปานกลาง', severe: 'รุนแรง' };
   const SOURCES = { parent: 'ผู้ปกครองแจ้ง', student: 'นักเรียนแจ้ง', doctor: 'เอกสารจากแพทย์ / สมุดสุขภาพ' };
+  // [key, label, unit, min, max, step, low below, high from] — the limits only colour the value, they are not a diagnosis
+  const VITALS = [['temp', 'อุณหภูมิ', '°C', 34, 43, 0.1, 35.5, 37.5], ['pulse', 'ชีพจร', '/นาที', 30, 220, 1, 60, 101], ['sys', 'ความดันตัวบน', 'mmHg', 50, 250, 1, 90, 130], ['dia', 'ความดันตัวล่าง', 'mmHg', 30, 150, 1, 60, 80], ['spo2', 'ออกซิเจนในเลือด', '%', 50, 100, 1, 95, 999]];
+  const FOLLOW = { scheduled: ['นัดติดตาม', 'b-info'], missed: ['ไม่มาตามนัด', 'b-danger'], done: ['มาตามนัดแล้ว', 'b-success'], cancelled: ['ยกเลิกนัด', 'b-neutral'] };
+  const FOLLOW_FILTER = [['', 'นัดที่ยังเปิดอยู่ทั้งหมด'], ['due', 'วันนี้ / เลยนัด / ไม่มา'], ['next', 'ยังไม่ถึงวันนัด']];
   const LONG_MIN = 60; // resting longer than this is highlighted
 
   const all = () => D().nurse || [];
@@ -46,12 +50,41 @@
   const dur = (m) => (m < 60 ? `${m} นาที` : `${Math.floor(m / 60)} ชม. ${m % 60 ? (m % 60) + ' นาที' : ''}`.trim());
   const timeOf = (iso) => (iso ? new Date(iso).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.' : '—');
   const what = (x) => `${esc(GROUPS[x.symptomGroup] || x.symptomGroup || 'อื่น ๆ')}${x.symptom ? ` · ${esc(x.symptom)}` : ''}`;
-  const tempHtml = (t) => (t == null || t === '' ? '' : `<span class="badge ${Number(t) >= 37.5 ? 'b-danger' : 'b-neutral'}">${Number(t).toFixed(1)}°C</span>`);
   const canDel = (x) => Store.isAdmin() || x.byUser === Store.user().id;
   const terms = () => { const t = [...new Set(all().map((x) => x.term).filter(Boolean))].sort().reverse(); if (!t.includes(Store.termKey())) t.unshift(Store.termKey()); return t; };
   const opt = (list, sel) => list.map(([k, l]) => `<option value="${esc(k)}" ${String(k) === String(sel ?? '') ? 'selected' : ''}>${esc(l)}</option>`).join('');
   const checks = (name, list, on = []) => `<div class="checks" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(170px,100%),1fr));gap:6px 16px">${list.map((a) => `<label><input type="checkbox" name="${name}" value="${esc(a)}" ${on.includes(a) ? 'checked' : ''}> ${esc(a)}</label>`).join('')}</div>`;
   const splitMeds = (s) => String(s || '').split(/\s*,\s*/).filter(Boolean);
+  /* ---- สัญญาณชีพ ---- */
+  // a visit from before vital signs existed has only temp
+  const measures = (x) => (x.vitals && x.vitals.length ? x.vitals : x.temp != null && x.temp !== '' ? [{ at: x.at, temp: x.temp, by: x.by }] : []);
+  const flag = (k, v) => { const [, , , , , , lo, hi] = VITALS.find((d) => d[0] === k); return Number(v) >= hi ? '↑' : Number(v) < lo ? '↓' : ''; };
+  function vitalChips(m) {
+    const b = (f, text) => `<span class="badge ${f ? 'b-danger' : 'b-neutral'}">${esc(text)}${f}</span>`;
+    return [m.temp != null && b(flag('temp', m.temp), Number(m.temp).toFixed(1) + '°C'), m.sys != null && b(flag('sys', m.sys) || flag('dia', m.dia), `BP ${m.sys}/${m.dia}`), m.pulse != null && b(flag('pulse', m.pulse), `ชีพจร ${m.pulse}`), m.spo2 != null && b(flag('spo2', m.spo2), `SpO₂ ${m.spo2}%`)].filter(Boolean).join(' ');
+  }
+  const vitalsHtml = (x) => { const l = measures(x); return l.length ? vitalChips(l[l.length - 1]) + (l.length > 1 ? ` <span class="muted small">วัด ${l.length} ครั้ง ล่าสุด ${timeOf(l[l.length - 1].at)}</span>` : '') : ''; };
+  const vitalLines = (x, removable) => measures(x).map((m) => `<div class="nv-line"><span class="muted small mono">${timeOf(m.at)}</span>${vitalChips(m)}<span class="muted small">${esc(m.by || '')}</span>${removable && m.id ? `<button type="button" class="icon-btn" data-nv-del="${esc(m.id)}" title="ลบการวัดนี้" aria-label="ลบการวัดนี้">${icon('x', 'i16')}</button>` : ''}</div>`).join('');
+  const vitalInputs = `<div class="field full"><label>สัญญาณชีพ <span class="muted small">(ไม่บังคับ กรอกเท่าที่วัด)</span></label><div class="nv-grid">${VITALS.map(([k, l, u, min, max, step]) => `<div><label>${l} (${u})</label><input class="input mono" type="number" inputmode="decimal" name="${k}" min="${min}" max="${max}" step="${step}" aria-label="${l}"></div>`).join('')}</div></div>`;
+  const vitalVals = (v) => Object.fromEntries(VITALS.map(([k]) => [k, v[k] || '']));
+  const badBp = (v) => (!!v.sys !== !!v.dia || (v.sys && Number(v.sys) <= Number(v.dia)) ? 'ความดันต้องกรอกทั้งตัวบนและตัวล่าง และตัวบนต้องมากกว่า' : '');
+  /* ---- นัดติดตาม ---- */
+  const dayAdd = (n, from = new Date()) => { const d = new Date(from); d.setDate(d.getDate() + n); if (n) { if (d.getDay() === 6) d.setDate(d.getDate() + 2); else if (d.getDay() === 0) d.setDate(d.getDate() + 1); } return localInput(d).slice(0, 10); }; // a weekend moves to Monday
+  const follows = () => D().nurseFollow || [];
+  const isDue = (f) => f.status === 'missed' || f.at <= today();
+  function followBadge(f) {
+    if (f.status === 'missed') return badge(FOLLOW.missed);
+    const n = Math.round((new Date(f.at) - new Date(today())) / 864e5);
+    return badge(n === 0 ? ['วันนี้', 'b-info'] : n < 0 ? [`เลยนัด ${-n} วัน`, 'b-warning'] : [`อีก ${n} วัน`, 'b-neutral']);
+  }
+  const followFields = (date = '', what = '') => `<div class="field full"><label>นัดติดตาม</label>
+      <div class="chips">${[['', 'ไม่นัด'], [1, 'พรุ่งนี้'], [3, '3 วัน'], [7, '1 สัปดาห์'], [14, '2 สัปดาห์']].map(([n, l]) => `<button type="button" class="chip" data-fu="${n}">${l}</button>`).join('')}</div>
+      <div class="nv-grid" style="margin-top:6px"><input class="input" type="date" name="followDate" min="${today()}" max="${dayAdd(177)}" value="${date >= today() ? esc(date) : ''}" aria-label="วันที่นัดติดตาม"><input class="input" name="followFor" maxlength="200" placeholder="นัดมาทำอะไร เช่น ล้างแผล วัดไข้ซ้ำ" value="${esc(what)}" aria-label="นัดมาทำอะไร"></div></div>`;
+  const bindFollow = (form) => form.querySelectorAll('[data-fu]').forEach((b) => b.addEventListener('click', () => { form.followDate.value = b.dataset.fu ? dayAdd(Number(b.dataset.fu)) : ''; }));
+  // nothing is sent when the appointment was not changed (saving again would count as moved)
+  const followVals = (v, x = {}) => (v.followDate && (v.followDate !== x.followAt || v.followFor.trim() !== (x.followFor || '')) ? { follow_date: v.followDate, follow_for: v.followFor.trim() } : {});
+  const openFollowOf = (x) => (['scheduled', 'missed'].includes(x.followStatus) ? x : {});
+
   /* ---- แพ้ยา / โรคประจำตัว: ไม่มีแถว = ยังไม่มีข้อมูล (ห้ามแสดงเหมือน "ไม่แพ้") ---- */
   const healthMap = () => new Map((D().nurseHealth || []).map((h) => [h.id, h]));
   const allergyText = (h) => (h.allergies || []).map((a) => [a.name, a.kind !== 'drug' && ALLERGY_KINDS[a.kind], a.severity !== 'unknown' && SEVERITY[a.severity], a.reaction].filter(Boolean).join(' · ')).join(' , ');
@@ -121,16 +154,16 @@
     },
     events(sid) {
       return this.list(sid).map((x) => ({ app: 'nurse', at: x.at, studentId: x.studentId, by: x.by, dot: 'care', ic: 'bed',
-        title: `พักห้องพยาบาล · ${what(x)} ${tempHtml(x.temp)} ${outBadge(x.outcome)}`,
-        note: [x.outAt ? `${timeOf(x.at)}–${timeOf(x.outAt)} (${dur(mins(x.at, x.outAt))})` : `เข้า ${timeOf(x.at)}`, x.care && 'การดูแล: ' + x.care, x.medicine && 'ยา: ' + x.medicine].filter(Boolean).join(' · ') }));
+        title: `พักห้องพยาบาล · ${what(x)} ${vitalsHtml(x)} ${outBadge(x.outcome)}`,
+        note: [x.outAt ? `${timeOf(x.at)}–${timeOf(x.outAt)} (${dur(mins(x.at, x.outAt))})` : `เข้า ${timeOf(x.at)}`, x.care && 'การดูแล: ' + x.care, x.medicine && 'ยา: ' + x.medicine, x.followStatus && `${FOLLOW[x.followStatus][0]} ${fmtDate(x.followAt)} ${x.followFor || ''}`].filter(Boolean).join(' · ') }));
     },
     table(list, withStudent = true) {
       if (!list.length) return empty('ยังไม่มีบันทึก', 'bed');
       return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>วันที่ / เวลา</th>${withStudent ? '<th>นักเรียน</th>' : ''}<th>อาการ</th><th>การดูแล / ยา</th><th>ผล</th><th>ผู้บันทึก</th><th></th></tr></thead><tbody>
         ${list.slice(0, 300).map((x) => `<tr><td>${fmtDate(x.at)}<div class="muted small">${timeOf(x.at)}–${x.outAt ? timeOf(x.outAt) : 'ยังพักอยู่'} · ${dur(mins(x.at, x.outAt))}${x.period ? ' · ' + esc(x.period) : ''}</div></td>${withStudent ? `<td>${sLink(x.studentId)}</td>` : ''}
-          <td>${what(x)} ${tempHtml(x.temp)}</td><td class="small">${esc(x.care) || '—'}${x.medicine ? `<div class="muted">ยา: ${esc(x.medicine)}</div>` : ''}${x.note ? `<div class="muted">${esc(x.note)}</div>` : ''}</td>
-          <td>${outBadge(x.outcome)}${x.parentNotified ? '<div class="muted small">แจ้งผู้ปกครองแล้ว</div>' : ''}</td><td>${esc(x.by)}${x.outBy && x.outBy !== x.by ? `<div class="muted small">ออก: ${esc(x.outBy)}</div>` : ''}</td>
-          <td style="text-align:right;white-space:nowrap">${x.outcome === 'resting' ? `<button class="btn secondary sm" data-action="nurse-out" data-id="${esc(x.id)}">${icon('log-out', 'i16')}ให้ออก</button>` : ''}<button class="icon-btn" title="แก้ไข" data-action="nurse-edit" data-id="${esc(x.id)}">${icon('pencil', 'i16')}</button>${canDel(x) ? `<button class="icon-btn" title="ลบ (เก็บไว้ 30 วัน)" data-action="nurse-del" data-id="${esc(x.id)}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}
+          <td>${what(x)}<div>${vitalsHtml(x)}</div></td><td class="small">${esc(x.care) || '—'}${x.medicine ? `<div class="muted">ยา: ${esc(x.medicine)}</div>` : ''}${x.note ? `<div class="muted">${esc(x.note)}</div>` : ''}</td>
+          <td>${outBadge(x.outcome)}${x.parentNotified ? '<div class="muted small">แจ้งผู้ปกครองแล้ว</div>' : ''}${x.followStatus ? `<div class="small" style="margin-top:4px">${badge(FOLLOW[x.followStatus])} <span class="muted">${fmtDate(x.followAt)} ${esc(x.followFor || '')}</span></div>` : ''}</td><td>${esc(x.by)}${x.outBy && x.outBy !== x.by ? `<div class="muted small">ออก: ${esc(x.outBy)}</div>` : ''}</td>
+          <td style="text-align:right;min-width:100px">${x.outcome === 'resting' ? `<button class="btn secondary sm" data-action="nurse-out" data-id="${esc(x.id)}">${icon('log-out', 'i16')}ให้ออก</button>` : ''}<button class="icon-btn" title="วัดสัญญาณชีพ" aria-label="วัดสัญญาณชีพ" data-action="nurse-vital" data-id="${esc(x.id)}">${icon('activity', 'i16')}</button><button class="icon-btn" title="นัดติดตาม" aria-label="นัดติดตาม" data-action="nurse-follow" data-id="${esc(x.id)}">${icon('calendar-plus', 'i16')}</button><button class="icon-btn" title="แก้ไข" data-action="nurse-edit" data-id="${esc(x.id)}">${icon('pencil', 'i16')}</button>${canDel(x) ? `<button class="icon-btn" title="ลบ (เก็บไว้ 30 วัน)" data-action="nurse-del" data-id="${esc(x.id)}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}
         </tbody></table></div>${list.length > 300 ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง 300 จาก ${list.length.toLocaleString()} รายการ — ใช้ตัวกรองเพื่อดูเพิ่ม</div>` : ''}`;
     },
     studentTab(sid) {
@@ -145,27 +178,30 @@
           <div class="field"><label>เวลาเข้า</label><input class="input" type="datetime-local" name="at" value="${localInput()}"></div>
           <div class="field"><label>คาบ</label><select class="select" name="period"><option value="">— ไม่ระบุ —</option>${opt(PERIODS.map((p) => [p, p]), periodNow())}</select></div>
           <div class="field"><label>อาการ <span class="req">*</span></label><select class="select" name="group" required>${opt(Object.entries(GROUPS), 'headache')}</select></div>
-          <div class="field"><label>อุณหภูมิ (°C)</label><input class="input mono" type="number" name="temp" min="34" max="43" step="0.1" placeholder="เช่น 37.5"></div>
           <div class="field full"><label>อาการโดยละเอียด</label><input class="input" name="symptom" placeholder="เช่น ปวดหัวตั้งแต่เช้า ไม่ได้กินข้าวเช้า">${quickHtml}</div>
+          ${vitalInputs}
           <div class="field full"><label>ยา / การปฐมพยาบาล</label>${checks('meds', MEDS)}</div>${repBox}
           <div class="field full"><label>การดูแล</label><input class="input" name="care" placeholder="เช่น นอนพัก วัดไข้ซ้ำ เช็ดตัว"></div>
           <div class="field full"><label>ผล</label><div class="radio-row">${Object.entries(OUTCOMES).map(([k, [l]]) => `<label><input type="radio" name="outcome" value="${k}" ${k === 'resting' ? 'checked' : ''}> ${esc(l)}</label>`).join('')}</div><span class="help">"กำลังพัก" = นักเรียนยังอยู่ในห้องพยาบาล ขึ้นบอร์ด กดให้ออกภายหลัง</span></div>
+          ${followFields()}
           <div class="field"><label><input type="checkbox" name="parentNotified"> แจ้งผู้ปกครองแล้ว</label></div>
           <div class="field full"><label>หมายเหตุ</label><textarea class="textarea" name="note" placeholder="เช่น ส่งต่อครูที่ปรึกษา"></textarea></div></div>
           <div class="notice">${icon('shield-check', 'i16')}<span>อาการและการดูแลเห็นเฉพาะผู้ดูแลระบบ ครูแนะแนว สารวัตร หัวหน้าระดับ ครูที่ปรึกษาของนักเรียน และผู้บันทึก · ครูคนอื่นเห็นเพียงว่านักเรียนกำลังพักอยู่ · ผู้ปกครองไม่เห็นในระบบผู้ปกครอง</span></div>`,
         onSubmit: async (v, form) => {
           const id = parseStudent(v.student);
           if (!id) { toast('ไม่พบรหัสนักเรียน กรุณาเลือกจากรายการ'); return false; }
+          if (badBp(v)) { toast(badBp(v)); return false; }
           const open = now().find((x) => x.studentId === id);
           if (open && !confirm(`${fullName(Store.student(id))} ยังพักอยู่ในห้องพยาบาล (เข้า ${timeOf(open.at)}) — บันทึกครั้งใหม่ซ้ำหรือไม่?`)) return false;
           if (!(await okMeds(id))) return false;
           const meds = [...form.querySelectorAll('input[name=meds]:checked')].map((c) => c.value);
           await Store.saveNurse({ student_id: id, at: new Date(v.at || Date.now()).toISOString(), period: v.period, symptom_group: v.group, symptom: v.symptom.trim(),
-            temp: v.temp || '', care: v.care.trim(), medicine: meds.join(', '), outcome: v.outcome, parent_notified: !!v.parentNotified, note: v.note.trim() });
+            ...vitalVals(v), ...followVals(v), care: v.care.trim(), medicine: meds.join(', '), outcome: v.outcome, parent_notified: !!v.parentNotified, note: v.note.trim() });
           toast(`บันทึกแล้ว · ${fullName(Store.student(id))}${v.outcome === 'resting' ? ' · กำลังพัก' : ''}`);
           App.render();
         } });
       okMeds = bindAlert(d.form);
+      bindFollow(d.form);
     },
 
     /* ---- ให้ออกจากห้องพยาบาล (ครูทุกคน ขณะนักเรียนยังพักอยู่) ---- */
@@ -180,17 +216,18 @@
           <div class="field"><label>เวลาออก</label><input class="input" type="datetime-local" name="outAt" value="${localInput()}"></div>
           ${full ? `<div class="field"><label><input type="checkbox" name="parentNotified" ${x.parentNotified ? 'checked' : ''}> แจ้งผู้ปกครองแล้ว</label></div>
           <div class="field full"><label>ยา / การปฐมพยาบาล (เพิ่ม)</label>${checks('meds', MEDS, splitMeds(x.medicine))}</div>${repBox}${alertBox}
-          <div class="field full"><label>การดูแล</label><input class="input" name="care" value="${esc(x.care || '')}" placeholder="เช่น นอนพัก 1 คาบ อาการดีขึ้น"></div>` : ''}</div>`,
+          <div class="field full"><label>การดูแล</label><input class="input" name="care" value="${esc(x.care || '')}" placeholder="เช่น นอนพัก 1 คาบ อาการดีขึ้น"></div>
+          ${measures(x).length ? `<div class="field full"><label>สัญญาณชีพที่วัดแล้ว</label>${vitalLines(x)}</div>` : ''}${followFields(openFollowOf(x).followAt || '', openFollowOf(x).followFor || '')}` : ''}</div>`,
         onSubmit: async (v, form) => {
           const meds = [...new Set(splitMeds(x.medicine).filter((m) => !MEDS.includes(m)).concat([...form.querySelectorAll('input[name=meds]:checked')].map((c) => c.value)))];
           const out = new Date(v.outAt || Date.now());
           if (out < new Date(x.at) - 60000) { toast('เวลาออกต้องไม่ก่อนเวลาเข้า'); return false; }
           if (full && !(await okMeds(x.studentId))) return false;
-          const p = { outcome: v.outcome, out_at: out.toISOString(), ...(full ? { parent_notified: !!v.parentNotified, care: v.care.trim(), medicine: meds.join(', ') } : {}) };
+          const p = { outcome: v.outcome, out_at: out.toISOString(), ...(full ? { parent_notified: !!v.parentNotified, care: v.care.trim(), medicine: meds.join(', '), ...followVals(v, openFollowOf(x)) } : {}) };
           await Store.updateNurse(id, p);
           toast(`${fullName(Store.student(x.studentId))} · ${OUTCOMES[v.outcome][0]}`); App.render();
         } });
-      if (full) okMeds = bindAlert(d.form, x.studentId, id, splitMeds(x.medicine));
+      if (full) { okMeds = bindAlert(d.form, x.studentId, id, splitMeds(x.medicine)); bindFollow(d.form); }
     },
 
     openEdit(id) {
@@ -202,7 +239,7 @@
           <div class="form-grid">
           <div class="field"><label>คาบ</label><select class="select" name="period"><option value="">— ไม่ระบุ —</option>${opt(PERIODS.concat(x.period && !PERIODS.includes(x.period) ? [x.period] : []).map((p) => [p, p]), x.period)}</select></div>
           <div class="field"><label>อาการ</label><select class="select" name="group">${opt(Object.entries(GROUPS), x.symptomGroup)}</select></div>
-          <div class="field"><label>อุณหภูมิ (°C)</label><input class="input mono" type="number" name="temp" min="34" max="43" step="0.1" value="${x.temp ?? ''}"></div>
+          <div class="field"><label>สัญญาณชีพ</label>${vitalLines(x) || '<span class="muted">ยังไม่ได้วัด</span>'}<span class="help">วัดเพิ่มหรือลบค่าที่ผิด: ปุ่มสัญญาณชีพในรายการ</span></div>
           <div class="field full"><label>อาการโดยละเอียด</label><input class="input" name="symptom" value="${esc(x.symptom)}">${quickHtml}</div>
           <div class="field full"><label>ยา / การปฐมพยาบาล</label>${checks('meds', MEDS.concat(splitMeds(x.medicine).filter((m) => !MEDS.includes(m))), splitMeds(x.medicine))}</div>${repBox}${alertBox}
           <div class="field full"><label>การดูแล</label><input class="input" name="care" value="${esc(x.care)}"></div>
@@ -214,11 +251,53 @@
           const meds = checkedMeds(form);
           if (!(await okMeds(x.studentId))) return false;
           if (v.outcome !== 'resting' && v.outAt && new Date(v.outAt) < new Date(x.at) - 60000) { toast('เวลาออกต้องไม่ก่อนเวลาเข้า'); return false; }
-          await Store.updateNurse(x.id, { period: v.period, symptom_group: v.group, symptom: v.symptom.trim(), temp: v.temp || '', care: v.care.trim(), medicine: meds.join(', '),
+          await Store.updateNurse(x.id, { period: v.period, symptom_group: v.group, symptom: v.symptom.trim(), care: v.care.trim(), medicine: meds.join(', '),
             outcome: v.outcome, out_at: v.outcome !== 'resting' && v.outAt ? new Date(v.outAt).toISOString() : '', parent_notified: !!v.parentNotified, note: v.note.trim() });
           toast('บันทึกการแก้ไขแล้ว'); App.render();
         } });
       okMeds = bindAlert(d.form, x.studentId, id, splitMeds(x.medicine));
+    },
+
+    openVital(id) {
+      const full = all().find((r) => r.id === id), x = full || now().find((r) => r.id === id);
+      if (!x) return;
+      const d = dialog({ title: 'วัดสัญญาณชีพ', submitLabel: 'บันทึกการวัด', size: 'sm',
+        body: `<div class="notice">${icon('info', 'i16')}<span>${sLink(x.studentId)} · บันทึกเป็นเวลาตอนนี้</span></div>${full && measures(x).length ? `<div class="field full"><label>วัดไปแล้ว</label>${vitalLines(x, true)}</div>` : ''}
+          <div class="form-grid">${vitalInputs}</div>`,
+        onSubmit: async (v) => {
+          if (!VITALS.some(([k]) => v[k])) { toast('กรุณากรอกอย่างน้อยหนึ่งค่า'); return false; }
+          if (badBp(v)) { toast(badBp(v)); return false; }
+          await Store.nurseVital(id, vitalVals(v));
+          toast(`บันทึกการวัดแล้ว · ${fullName(Store.student(x.studentId))}`); App.render();
+        } });
+      d.form.querySelectorAll('[data-nv-del]').forEach((b) => b.addEventListener('click', async () => {
+        if (!confirm('ลบการวัดครั้งนี้?')) return;
+        try { await Store.nurseVital(id, { remove: b.dataset.nvDel }); App.render(); this.openVital(id); } catch (e) { toast('ลบไม่สำเร็จ: ' + e.message); }
+      }));
+    },
+    // act: set (new or moved) | done | missed | cancel
+    openFollow(id, act) {
+      const full = all().find((r) => r.id === id), f = follows().find((r) => r.id === id);
+      if (!full && !f) return;
+      const sid = (full || f).studentId, at = f ? f.at : '', forWhat = f ? f.what : (full && full.followFor) || '';
+      const title = { set: f ? 'เลื่อนนัดติดตาม' : 'นัดติดตาม', done: 'มาตามนัดแล้ว', missed: 'ไม่มาตามนัด', cancel: 'ยกเลิกนัด' }[act];
+      const d = dialog({ title, size: 'sm', submitLabel: act === 'done' ? 'มาแล้ว' : 'บันทึก',
+        body: `<div class="notice">${icon('calendar-clock', 'i16')}<span>${sLink(sid)}${f ? ` · นัด ${fmtDate(f.at)} · ${esc(f.what)}` : ''}</span></div><div class="form-grid">${act === 'set' ? followFields(at, forWhat) : ''}
+          <div class="field full"><label>หมายเหตุ</label><input class="input" name="note" maxlength="200"></div></div>${act === 'done' ? '<p class="muted small" style="margin:0">หลังบันทึก ระบบเปิดฟอร์มบันทึกการมาครั้งนี้ให้</p>' : ''}`,
+        onSubmit: async (v) => {
+          if (act === 'set' && !v.followDate) { toast('กรุณาเลือกวันนัด'); return false; }
+          await Store.nurseFollowUp(id, act === 'set' ? { action: 'set', date: v.followDate, for: v.followFor.trim(), note: v.note } : { action: act, note: v.note });
+          toast(`${title} · ${fullName(Store.student(sid))}`); App.render();
+          if (act === 'done') setTimeout(() => this.openRecord(sid), 0); // after this dialog has closed
+        } });
+      if (act === 'set') bindFollow(d.form);
+    },
+    followHtml(q) {
+      const list = follows().filter((f) => (!q.fs || (q.fs === 'due') === isDue(f))).sort((a, b) => (a.at < b.at ? -1 : 1));
+      return `<div class="card"><div class="toolbar no-print"><select class="select" id="nf-state" aria-label="สถานะนัด">${opt(FOLLOW_FILTER, q.fs)}</select><span class="muted small">${list.length} รายการ</span></div>
+        ${list.length ? `<div class="list">${list.map((f) => `<div class="list-row nurse-row">${followBadge(f)}<div class="grow"><div class="t">${sLink(f.studentId)}</div><div class="s">${fmtDate(f.at)} · ${esc(f.what)}${f.by ? ' · นัดโดย ' + esc(f.by) : ''}${f.moved ? ` · เลื่อน ${f.moved} ครั้ง` : ''}${f.missed >= 2 ? ` · <b>ไม่มา ${f.missed} ครั้ง — ควรแจ้งครูที่ปรึกษา</b>` : ''}</div></div>
+          <div class="actions">${[['done', 'มาแล้ว', 'primary'], ['set', 'เลื่อน', 'secondary'], ...(f.status === 'scheduled' && f.at <= today() ? [['missed', 'ไม่มา', 'secondary']] : []), ['cancel', 'ยกเลิก', 'ghost']].map(([a, l, c]) => `<button class="btn ${c} sm" data-action="nurse-follow" data-act="${a}" data-id="${esc(f.id)}">${l}</button>`).join('')}</div></div>`).join('')}</div>` : empty('ไม่มีนัดติดตาม', 'calendar-check')}</div>
+        <div class="notice">${icon('shield-check', 'i16')}<span>เห็นเฉพาะวันนัดและเรื่องที่นัด ไม่มีอาการ · ครูห้องพยาบาลเห็นทุกนัด ครูที่ปรึกษาเห็นนัดของห้องตัวเอง · นัดใหม่ได้จากฟอร์มบันทึก หรือปุ่มนัดในรายการบันทึก</span></div>`;
     },
 
     /* ---- บอร์ด "กำลังพักอยู่" ---- */
@@ -227,9 +306,9 @@
       const full = new Map(all().map((x) => [x.id, x])), hm = healthMap();
       return `<div class="card" id="nurse-board"><div class="card-head"><h3>${icon('bed', 'i16')} กำลังพักอยู่ตอนนี้</h3><span class="muted small">${l.length} คน · อัปเดตอัตโนมัติทุก 1 นาที <button class="btn ghost sm" data-action="nurse-refresh" title="โหลดใหม่">${icon('refresh-cw', 'i16')}</button></span></div>
         ${l.length ? `<div class="list">${l.map((b) => { const x = full.get(b.id), m = mins(b.at);
-          return `<div class="list-row"><span class="badge ${m >= LONG_MIN ? 'b-warning' : 'b-info'}" title="เวลาที่พักแล้ว">${dur(m)}</span><div class="grow"><div class="t">${sLink(b.studentId)} ${isAllergic(hm.get(b.studentId)) ? `<span class="badge b-danger">${icon('triangle-alert', 'i16')}แพ้</span>` : ''}</div>
-            <div class="s">เข้า ${timeOf(b.at)}${b.period ? ' · ' + esc(b.period) : ''} · รับโดย ${esc(b.by || '—')}${x ? ' · ' + what(x) + ' ' + tempHtml(x.temp) : ''}${m >= LONG_MIN ? ' · <b>พักนานเกิน 1 ชั่วโมง — พิจารณาแจ้งผู้ปกครอง</b>' : ''}</div></div>
-            <button class="btn primary sm" data-action="nurse-out" data-id="${b.id}">${icon('log-out', 'i16')}ให้ออก</button></div>`; }).join('')}</div>`
+          return `<div class="list-row nurse-row"><span class="badge ${m >= LONG_MIN ? 'b-warning' : 'b-info'}" title="เวลาที่พักแล้ว">${dur(m)}</span><div class="grow"><div class="t">${sLink(b.studentId)} ${isAllergic(hm.get(b.studentId)) ? `<span class="badge b-danger">${icon('triangle-alert', 'i16')}แพ้</span>` : ''}</div>
+            <div class="s">เข้า ${timeOf(b.at)}${b.period ? ' · ' + esc(b.period) : ''} · รับโดย ${esc(b.by || '—')}${x ? ' · ' + what(x) + ' ' + vitalsHtml(x) : ''}${m >= LONG_MIN ? ' · <b>พักนานเกิน 1 ชั่วโมง — พิจารณาแจ้งผู้ปกครอง</b>' : ''}</div></div>
+            ${x || Store.nurseStaff() ? `<button class="btn secondary sm" data-action="nurse-vital" data-id="${esc(b.id)}">${icon('activity', 'i16')}วัดซ้ำ</button>` : ''}<button class="btn primary sm" data-action="nurse-out" data-id="${esc(b.id)}">${icon('log-out', 'i16')}ให้ออก</button></div>`; }).join('')}</div>`
           : empty('ไม่มีนักเรียนพักอยู่ในห้องพยาบาล', 'bed')}</div>`;
     },
     bindBoard() {
@@ -245,17 +324,18 @@
 
     page(q) {
       const tab = q.tab || 'overview', base = '#/apps/nurse';
-      const hs = Store.healthStudents(), hm = healthMap(), states = hs.map((s) => healthState(hm.get(s.id)));
-      const tabs = Apps.tabsBar([['overview', 'ภาพรวม'], ['records', 'รายการบันทึก'], ...(hs.length ? [['health', 'แพ้ยา / โรคประจำตัว']] : []), ['report', 'รายงาน']], tab, base);
+      const hs = Store.healthStudents(), hm = healthMap(), states = hs.map((s) => healthState(hm.get(s.id))), due = follows().filter(isDue);
+      const tabs = Apps.tabsBar([['overview', 'ภาพรวม'], ['records', 'รายการบันทึก'], ['follow', 'นัดติดตาม'], ...(hs.length ? [['health', 'แพ้ยา / โรคประจำตัว']] : []), ['report', 'รายงาน']], tab, base);
       const actions = `<button class="btn accent" data-action="nurse-record">${icon('plus')}บันทึกเข้าห้องพยาบาล</button>`;
       // summary cards stay on top of every tab (app standard, like the care app); each opens its list below
       const t = Store.termKey(), cur = all().filter((x) => x.term === t), td = all().filter((x) => dayOf(x.at) === today());
       const sent = cur.filter((x) => x.outcome === 'home' || x.outcome === 'hospital');
-      const cards = `<div class="grid ${hs.length ? 'g3' : 'g4'}">
+      const cards = `<div class="grid nurse-cards">
           ${Apps.stat('bed', 'กำลังพักอยู่', now().length, 'คน', '', 'ครูทุกคนเห็นบอร์ดนี้', '#/apps/nurse?tab=overview&go=nurse-board')}
           ${Apps.stat('calendar-check', 'วันนี้', td.length, 'ครั้ง', '', `${new Set(td.map((x) => x.studentId)).size} คน`, '#/apps/nurse?tab=records&from=' + today() + '&to=' + today())}
           ${Apps.stat('file-text', 'ภาคเรียนนี้', cur.length, 'ครั้ง', '', `${new Set(cur.map((x) => x.studentId)).size} คน · ภาคเรียน ${t}`, '#/apps/nurse?tab=records')}
           ${Apps.stat('ambulance', 'กลับบ้าน / ส่ง รพ.', sent.length, 'ครั้ง', 'red', `กลับบ้าน ${sent.filter((x) => x.outcome === 'home').length} · ส่ง รพ. ${sent.filter((x) => x.outcome === 'hospital').length}`, '#/apps/nurse?tab=records&outcome=home,hospital')}
+          ${Apps.stat('calendar-clock', 'ถึงวันนัดติดตาม', due.length, 'คน', due.length ? 'amber' : '', `เลยนัด ${due.filter((f) => f.status === 'scheduled' && f.at < today()).length} · ไม่มา ${due.filter((f) => f.status === 'missed').length} · ที่จะถึง ${follows().length - due.length}`, '#/apps/nurse?tab=follow&fs=due')}
           ${hs.length ? Apps.stat('triangle-alert', 'มีประวัติแพ้', states.filter((x) => x.allergy).length, 'คน', 'red', 'แพ้ยา อาหาร หรืออื่น ๆ', '#/apps/nurse?tab=health&hs=allergy')
             + Apps.stat('circle-help', 'ยังไม่มีข้อมูลสุขภาพ', states.filter((x) => x.missing).length, 'คน', 'amber', `จาก ${hs.length.toLocaleString()} คนที่คุณดูแล`, '#/apps/nurse?tab=health&hs=missing') : ''}</div>`;
       // app standard: search → summary cards → tabs → content, on every tab
@@ -264,6 +344,7 @@
       const out = (html, after) => ({ title: this.name, actions, html: search + cards + tabs + html, after: () => { bindS(); if (after) after(); } });
       if (tab === 'trash') return out(Apps.trashView('nurse', 'บันทึกห้องพยาบาล'));
       if (tab === 'records') return out(this.recordsHtml(q), () => this.bindRecords());
+      if (tab === 'follow') return out(this.followHtml(q), () => document.getElementById('nf-state').addEventListener('input', (e) => { location.hash = Apps.hashOf('#/apps/nurse', { tab: 'follow', fs: e.target.value }); }));
       if (tab === 'health' && hs.length) return out(this.healthHtml(q, hs), () => this.bindHealth());
       if (tab === 'report') return out(this.reportHtml(q), () => this.bindReport());
       return out(this.boardHtml() + `
@@ -403,8 +484,8 @@
       ['nv-q', 'nv-term', 'nv-group', 'nv-out', 'nv-grade', 'nv-from', 'nv-to'].forEach((id) => $(id).addEventListener('input', draw));
       $('nv-csv').addEventListener('click', () => {
         const qq = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-        const lines = [['วันที่', 'เวลาเข้า', 'เวลาออก', 'นาที', 'คาบ', 'รหัส', 'ชื่อ', 'ชั้น', 'อาการ', 'รายละเอียด', 'อุณหภูมิ', 'ยา', 'การดูแล', 'ผล', 'แจ้งผู้ปกครอง', 'ผู้บันทึก'].map(qq).join(',')]
-          .concat(this.filtered().map((x) => { const s = Store.student(x.studentId); return [dayOf(x.at), timeOf(x.at), x.outAt ? timeOf(x.outAt) : '', x.outAt ? mins(x.at, x.outAt) : '', x.period, x.studentId, s ? fullName(s) : '', s ? klass(s) : '', GROUPS[x.symptomGroup] || x.symptomGroup, x.symptom, x.temp ?? '', x.medicine, x.care, OUTCOMES[x.outcome] ? OUTCOMES[x.outcome][0] : x.outcome, x.parentNotified ? 'ใช่' : '', x.by].map(qq).join(','); }));
+        const lines = [['วันที่', 'เวลาเข้า', 'เวลาออก', 'นาที', 'คาบ', 'รหัส', 'ชื่อ', 'ชั้น', 'อาการ', 'รายละเอียด', 'อุณหภูมิ', 'ยา', 'การดูแล', 'ผล', 'แจ้งผู้ปกครอง', 'ผู้บันทึก', 'ชีพจร', 'ความดัน', 'ออกซิเจน', 'วันนัดติดตาม', 'สถานะนัด'].map(qq).join(',')]
+          .concat(this.filtered().map((x) => { const s = Store.student(x.studentId), m = measures(x).slice(-1)[0] || {}; return [dayOf(x.at), timeOf(x.at), x.outAt ? timeOf(x.outAt) : '', x.outAt ? mins(x.at, x.outAt) : '', x.period, x.studentId, s ? fullName(s) : '', s ? klass(s) : '', GROUPS[x.symptomGroup] || x.symptomGroup, x.symptom, x.temp ?? '', x.medicine, x.care, OUTCOMES[x.outcome] ? OUTCOMES[x.outcome][0] : x.outcome, x.parentNotified ? 'ใช่' : '', x.by, m.pulse ?? '', m.sys ? m.sys + '/' + m.dia : '', m.spo2 ?? '', x.followAt || '', x.followStatus ? FOLLOW[x.followStatus][0] : ''].map(qq).join(','); }));
         UI.download(`บันทึกห้องพยาบาล-${today()}.csv`, '﻿' + lines.join('\n'));
       });
       draw();
@@ -453,6 +534,6 @@
   };
 
   Apps.all.push(app);
-  app._test = { healthNotices, healthState, repeats, newDrugs };
+  app._test = { healthNotices, healthState, repeats, newDrugs, flag, measures, vitalChips, dayAdd, followVals, isDue, badBp };
   window.NurseApp = app;
 })();
