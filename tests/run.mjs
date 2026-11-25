@@ -81,6 +81,18 @@ const tests = {
       assert.ok(opts.every((o) => !o.upsert));
     } finally { sb.storage.from = keep; Store.driveSync = drive; }
   },
+  'contact import: father / mother / student numbers, only the columns in the file change': () => {
+    const r = Pages.contactRows([['รหัสนักเรียน', 'ชื่อบิดา', 'เบอร์โทรบิดา', 'เบอร์แม่', 'เบอร์โทรนักเรียน'], ['30001', 'นาย ก', '812345678', '', '0899999999']]);
+    assert.deepEqual([r.out[0].father, r.out[0].fatherPhone, r.out[0].motherPhone, r.out[0].studentPhone, r.out[0].guardianPhone], ['นาย ก', '081-234-5678', undefined, '089-999-9999', '081']);
+    assert.equal(Pages.contactRows([['รหัสนักเรียน', 'เบอร์โทรมารดา'], ['30001', '12']]).skipped[0][2], 'เบอร์โทรไม่ถูกต้อง');
+  },
+  'registry: gender comes from the title': () => {
+    assert.deepEqual(['ด.ช.', 'นาย', 'ด.ญ.', 'นางสาว', 'เด็กหญิง', '', 'Mr.'].map((p) => Pages.sexOf({ prefix: p })), ['m', 'm', 'f', 'f', 'f', 'x', 'x']);
+  },
+  'nurse: father, mother and student numbers each get a call button': () => {
+    const h = ctx.NurseApp._test.guardianHtml({ name: '', phone: '', others: [{ who: 'บิดา', name: '<b>', phone: '0812345678' }, { who: 'มารดา', name: '', phone: '' }] });
+    assert.match(h, /โทรบิดา 0812345678/); assert.match(h, /title="&lt;b&gt;"/); assert.ok(!/ยังไม่มีเบอร์/.test(h));
+  },
   'settings: only the changed value is sent': async () => {
     await Store.saveSettings({ apps: { care: false } });
     assert.deepEqual(Object.keys(op(calls[0], 'update')[1]), ['apps']);

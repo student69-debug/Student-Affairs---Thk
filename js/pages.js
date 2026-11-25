@@ -173,7 +173,9 @@
     const info = `<div class="card-body"><div class="form-grid">${[
       ['รหัสนักเรียน', `<span class="mono">${esc(s.id)}</span>`], ['เลขประจำตัวประชาชน', `<span class="mono">${Store.isAdmin() ? esc(s.cid) : esc(s.cid).slice(0, 1) + '-XXXX-XXXXX-' + s.cid.slice(-3)}</span>`],
       ['ชื่อ – นามสกุล', esc(fullName(s))], ['ชื่อเล่น', esc(s.nick)], ['ชั้น / ห้อง / เลขที่', `${klass(s)} เลขที่ ${s.no}`], ['ครูที่ปรึกษา', esc(s.advisor)],
-      ['ผู้ปกครอง', esc(s.guardian)], ['เบอร์โทร', `<span class="mono">${esc(s.guardianPhone)}</span>`], ['ที่อยู่', esc(s.address)], ['สถานะ', statusBadge(s.status)],
+      ['ผู้ปกครอง', esc(s.guardian)], ['เบอร์โทรผู้ปกครอง', `<span class="mono">${esc(s.guardianPhone)}</span>`], ['เบอร์โทรนักเรียน', `<span class="mono">${esc(s.studentPhone)}</span>`], ['', ''],
+      ['ชื่อบิดา', esc(s.father)], ['เบอร์โทรบิดา', `<span class="mono">${esc(s.fatherPhone)}</span>`], ['ชื่อมารดา', esc(s.mother)], ['เบอร์โทรมารดา', `<span class="mono">${esc(s.motherPhone)}</span>`],
+      ['ที่อยู่', esc(s.address)], ['สถานะ', statusBadge(s.status)],
     ].map(([k, v]) => `<div class="field"><label class="muted" style="font-weight:500;color:var(--ink-500)">${k}</label><div>${v}</div></div>`).join('')}</div>
       <p class="muted small" style="margin:16px 0 0">${icon('database', 'i16')} ข้อมูลจากฐานข้อมูลกลาง — แอปย่อยอ่านได้อย่างเดียว ${Store.isAdmin() ? `· <a href="#" data-action="registry-edit" data-id="${esc(s.id)}">แก้ไขในทะเบียน</a>` : ''}</p></div>`;
 
@@ -207,7 +209,7 @@
   }
 
   /* ---------------- ทะเบียนนักเรียน ---------------- */
-  const FIELDS = [['id', 'รหัสนักเรียน'], ['cid', 'เลขประจำตัวประชาชน'], ['prefix', 'คำนำหน้า'], ['first', 'ชื่อ'], ['last', 'นามสกุล'], ['nick', 'ชื่อเล่น'], ['grade', 'ชั้น'], ['room', 'ห้อง'], ['no', 'เลขที่'], ['advisor', 'ครูที่ปรึกษา'], ['guardian', 'ผู้ปกครอง'], ['guardianPhone', 'เบอร์โทร'], ['address', 'ที่อยู่']];
+  const FIELDS = [['id', 'รหัสนักเรียน'], ['cid', 'เลขประจำตัวประชาชน'], ['prefix', 'คำนำหน้า'], ['first', 'ชื่อ'], ['last', 'นามสกุล'], ['nick', 'ชื่อเล่น'], ['grade', 'ชั้น'], ['room', 'ห้อง'], ['no', 'เลขที่'], ['advisor', 'ครูที่ปรึกษา'], ['guardian', 'ผู้ปกครอง'], ['guardianPhone', 'เบอร์โทร'], ['address', 'ที่อยู่'], ['studentPhone', 'เบอร์โทรนักเรียน'], ['father', 'ชื่อบิดา'], ['fatherPhone', 'เบอร์โทรบิดา'], ['mother', 'ชื่อมารดา'], ['motherPhone', 'เบอร์โทรมารดา']];
 
   // ตารางผู้ใช้ (ใช้ทั้งในทะเบียนครูและตั้งค่า → ผู้ใช้และสิทธิ์)
   function usersTable(list, admin) {
@@ -274,6 +276,27 @@
 
   // admin: every grade · grade head: add / edit students only in the grades they look after (enforced by row level security)
   const regGrades = () => (Store.isAdmin() ? [1, 2, 3, 4, 5, 6] : Store.user().role === 'grade_head' ? Store.myGrades().map(Number) : []);
+  // gender from the title (the registry has no separate column): ด.ช. / นาย = boy, ด.ญ. / นางสาว / นาง = girl
+  const SEX = { m: 'ชาย', f: 'หญิง', x: 'ไม่ระบุ' };
+  const sexOf = (s) => (/^(ด\.?\s?ช\.?|เด็กชาย|นาย)/.test(s.prefix || '') ? 'm' : /^(ด\.?\s?ญ\.?|เด็กหญิง|นาง)/.test(s.prefix || '') ? 'f' : 'x');
+  // studying students per grade × gender; every number opens the filtered list below it
+  function regDash(grades) {
+    const act = D().students.filter((s) => s.status === 'studying' && grades.includes(Number(s.grade)));
+    const n = (g, x) => act.filter((s) => (!g || s.grade === g) && (!x || sexOf(s) === x)).length;
+    const href = (g, x) => Apps.hashOf('#/registry', { status: 'studying', grade: g, sex: x, go: 'rg-list' });
+    const pct = (v) => (act.length ? Math.round((v / act.length) * 100) + '% ของทั้งหมด' : '');
+    const cell = (g, x) => `<a href="${href(g, x)}">${n(g, x).toLocaleString()}</a>`;
+    const unknown = n(0, 'x');
+    return `<div class="grid g${unknown ? 4 : 3}">
+        ${stat('users', 'นักเรียนกำลังศึกษา', act.length.toLocaleString(), 'คน', '', grades.length < 6 ? 'เฉพาะระดับชั้นที่ดูแล' : 'ทุกระดับชั้น', href('', ''))}
+        ${stat('user', 'ชาย', n(0, 'm').toLocaleString(), 'คน', 'blue', pct(n(0, 'm')), href('', 'm'))}
+        ${stat('user', 'หญิง', n(0, 'f').toLocaleString(), 'คน', 'red', pct(n(0, 'f')), href('', 'f'))}
+        ${unknown ? stat('circle-help', 'ไม่ระบุเพศ', unknown, 'คน', 'amber', 'คำนำหน้าไม่ใช่ ด.ช. ด.ญ. นาย นางสาว', href('', 'x')) : ''}</div>
+      <div class="card"><div class="card-head"><h3>จำนวนนักเรียนแยกตามระดับชั้นและเพศ</h3><span class="muted small">กำลังศึกษา · เพศดูจากคำนำหน้าชื่อ</span></div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>ระดับชั้น</th><th class="num">ชาย</th><th class="num">หญิง</th>${unknown ? '<th class="num">ไม่ระบุ</th>' : ''}<th class="num">รวม</th></tr></thead><tbody>
+        ${grades.map((g) => `<tr><td>ม.${g}</td><td class="num">${cell(g, 'm')}</td><td class="num">${cell(g, 'f')}</td>${unknown ? `<td class="num">${cell(g, 'x')}</td>` : ''}<td class="num"><b>${cell(g, '')}</b></td></tr>`).join('')}
+        <tr><td><b>รวม</b></td><td class="num"><b>${cell(0, 'm')}</b></td><td class="num"><b>${cell(0, 'f')}</b></td>${unknown ? `<td class="num"><b>${cell(0, 'x')}</b></td>` : ''}<td class="num"><b>${cell(0, '')}</b></td></tr></tbody></table></div></div>`;
+  }
   function registry(q) {
     const admin = Store.isAdmin(), grades = regGrades();
     if (!grades.length) return { title: 'ทะเบียนนักเรียน', html: `<div class="card lock-box">${icon('lock', 'i28')}<h3>เฉพาะผู้ดูแลระบบและหัวหน้าระดับ</h3><p class="muted" style="margin:0">ทะเบียนนักเรียน (ข้อมูลกลาง) แก้ไขได้เฉพาะผู้ดูแลระบบ และหัวหน้า/รองหัวหน้าระดับ (เฉพาะระดับชั้นที่ดูแล)${Store.user().role === 'grade_head' ? '<br>บัญชีของคุณยังไม่ได้กำหนดระดับชั้น — แจ้งผู้ดูแลระบบ' : ''}</p></div>` };
@@ -298,23 +321,27 @@
     }
     return { title: 'ทะเบียนนักเรียน (ข้อมูลกลาง)', actions, html: tabs + `
       ${scopeNote}<div class="notice">${icon('database', 'i16')}<span>ฐานข้อมูลกลางเก็บเฉพาะทะเบียนนักเรียน ไม่เก็บคะแนนหรือบันทึกใด ๆ · ย้ายออก/จบ ไม่ลบข้อมูล เพื่อเก็บประวัติ</span></div>
-      <div class="card"><div class="toolbar">
+      ${regDash(grades)}
+      <div class="card" id="rg-list"><div class="toolbar" data-stat-sync>
         <input class="input grow" id="rg-q" placeholder="ค้นหารหัส / ชื่อ">
-        <select class="select" id="rg-grade" aria-label="ระดับชั้น"><option value="">${admin ? 'ทุกชั้น' : 'ทุกระดับที่ดูแล'}</option>${grades.map((g) => `<option value="${g}">ม.${g}</option>`).join('')}</select>
-        <select class="select" id="rg-status" aria-label="สถานะ"><option value="">ทุกสถานะ</option>${Object.entries(UI.STATUS).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join('')}</select>
+        <select class="select" id="rg-grade" aria-label="ระดับชั้น"><option value="">${admin ? 'ทุกชั้น' : 'ทุกระดับที่ดูแล'}</option>${grades.map((g) => `<option value="${g}" ${q.grade === String(g) ? 'selected' : ''}>ม.${g}</option>`).join('')}</select>
+        <select class="select" id="rg-sex" aria-label="เพศ"><option value="">ทุกเพศ</option>${Object.entries(SEX).map(([k, v]) => `<option value="${k}" ${q.sex === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        <select class="select" id="rg-status" aria-label="สถานะ"><option value="">ทุกสถานะ</option>${Object.entries(UI.STATUS).map(([k, v]) => `<option value="${k}" ${q.status === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select>
         ${admin ? `<button class="btn ghost sm" data-action="registry-export">${icon('download', 'i16')}ส่งออก CSV</button>` : ''}</div>
         <div class="tbl-wrap" id="rg-table"></div></div>`,
       after() {
         const draw = () => {
-          const t = document.getElementById('rg-q').value.trim().toLowerCase(), g = document.getElementById('rg-grade').value, st = document.getElementById('rg-status').value;
-          const list = D().students.filter((s) => grades.includes(Number(s.grade)) && (!g || String(s.grade) === g) && (!st || s.status === st) && (!t || [s.id, fullName(s), s.nick].some((x) => x.toLowerCase().includes(t))))
+          const t = document.getElementById('rg-q').value.trim().toLowerCase(), g = document.getElementById('rg-grade').value, st = document.getElementById('rg-status').value, sx = document.getElementById('rg-sex').value;
+          if (drawn++) Apps.markStats(Apps.hashOf('#/registry', { status: st, grade: g, sex: sx }));
+          const list = D().students.filter((s) => grades.includes(Number(s.grade)) && (!g || String(s.grade) === g) && (!st || s.status === st) && (!sx || sexOf(s) === sx) && (!t || [s.id, fullName(s), s.nick].some((x) => x.toLowerCase().includes(t))))
             .sort((a, b) => a.grade - b.grade || a.room - b.room || a.no - b.no);
           document.getElementById('rg-table').innerHTML = `<table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชื่อเล่น</th><th>ชั้น</th><th class="num">เลขที่</th><th>ครูที่ปรึกษา</th><th>สถานะ</th><th></th></tr></thead><tbody>
             ${list.slice(0, 300).map((s) => `<tr><td class="mono">${esc(s.id)}</td><td><a href="#/student/${esc(s.id)}">${esc(fullName(s))}</a></td><td>${esc(s.nick)}</td><td>${klass(s)}</td><td class="num">${s.no}</td><td>${esc(s.advisor)}</td><td>${statusBadge(s.status)}</td>
             <td style="text-align:right;white-space:nowrap"><button class="icon-btn" title="แก้ไข" data-action="registry-edit" data-id="${esc(s.id)}">${icon('pencil', 'i16')}</button><button class="icon-btn" title="เปลี่ยนสถานะ" data-action="registry-status" data-id="${esc(s.id)}">${icon('user-cog', 'i16')}</button><button class="icon-btn" title="ลบ (เก็บไว้ 30 วันก่อนลบถาวร)" data-action="registry-delete" data-id="${esc(s.id)}">${icon('trash-2', 'i16')}</button></td></tr>`).join('') || `<tr><td colspan="8">${empty('ไม่พบข้อมูล')}</td></tr>`}</tbody></table>${list.length > 300 ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง 300 จาก ${list.length.toLocaleString()} คน — พิมพ์ค้นหาหรือเลือกชั้น/สถานะเพื่อกรอง</div>` : `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">ทั้งหมด ${list.length.toLocaleString()} คน</div>`}`;
           UI.refreshIcons();
         };
-        ['rg-q', 'rg-grade', 'rg-status'].forEach((i) => document.getElementById(i).addEventListener('input', draw));
+        let drawn = 0;
+        ['rg-q', 'rg-grade', 'rg-status', 'rg-sex'].forEach((i) => document.getElementById(i).addEventListener('input', draw));
         draw();
       } };
   }
@@ -338,12 +365,17 @@
         <div class="field full"><label>ครูที่ปรึกษา</label><input class="input" name="advisor" value="${v('advisor')}"></div>
         <div class="field"><label>ผู้ปกครอง</label><input class="input" name="guardian" value="${v('guardian')}"></div>
         <div class="field"><label>เบอร์โทรผู้ปกครอง</label><input class="input mono" name="guardianPhone" value="${v('guardianPhone')}"></div>
+        <div class="field"><label>ชื่อบิดา</label><input class="input" name="father" maxlength="200" value="${v('father')}"></div>
+        <div class="field"><label>เบอร์โทรบิดา</label><input class="input mono" name="fatherPhone" maxlength="60" value="${v('fatherPhone')}"></div>
+        <div class="field"><label>ชื่อมารดา</label><input class="input" name="mother" maxlength="200" value="${v('mother')}"></div>
+        <div class="field"><label>เบอร์โทรมารดา</label><input class="input mono" name="motherPhone" maxlength="60" value="${v('motherPhone')}"></div>
+        <div class="field"><label>เบอร์โทรนักเรียน</label><input class="input mono" name="studentPhone" maxlength="60" value="${v('studentPhone')}"></div>
         <div class="field full"><label>ที่อยู่</label><textarea class="textarea" name="address" style="min-height:64px">${v('address')}</textarea></div>
         <div class="field full"><label>รูปถ่าย</label><input class="input" type="file" name="photoFile" accept="image/*" style="padding-top:6px"></div></div>`,
       onSubmit: (val, form) => {
         if (!s && Store.student(val.id)) { UI.toast('รหัสนักเรียนนี้มีอยู่แล้ว'); return false; }
         if (!grades.includes(Number(val.grade))) { UI.toast('เลือกได้เฉพาะระดับชั้นที่คุณดูแล'); return false; }
-        const obj = { cid: val.cid, prefix: val.prefix, first: val.first.trim(), last: val.last.trim(), nick: val.nick.trim(), grade: Number(val.grade), room: Number(val.room), no: Number(val.no) || 1, advisor: val.advisor.trim(), guardian: val.guardian.trim(), guardianPhone: val.guardianPhone.trim(), address: val.address.trim() };
+        const obj = { cid: val.cid, prefix: val.prefix, first: val.first.trim(), last: val.last.trim(), nick: val.nick.trim(), grade: Number(val.grade), room: Number(val.room), no: Number(val.no) || 1, advisor: val.advisor.trim(), guardian: val.guardian.trim(), guardianPhone: val.guardianPhone.trim(), address: val.address.trim(), studentPhone: val.studentPhone.trim(), father: val.father.trim(), fatherPhone: val.fatherPhone.trim(), mother: val.mother.trim(), motherPhone: val.motherPhone.trim() };
         const commit = async (photo) => {
           if (photo) obj.photoPath = await Store.uploadPhoto(s ? s.id : val.id, photo);
           if (s) {
@@ -443,7 +475,7 @@
       seen.add(o.id);
       ['grade', 'room', 'no'].forEach((k) => { if (o[k]) o[k] = Number(o[k]); });
       if (o.cid) o.cid = o.cid.toUpperCase();
-      if (ex) { out.push({ ...ex, ...o }); upd++; } else { out.push({ prefix: '', nick: '', advisor: '', guardian: '', guardianPhone: '', address: '', ...o, status: 'studying' }); add++; }
+      if (ex) { out.push({ ...ex, ...o }); upd++; } else { out.push({ prefix: '', nick: '', advisor: '', guardian: '', guardianPhone: '', address: '', studentPhone: '', father: '', fatherPhone: '', mother: '', motherPhone: '', ...o, status: 'studying' }); add++; }
     });
     if (!out.length && !errors.length) errors.push('ไม่มีข้อมูลในไฟล์');
     return { out, add, upd, errors };
@@ -461,43 +493,47 @@
     }
     return [...new Set(out)].join(', ');
   }
-  const CONTACT = { id: ['รหัสนักเรียน', 'เลขประจำตัวนักเรียน', 'รหัสประจำตัวนักเรียน', 'รหัสประจำตัว'], first: ['ชื่อ'], last: ['นามสกุล', 'สกุล'], guardian: ['ผู้ปกครอง', 'ชื่อผู้ปกครอง', 'ชื่อ-สกุลผู้ปกครอง'], guardianPhone: ['เบอร์โทร', 'เบอร์โทรผู้ปกครอง', 'เบอร์โทรศัพท์', 'เบอร์โทรศัพท์ผู้ปกครอง', 'โทรศัพท์', 'โทรศัพท์ผู้ปกครอง'] };
+  const CONTACT = { id: ['รหัสนักเรียน', 'เลขประจำตัวนักเรียน', 'รหัสประจำตัวนักเรียน', 'รหัสประจำตัว'], first: ['ชื่อ'], last: ['นามสกุล', 'สกุล'], guardian: ['ผู้ปกครอง', 'ชื่อผู้ปกครอง', 'ชื่อ-สกุลผู้ปกครอง'], guardianPhone: ['เบอร์โทร', 'เบอร์โทรผู้ปกครอง', 'เบอร์โทรศัพท์', 'เบอร์โทรศัพท์ผู้ปกครอง', 'โทรศัพท์', 'โทรศัพท์ผู้ปกครอง'],
+    studentPhone: ['เบอร์โทรนักเรียน', 'เบอร์โทรศัพท์นักเรียน', 'โทรศัพท์นักเรียน'], father: ['ชื่อบิดา', 'บิดา', 'ชื่อ-สกุลบิดา', 'ชื่อพ่อ'], fatherPhone: ['เบอร์โทรบิดา', 'เบอร์โทรศัพท์บิดา', 'โทรศัพท์บิดา', 'เบอร์พ่อ'],
+    mother: ['ชื่อมารดา', 'มารดา', 'ชื่อ-สกุลมารดา', 'ชื่อแม่'], motherPhone: ['เบอร์โทรมารดา', 'เบอร์โทรศัพท์มารดา', 'โทรศัพท์มารดา', 'เบอร์แม่'] };
+  const C_TEXT = ['guardian', 'father', 'mother'], C_TEL = ['guardianPhone', 'studentPhone', 'fatherPhone', 'motherPhone'];
   // guardian name + phone only: every other column is ignored; a row that cannot be trusted is skipped, the rest still comes in
   function contactRows(rows) {
     const tidy = (x) => String(x ?? '').replace(/[\u200b\ufeff]/g, '').replace(/\s+/g, ' ').trim();
     const at = rows.slice(0, 10).findIndex((r) => r.some((h) => CONTACT.id.includes(tidy(h))));
     const head = at < 0 ? [] : rows[at].map(tidy);
     const idx = Object.fromEntries(Object.entries(CONTACT).map(([k, l]) => [k, head.findIndex((h) => l.includes(h))]));
-    if (idx.id < 0 || (idx.guardian < 0 && idx.guardianPhone < 0)) return { out: [], skipped: [], same: 0, error: 'ไม่พบคอลัมน์ "รหัสนักเรียน" และ "เบอร์โทร" (หรือ "ผู้ปกครอง") กรุณาใช้แม่แบบเบอร์ผู้ปกครอง' };
+    if (idx.id < 0 || C_TEXT.concat(C_TEL).every((k) => idx[k] < 0)) return { out: [], skipped: [], same: 0, error: 'ไม่พบคอลัมน์ "รหัสนักเรียน" และข้อมูลติดต่อ เช่น "เบอร์โทร" หรือ "ชื่อบิดา" กรุณาใช้แม่แบบข้อมูลติดต่อ' };
     const out = [], skipped = [], seen = new Map();
     let same = 0;
     rows.forEach((r) => { const id = tidy(r[idx.id]); seen.set(id, (seen.get(id) || 0) + 1); });
     rows.slice(at + 1).forEach((r, i) => {
       const o = Object.fromEntries(Object.entries(idx).map(([k, j]) => [k, j < 0 ? '' : tidy(r[j])]));
       const blank = (v) => !v || /^[-–—.]+$/.test(v);
-      if (blank(o.guardian) && blank(o.guardianPhone)) return;
-      const s = Store.student(o.id), tel = blank(o.guardianPhone) ? '' : phones(o.guardianPhone);
+      const given = C_TEXT.concat(C_TEL).filter((k) => !blank(o[k]));
+      if (!given.length) return;
+      const s = Store.student(o.id), tels = C_TEL.filter((k) => given.includes(k)).map((k) => [k, phones(o[k])]), tel = tels.some(([, t]) => t === null) ? null : '';
       const why = !o.id ? 'ไม่มีรหัสนักเรียน' : !s ? 'ไม่มีรหัสนี้ในทะเบียน' : seen.get(o.id) > 1 ? 'รหัสซ้ำในไฟล์'
         : (o.first && o.first !== tidy(s.first)) || (o.last && o.last !== tidy(s.last)) ? 'ชื่อไม่ตรงกับทะเบียน' : tel === null ? 'เบอร์โทรไม่ถูกต้อง' : '';
       if (why) { skipped.push([at + i + 2, o.id, why]); return; }
-      const n = { ...s, ...(blank(o.guardian) ? {} : { guardian: o.guardian }), ...(tel ? { guardianPhone: tel } : {}) };
-      if (n.guardian === s.guardian && n.guardianPhone === s.guardianPhone) same++; else out.push(n);
+      const n = { ...s, ...Object.fromEntries(C_TEXT.filter((k) => given.includes(k)).map((k) => [k, o[k].slice(0, 200)])), ...Object.fromEntries(tels) };
+      if (given.every((k) => (n[k] || '') === (s[k] || ''))) same++; else out.push(n);
     });
-    return { out, skipped, same, error: out.length || skipped.length || same ? '' : 'ไม่มีเบอร์โทรหรือชื่อผู้ปกครองในไฟล์' };
+    return { out, skipped, same, error: out.length || skipped.length || same ? '' : 'ไม่มีข้อมูลติดต่อในไฟล์' };
   }
   async function importContacts(f) {
     const rows = await UI.readSheet(f);
     await Store.refresh('students'); // rows are saved whole, so start from what is in the database now
     const { out, skipped, same, error } = contactRows(rows);
     if (error) { UI.toast('นำเข้าไม่ได้: ' + error, 'error'); return false; }
-    UI.dialog({ title: 'ตรวจก่อนนำเข้าเบอร์ผู้ปกครอง', submitLabel: 'นำเข้า ' + out.length + ' คน', cancelLabel: out.length ? 'ยกเลิก' : 'ปิด',
-      body: `<div class="notice">${icon('info', 'i16')}<span>อัปเดต <b>${out.length}</b> คน · เหมือนเดิมแล้ว ${same} คน · ข้าม <b>${skipped.length}</b> แถว<br>แก้เฉพาะชื่อผู้ปกครองและเบอร์โทร ข้อมูลอื่นไม่เปลี่ยน</span></div>
+    UI.dialog({ title: 'ตรวจก่อนนำเข้าข้อมูลติดต่อ', submitLabel: 'นำเข้า ' + out.length + ' คน', cancelLabel: out.length ? 'ยกเลิก' : 'ปิด',
+      body: `<div class="notice">${icon('info', 'i16')}<span>อัปเดต <b>${out.length}</b> คน · เหมือนเดิมแล้ว ${same} คน · ข้าม <b>${skipped.length}</b> แถว<br>แก้เฉพาะข้อมูลติดต่อที่มีในไฟล์ (ผู้ปกครอง บิดา มารดา เบอร์โทร) ช่องว่างคงข้อมูลเดิม ข้อมูลอื่นไม่เปลี่ยน</span></div>
         ${skipped.length ? `<div class="notice warn">${icon('circle-alert', 'i16')}<span><b>แถวที่ข้าม</b><br>${skipped.slice(0, 15).map(([n, id, why]) => esc(`แถว ${n} รหัส ${id || '—'}: ${why}`)).join('<br>')}${skipped.length > 15 ? '<br>… ดูทั้งหมดในไฟล์' : ''}</span></div>
         <button type="button" class="btn secondary sm" id="ct-skip" style="align-self:flex-start">${icon('download', 'i16')}ดาวน์โหลดรายการที่ข้าม</button>` : ''}`,
       onSubmit: out.length ? async () => {
         await Store.upsert('students', out);
-        await Store.log('', 'นำเข้าข้อมูล', `นำเข้าเบอร์ผู้ปกครองจากไฟล์ ${f.name} · อัปเดต ${out.length} คน · ข้าม ${skipped.length} แถว`);
-        UI.toast(`นำเข้าเบอร์ผู้ปกครองแล้ว ${out.length} คน`); App.render();
+        await Store.log('', 'นำเข้าข้อมูล', `นำเข้าข้อมูลติดต่อจากไฟล์ ${f.name} · อัปเดต ${out.length} คน · ข้าม ${skipped.length} แถว`);
+        UI.toast(`นำเข้าข้อมูลติดต่อแล้ว ${out.length} คน`); App.render();
       } : undefined });
     const b = document.getElementById('ct-skip');
     if (b) b.addEventListener('click', () => skipCSV('แถวที่ข้าม.csv', skipped));
@@ -506,7 +542,8 @@
   // every studying student with the numbers known so far, to fill in and bring back
   function contactTemplate() {
     const list = Store.activeStudents().slice().sort((a, b) => a.grade - b.grade || a.room - b.room || a.no - b.no);
-    UI.download('แม่แบบเบอร์ผู้ปกครอง.csv', [['รหัสนักเรียน', 'ชั้น', 'ห้อง', 'เลขที่', 'ชื่อ', 'นามสกุล', 'ผู้ปกครอง', 'เบอร์โทร'], ...list.map((s) => [s.id, s.grade, s.room, s.no, s.first, s.last, s.guardian, s.guardianPhone])].map(csvRow).join('\n'));
+    UI.download('แม่แบบข้อมูลติดต่อ.csv', [['รหัสนักเรียน', 'ชั้น', 'ห้อง', 'เลขที่', 'ชื่อ', 'นามสกุล', 'เบอร์โทรนักเรียน', 'ผู้ปกครอง', 'เบอร์โทร', 'ชื่อบิดา', 'เบอร์โทรบิดา', 'ชื่อมารดา', 'เบอร์โทรมารดา'],
+      ...list.map((s) => [s.id, s.grade, s.room, s.no, s.first, s.last, s.studentPhone, s.guardian, s.guardianPhone, s.father, s.fatherPhone, s.mother, s.motherPhone])].map(csvRow).join('\n'));
   }
   // photo links: which students get a photo, and which rows are left out (and why)
   function photoRows(rows) {
@@ -587,9 +624,9 @@
   }
   function importDialog() {
     UI.dialog({ title: 'นำเข้าข้อมูลนักเรียนจาก Excel', submitLabel: 'นำเข้า',
-      body: `<div class="field"><label>นำเข้าอะไร</label><select class="select" name="what"><option value="all">ข้อมูลทะเบียนทั้งหมด (ไฟล์ CSV)</option><option value="contact">เฉพาะผู้ปกครองและเบอร์โทร (ไฟล์ Excel หรือ CSV)</option><option value="photo">รูปถ่ายจากลิงก์ (ไฟล์ Excel หรือ CSV)</option></select></div>
-        <p style="margin:0"><b>ข้อมูลทะเบียนทั้งหมด:</b> ใน Excel เลือก <b>บันทึกเป็น → CSV UTF-8</b> แถวแรกต้องเป็นหัวคอลัมน์ตามแม่แบบ<br><b>เฉพาะผู้ปกครองและเบอร์โทร:</b> ใช้คอลัมน์ รหัสนักเรียน, ผู้ปกครอง, เบอร์โทร คอลัมน์อื่นไม่ถูกนำเข้า และตรวจรายการก่อนบันทึกได้<br><b>รูปถ่ายจากลิงก์:</b> ใช้คอลัมน์ รหัสนักเรียน (หรือรหัสประจำตัว) และ ลิงก์รูปภาพ คนที่มีรูปแล้วไม่ถูกเปลี่ยน</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn secondary sm" data-action="registry-template">${icon('download', 'i16')}แม่แบบทะเบียน</button><button type="button" class="btn secondary sm" data-action="contact-template">${icon('download', 'i16')}แม่แบบเบอร์ผู้ปกครอง (มีรายชื่อ)</button></div>
+      body: `<div class="field"><label>นำเข้าอะไร</label><select class="select" name="what"><option value="all">ข้อมูลทะเบียนทั้งหมด (ไฟล์ CSV)</option><option value="contact">ข้อมูลติดต่อ: เบอร์นักเรียน ผู้ปกครอง บิดา มารดา (ไฟล์ Excel หรือ CSV)</option><option value="photo">รูปถ่ายจากลิงก์ (ไฟล์ Excel หรือ CSV)</option></select></div>
+        <p style="margin:0"><b>ข้อมูลทะเบียนทั้งหมด:</b> ใน Excel เลือก <b>บันทึกเป็น → CSV UTF-8</b> แถวแรกต้องเป็นหัวคอลัมน์ตามแม่แบบ<br><b>ข้อมูลติดต่อ:</b> ใช้คอลัมน์ รหัสนักเรียน กับคอลัมน์ที่มี เช่น เบอร์โทรนักเรียน, ผู้ปกครอง, เบอร์โทร, ชื่อบิดา, เบอร์โทรบิดา, ชื่อมารดา, เบอร์โทรมารดา คอลัมน์อื่นไม่ถูกนำเข้า และตรวจรายการก่อนบันทึกได้<br><b>รูปถ่ายจากลิงก์:</b> ใช้คอลัมน์ รหัสนักเรียน (หรือรหัสประจำตัว) และ ลิงก์รูปภาพ คนที่มีรูปแล้วไม่ถูกเปลี่ยน</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn secondary sm" data-action="registry-template">${icon('download', 'i16')}แม่แบบทะเบียน</button><button type="button" class="btn secondary sm" data-action="contact-template">${icon('download', 'i16')}แม่แบบข้อมูลติดต่อ (มีรายชื่อ)</button></div>
         <div class="field"><label>ไฟล์ <span class="req">*</span></label><input class="input" type="file" name="file" accept=".csv,text/csv,.xlsx,.xls" required style="padding-top:6px"></div>
         <div class="notice">${icon('info', 'i16')}<span>ข้อมูลทะเบียนทั้งหมด: รหัสที่มีอยู่แล้วจะถูกอัปเดต (ช่องว่าง = คงข้อมูลเดิม) รหัสใหม่จะถูกเพิ่ม · ถ้ามีแถวใดผิด ระบบจะไม่นำเข้าเลย</span></div>`,
       onSubmit: (v, form) => {
@@ -610,7 +647,7 @@
       } });
   }
   function template() {
-    UI.download('แม่แบบนำเข้านักเรียน.csv', [FIELDS.map((f) => f[1]), ['67001', '1234567890123', 'ด.ช.', 'ตัวอย่าง', 'นามสกุล', 'ต้น', '1', '1', '1', 'ครูสมศรี วงศ์ใหญ่', 'นายสมชาย นามสกุล', '081-234-5678', '1/2 ต.คลองหนึ่ง อ.คลองหลวง จ.ปทุมธานี']].map(csvRow).join('\n'));
+    UI.download('แม่แบบนำเข้านักเรียน.csv', [FIELDS.map((f) => f[1]), ['67001', '1234567890123', 'ด.ช.', 'ตัวอย่าง', 'นามสกุล', 'ต้น', '1', '1', '1', 'ครูสมศรี วงศ์ใหญ่', 'นายสมชาย นามสกุล', '081-234-5678', '1/2 ต.คลองหนึ่ง อ.คลองหลวง จ.ปทุมธานี', '089-876-5432', 'นายสมชาย นามสกุล', '081-234-5678', 'นางสมหญิง นามสกุล', '082-345-6789']].map(csvRow).join('\n'));
   }
 
   /* ---------------- รายงาน ---------------- */
@@ -985,5 +1022,5 @@
     });
   }
 
-  window.Pages = { home, search, student, registry, teachers, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES, approveRequest, planFor, importRows, contactRows, contactTemplate, photoRows, backupDialog };
+  window.Pages = { home, search, student, registry, teachers, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES, approveRequest, planFor, importRows, contactRows, sexOf, contactTemplate, photoRows, backupDialog };
 })();

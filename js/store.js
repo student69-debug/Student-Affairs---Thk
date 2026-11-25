@@ -22,7 +22,7 @@
 
   // [ชื่อในแอป, ชื่อคอลัมน์ในฐานข้อมูล]
   const MAPS = {
-    students: { table: 'students', order: 'id', cols: [['id', 'id'], ['cid', 'cid'], ['prefix', 'prefix'], ['first', 'first_name'], ['last', 'last_name'], ['nick', 'nick'], ['grade', 'grade'], ['room', 'room'], ['no', 'no'], ['advisor', 'advisor'], ['guardian', 'guardian'], ['guardianPhone', 'guardian_phone'], ['address', 'address'], ['status', 'status'], ['photoPath', 'photo_path'], ['mine', 'mine'], ['taught', 'taught']] },
+    students: { table: 'students', order: 'id', cols: [['id', 'id'], ['cid', 'cid'], ['prefix', 'prefix'], ['first', 'first_name'], ['last', 'last_name'], ['nick', 'nick'], ['grade', 'grade'], ['room', 'room'], ['no', 'no'], ['advisor', 'advisor'], ['guardian', 'guardian'], ['guardianPhone', 'guardian_phone'], ['address', 'address'], ['status', 'status'], ['photoPath', 'photo_path'], ['studentPhone', 'student_phone'], ['father', 'father_name'], ['fatherPhone', 'father_phone'], ['mother', 'mother_name'], ['motherPhone', 'mother_phone'], ['mine', 'mine'], ['taught', 'taught']] },
     teacherRooms: { table: 'teacher_rooms', order: 'user_id', cols: [['userId', 'user_id'], ['grade', 'grade'], ['room', 'room']] },
     teacherGrades: { table: 'teacher_grades', order: 'user_id', cols: [['userId', 'user_id'], ['grade', 'grade']] },
     gradeStaff: { table: 'grade_staff', order: 'grade', cols: [['grade', 'grade'], ['title', 'title'], ['name', 'name']] },

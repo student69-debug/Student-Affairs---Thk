@@ -100,10 +100,13 @@
     return a + c + (h && h.careNote ? n('warn', 'siren', `<b>ข้อควรปฏิบัติ:</b> ${esc(h.careNote)}`) : '');
   }
   // guardian's phone: null = this person may not see it (decided in the database). Several numbers may share the field ("081-234-5678, 02…")
+  // g.others = father, mother, the student (same right as the guardian's number)
   function guardianHtml(g) {
     if (!g) return '';
-    const nums = String(g.phone || '').split(/[,/;]|\s{2,}/).map((t) => t.trim()).filter((t) => t.replace(/\D/g, '').length >= 9);
-    return `<div class="notice nh-call">${icon('phone', 'i16')}<span><b>ผู้ปกครอง:</b> ${esc(g.name) || ''} ${nums.length ? '' : `<span class="muted">${g.phone ? esc(g.phone) : 'ยังไม่มีเบอร์โทรในทะเบียน'}</span>`}</span>${nums.map((t) => `<a class="btn primary sm" href="tel:${t.replace(/[^\d+]/g, '')}">${icon('phone-call', 'i16')}โทร ${esc(t)}</a>`).join('')}</div>`;
+    const nums = (p) => String(p || '').split(/[,/;]|\s{2,}/).map((t) => t.trim()).filter((t) => t.replace(/\D/g, '').length >= 9);
+    const people = [{ who: 'ผู้ปกครอง', name: g.name, phone: g.phone }, ...(g.others || [])];
+    const btns = people.flatMap((p) => nums(p.phone).map((t) => `<a class="btn primary sm" href="tel:${t.replace(/[^\d+]/g, '')}"${p.name ? ` title="${esc(p.name)}"` : ''}>${icon('phone-call', 'i16')}โทร${p === people[0] ? '' : esc(p.who)} ${esc(t)}</a>`));
+    return `<div class="notice nh-call">${icon('phone', 'i16')}<span><b>ผู้ปกครอง:</b> ${esc(g.name) || ''} ${btns.length ? '' : `<span class="muted">${g.phone ? esc(g.phone) : 'ยังไม่มีเบอร์โทรในทะเบียน'}</span>`}</span>${btns.join('')}</div>`;
   }
   // medicines given in the last 24 hours that are being given again (visitId = the visit being edited, not counted)
   const repeats = (given, meds, visitId) => given.filter((g) => g.visit !== visitId).flatMap((g) => splitMeds(g.medicine).filter((m) => meds.includes(m) && !NOT_DRUG.includes(m)).map((m) => `${m} ให้ไปแล้วเมื่อ ${fmtDate(g.at)} ${timeOf(g.at)}`));
