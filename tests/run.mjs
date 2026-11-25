@@ -46,6 +46,20 @@ const tests = {
     assert.equal(r.errors.length, 0);
     assert.deepEqual([r.out[0].grade, r.out[0].room, r.out[0].cid, r.out[0].guardianPhone], [4, 3, '1234567890123', '081']);
   },
+  'contact import: lost zeros come back, other columns never change, doubtful rows are skipped': () => {
+    const go = (...rows) => Pages.contactRows([['รายงาน'], ['รหัสนักเรียน', 'ชั้น', 'ชื่อ', 'ผู้ปกครอง', 'เบอร์โทรผู้ปกครอง'], ...rows]);
+    const tel = (t) => { const r = go(['30001', '1', 'ก', '', t]); return r.out[0] ? r.out[0].guardianPhone : r.skipped.length ? 'skip' : 'same'; };
+    assert.equal(tel('812345678'), '081-234-5678'); assert.equal(tel('+66 81 234 5678'), '081-234-5678'); assert.equal(tel('662123456'), '066-212-3456');
+    assert.equal(tel('0812345678/021234567'), '081-234-5678, 02-123-4567'); assert.equal(tel('21234567'), '02-123-4567');
+    for (const bad of ['8.12E+08', '12345', '08123456789', '0012345678', 'แม่', '<img>']) assert.equal(tel(bad), 'skip', bad);
+    assert.equal(tel('-'), 'same');
+    const r = go(['30001', '1', 'ก', 'นาง ค', '']);
+    assert.deepEqual([r.out[0].grade, r.out[0].guardian, r.out[0].guardianPhone, r.out[0].cid], [4, 'นาง ค', '081', '1234567890123']);
+    assert.equal(go(['30001', '', 'ผิดคน', '', '0812345678']).skipped[0][2], 'ชื่อไม่ตรงกับทะเบียน');
+    assert.deepEqual(Array.from(go(['39999', '', '', '', '0812345678']).skipped[0]), [3, '39999', 'ไม่มีรหัสนี้ในทะเบียน']);
+    assert.equal(go(['30001', '', '', '', '0812345678'], ['30001', '', '', '', '0812345679']).out.length, 0);
+    assert.ok(Pages.contactRows([['รหัสนักเรียน', 'ชื่อ'], ['30001', 'ก']]).error);
+  },
   'settings: only the changed value is sent': async () => {
     await Store.saveSettings({ apps: { care: false } });
     assert.deepEqual(Object.keys(op(calls[0], 'update')[1]), ['apps']);

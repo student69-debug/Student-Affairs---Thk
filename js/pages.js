@@ -448,15 +448,78 @@
     if (!out.length && !errors.length) errors.push('ไม่มีข้อมูลในไฟล์');
     return { out, add, upd, errors };
   }
+  // "081-234-5678, 02 123 4567" → the same numbers tidied up, or null when one is not a Thai phone number. Excel drops the leading 0.
+  function phones(text) {
+    const out = [];
+    for (const t of String(text).split(/[,/;\n]/).map((x) => x.trim()).filter(Boolean)) {
+      if (!/^\+?[\d\s().-]+$/.test(t)) return null;
+      let d = t.replace(/\D/g, '');
+      if (/^\+?66/.test(t) && d.length >= 10) d = d.slice(2);
+      if (/^[689]\d{8}$/.test(d) || /^[2-7]\d{7}$/.test(d)) d = '0' + d;
+      if (!/^(0[689]\d{8}|0[2-7]\d{7})$/.test(d)) return null;
+      out.push(d.length === 10 ? d.replace(/(...)(...)(....)/, '$1-$2-$3') : d.replace(/(..)(...)(....)/, '$1-$2-$3'));
+    }
+    return [...new Set(out)].join(', ');
+  }
+  const CONTACT = { id: ['รหัสนักเรียน', 'เลขประจำตัวนักเรียน', 'รหัสประจำตัวนักเรียน', 'รหัสประจำตัว'], first: ['ชื่อ'], last: ['นามสกุล', 'สกุล'], guardian: ['ผู้ปกครอง', 'ชื่อผู้ปกครอง', 'ชื่อ-สกุลผู้ปกครอง'], guardianPhone: ['เบอร์โทร', 'เบอร์โทรผู้ปกครอง', 'เบอร์โทรศัพท์', 'เบอร์โทรศัพท์ผู้ปกครอง', 'โทรศัพท์', 'โทรศัพท์ผู้ปกครอง'] };
+  // guardian name + phone only: every other column is ignored; a row that cannot be trusted is skipped, the rest still comes in
+  function contactRows(rows) {
+    const tidy = (x) => String(x ?? '').replace(/[\u200b\ufeff]/g, '').replace(/\s+/g, ' ').trim();
+    const at = rows.slice(0, 10).findIndex((r) => r.some((h) => CONTACT.id.includes(tidy(h))));
+    const head = at < 0 ? [] : rows[at].map(tidy);
+    const idx = Object.fromEntries(Object.entries(CONTACT).map(([k, l]) => [k, head.findIndex((h) => l.includes(h))]));
+    if (idx.id < 0 || (idx.guardian < 0 && idx.guardianPhone < 0)) return { out: [], skipped: [], same: 0, error: 'ไม่พบคอลัมน์ "รหัสนักเรียน" และ "เบอร์โทร" (หรือ "ผู้ปกครอง") กรุณาใช้แม่แบบเบอร์ผู้ปกครอง' };
+    const out = [], skipped = [], seen = new Map();
+    let same = 0;
+    rows.forEach((r) => { const id = tidy(r[idx.id]); seen.set(id, (seen.get(id) || 0) + 1); });
+    rows.slice(at + 1).forEach((r, i) => {
+      const o = Object.fromEntries(Object.entries(idx).map(([k, j]) => [k, j < 0 ? '' : tidy(r[j])]));
+      const blank = (v) => !v || /^[-–—.]+$/.test(v);
+      if (blank(o.guardian) && blank(o.guardianPhone)) return;
+      const s = Store.student(o.id), tel = blank(o.guardianPhone) ? '' : phones(o.guardianPhone);
+      const why = !o.id ? 'ไม่มีรหัสนักเรียน' : !s ? 'ไม่มีรหัสนี้ในทะเบียน' : seen.get(o.id) > 1 ? 'รหัสซ้ำในไฟล์'
+        : (o.first && o.first !== tidy(s.first)) || (o.last && o.last !== tidy(s.last)) ? 'ชื่อไม่ตรงกับทะเบียน' : tel === null ? 'เบอร์โทรไม่ถูกต้อง' : '';
+      if (why) { skipped.push([at + i + 2, o.id, why]); return; }
+      const n = { ...s, ...(blank(o.guardian) ? {} : { guardian: o.guardian }), ...(tel ? { guardianPhone: tel } : {}) };
+      if (n.guardian === s.guardian && n.guardianPhone === s.guardianPhone) same++; else out.push(n);
+    });
+    return { out, skipped, same, error: out.length || skipped.length || same ? '' : 'ไม่มีเบอร์โทรหรือชื่อผู้ปกครองในไฟล์' };
+  }
+  async function importContacts(f) {
+    const rows = await UI.readSheet(f);
+    await Store.refresh('students'); // rows are saved whole, so start from what is in the database now
+    const { out, skipped, same, error } = contactRows(rows);
+    if (error) { UI.toast('นำเข้าไม่ได้: ' + error, 'error'); return false; }
+    UI.dialog({ title: 'ตรวจก่อนนำเข้าเบอร์ผู้ปกครอง', submitLabel: 'นำเข้า ' + out.length + ' คน', cancelLabel: out.length ? 'ยกเลิก' : 'ปิด',
+      body: `<div class="notice">${icon('info', 'i16')}<span>อัปเดต <b>${out.length}</b> คน · เหมือนเดิมแล้ว ${same} คน · ข้าม <b>${skipped.length}</b> แถว<br>แก้เฉพาะชื่อผู้ปกครองและเบอร์โทร ข้อมูลอื่นไม่เปลี่ยน</span></div>
+        ${skipped.length ? `<div class="notice warn">${icon('circle-alert', 'i16')}<span><b>แถวที่ข้าม</b><br>${skipped.slice(0, 15).map(([n, id, why]) => esc(`แถว ${n} รหัส ${id || '—'}: ${why}`)).join('<br>')}${skipped.length > 15 ? '<br>… ดูทั้งหมดในไฟล์' : ''}</span></div>
+        <button type="button" class="btn secondary sm" id="ct-skip" style="align-self:flex-start">${icon('download', 'i16')}ดาวน์โหลดรายการที่ข้าม</button>` : ''}`,
+      onSubmit: out.length ? async () => {
+        await Store.upsert('students', out);
+        await Store.log('', 'นำเข้าข้อมูล', `นำเข้าเบอร์ผู้ปกครองจากไฟล์ ${f.name} · อัปเดต ${out.length} คน · ข้าม ${skipped.length} แถว`);
+        UI.toast(`นำเข้าเบอร์ผู้ปกครองแล้ว ${out.length} คน`); App.render();
+      } : undefined });
+    const b = document.getElementById('ct-skip');
+    if (b) b.addEventListener('click', () => UI.download('แถวที่ข้าม.csv', [['แถว', 'รหัสนักเรียน', 'เหตุผล'], ...skipped].map(csvRow).join('\n')));
+    return false;
+  }
+  // every studying student with the numbers known so far, to fill in and bring back
+  function contactTemplate() {
+    const list = Store.activeStudents().slice().sort((a, b) => a.grade - b.grade || a.room - b.room || a.no - b.no);
+    UI.download('แม่แบบเบอร์ผู้ปกครอง.csv', [['รหัสนักเรียน', 'ชั้น', 'ห้อง', 'เลขที่', 'ชื่อ', 'นามสกุล', 'ผู้ปกครอง', 'เบอร์โทร'], ...list.map((s) => [s.id, s.grade, s.room, s.no, s.first, s.last, s.guardian, s.guardianPhone])].map(csvRow).join('\n'));
+  }
   function importDialog() {
     UI.dialog({ title: 'นำเข้าข้อมูลนักเรียนจาก Excel', submitLabel: 'นำเข้า',
-      body: `<p style="margin:0">ใน Excel เลือก <b>บันทึกเป็น → CSV UTF-8</b> แล้วเลือกไฟล์ที่นี่ แถวแรกต้องเป็นหัวคอลัมน์ตามแม่แบบ</p>
-        <button type="button" class="btn secondary sm" data-action="registry-template" style="align-self:flex-start">${icon('download', 'i16')}ดาวน์โหลดแม่แบบ</button>
-        <div class="field"><label>ไฟล์ CSV <span class="req">*</span></label><input class="input" type="file" name="file" accept=".csv,text/csv" required style="padding-top:6px"></div>
-        <div class="notice">${icon('info', 'i16')}<span>รหัสที่มีอยู่แล้วจะถูกอัปเดต (ช่องว่าง = คงข้อมูลเดิม) รหัสใหม่จะถูกเพิ่ม · ถ้ามีแถวใดผิด ระบบจะไม่นำเข้าเลย</span></div>`,
+      body: `<div class="field"><label>นำเข้าอะไร</label><select class="select" name="what"><option value="all">ข้อมูลทะเบียนทั้งหมด (ไฟล์ CSV)</option><option value="contact">เฉพาะผู้ปกครองและเบอร์โทร (ไฟล์ Excel หรือ CSV)</option></select></div>
+        <p style="margin:0"><b>ข้อมูลทะเบียนทั้งหมด:</b> ใน Excel เลือก <b>บันทึกเป็น → CSV UTF-8</b> แถวแรกต้องเป็นหัวคอลัมน์ตามแม่แบบ<br><b>เฉพาะผู้ปกครองและเบอร์โทร:</b> ใช้คอลัมน์ รหัสนักเรียน, ผู้ปกครอง, เบอร์โทร คอลัมน์อื่นไม่ถูกนำเข้า และตรวจรายการก่อนบันทึกได้</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn secondary sm" data-action="registry-template">${icon('download', 'i16')}แม่แบบทะเบียน</button><button type="button" class="btn secondary sm" data-action="contact-template">${icon('download', 'i16')}แม่แบบเบอร์ผู้ปกครอง (มีรายชื่อ)</button></div>
+        <div class="field"><label>ไฟล์ <span class="req">*</span></label><input class="input" type="file" name="file" accept=".csv,text/csv,.xlsx,.xls" required style="padding-top:6px"></div>
+        <div class="notice">${icon('info', 'i16')}<span>ข้อมูลทะเบียนทั้งหมด: รหัสที่มีอยู่แล้วจะถูกอัปเดต (ช่องว่าง = คงข้อมูลเดิม) รหัสใหม่จะถูกเพิ่ม · ถ้ามีแถวใดผิด ระบบจะไม่นำเข้าเลย</span></div>`,
       onSubmit: (v, form) => {
         const f = form.file.files[0];
         if (!f) return false;
+        if (v.what === 'contact') return importContacts(f);
+        if (!/\.csv$/i.test(f.name)) { UI.toast('ข้อมูลทะเบียนทั้งหมดต้องเป็นไฟล์ CSV', 'error'); return false; }
         return f.text().then(async (txt) => {
           const rows = UI.parseCSV(txt);
           const head = rows.shift() || [];
@@ -844,5 +907,5 @@
     });
   }
 
-  window.Pages = { home, search, student, registry, teachers, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES, approveRequest, planFor, importRows, backupDialog };
+  window.Pages = { home, search, student, registry, teachers, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES, approveRequest, planFor, importRows, contactRows, contactTemplate, backupDialog };
 })();

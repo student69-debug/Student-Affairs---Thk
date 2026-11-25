@@ -181,6 +181,7 @@
     'registry-promote': () => Pages.promoteDialog(),
     'registry-import': () => Pages.importDialog(),
     'registry-template': () => Pages.template(),
+    'contact-template': () => Pages.contactTemplate(),
     'registry-export': () => Pages.exportCSV(),
     'report-export': () => Pages.reportExport(),
     backup: () => Pages.backupDialog(),
