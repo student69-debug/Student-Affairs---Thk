@@ -38,6 +38,7 @@
     referrals: { table: 'care_referrals', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['type', 'type'], ['to', 'to'], ['note', 'note']] },
     drugs: { table: 'drug_cases', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['term', 'term'], ['category', 'category'], ['substance', 'substance'], ['act', 'act'], ['foundBy', 'found_by'], ['place', 'place'], ['items', 'items'], ['level', 'level'], ['actions', 'actions'], ['points', 'points'], ['recordId', 'behavior_record_id'], ['status', 'status'], ['followUp', 'follow_up'], ['note', 'note'], ['photos', 'photos'], ['by', 'by_name'], ['byUser', 'by_user'], ['updatedAt', 'updated_at']] },
     nurse: { table: 'nurse_visits', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['outAt', 'out_at'], ['term', 'term'], ['period', 'period'], ['symptomGroup', 'symptom_group'], ['symptom', 'symptom'], ['temp', 'temp'], ['care', 'care'], ['medicine', 'medicine'], ['outcome', 'outcome'], ['parentNotified', 'parent_notified'], ['note', 'note'], ['by', 'by_name'], ['outBy', 'out_by_name'], ['byUser', 'by_user'], ['updatedAt', 'updated_at']] },
+    nurseHealth: { table: 'nurse_health', order: 'student_id', cols: [['id', 'student_id'], ['allergyStatus', 'allergy_status'], ['allergies', 'allergies'], ['conditionStatus', 'condition_status'], ['conditions', 'conditions'], ['careNote', 'care_note'], ['source', 'source'], ['consentAt', 'consent_at'], ['by', 'by_name'], ['updatedAt', 'updated_at']] },
     users: { table: 'profiles', order: 'created_at', desc: true, cols: [['id', 'id'], ['name', 'name'], ['email', 'email'], ['role', 'role'], ['apps', 'app_access'], ['request', 'request'], ['createdAt', 'created_at']] }, // newest sign-ups first (user, 24 Nov 2026)
   };
   const fromRow = (kind, r) => { const o = {}; MAPS[kind].cols.forEach(([a, b]) => { o[a] = r[b] ?? (b === 'next_at' || b === 'student_id' ? '' : r[b]); }); return o; };
@@ -115,7 +116,7 @@
     students: ['students'], history: ['history'], users: ['users'], cases: ['cases'], apptLog: ['apptLog'], progress: ['progress'], counsellors: ['counsellors'], subjects: ['subjects'],
     health: ['care', 'health'], incidents: ['behavior', 'incidents'], incidentPeople: ['behavior', 'people'],
     teacherRooms: ['teacherRooms'], teacherGrades: ['teacherGrades'], gradeStaff: ['gradeStaff'], rules: ['behavior', 'rules'], records: ['behavior', 'records'],
-    screenings: ['care', 'screenings'], visits: ['care', 'visits'], needs: ['care', 'needs'], referrals: ['care', 'referrals'], drugs: ['drugs'], nurse: ['nurse'], nurseNow: ['nurseNow'],
+    screenings: ['care', 'screenings'], visits: ['care', 'visits'], needs: ['care', 'needs'], referrals: ['care', 'referrals'], drugs: ['drugs'], nurse: ['nurse'], nurseNow: ['nurseNow'], nurseHealth: ['nurseHealth'],
   };
   function setSlot(kind, list) {
     const p = SLOT[kind];
@@ -284,7 +285,7 @@
         behavior: {}, care: {}, history: [] };
       this.data.gradeStaff = [];
       this.data.subjects = [];
-      const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'incidents', 'incidentPeople', 'cases', 'apptLog', 'progress', 'counsellors', 'screenings', 'visits', 'needs', 'referrals', 'health', 'drugs', 'nurse', 'nurseNow'];
+      const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'incidents', 'incidentPeople', 'cases', 'apptLog', 'progress', 'counsellors', 'screenings', 'visits', 'needs', 'referrals', 'health', 'drugs', 'nurse', 'nurseNow', 'nurseHealth'];
       if (!this.isAdmin() && this.profile.role === 'grade_head') kinds.push('history'); // own grades only (row level security)
       if (this.isAdmin()) {
         kinds.push('history', 'gradeStaff', 'subjects');
@@ -400,6 +401,9 @@
     /* ---- ห้องพยาบาล: writes go through nurse_save / nurse_update (any staff may check a resting student out) ---- */
     async saveNurse(p) { const id = check(await sb.rpc('nurse_save', { p })); await this.pull('nurse', id); await this.refresh('nurseNow'); return id; },
     async updateNurse(id, p) { const r = check(await sb.rpc('nurse_update', { p_id: id, p })); await this.pull('nurse', id); await this.refresh('nurseNow'); return r; },
+    // allergies / chronic illness: the database checks who may write and refuses to overwrite a newer version (seen)
+    async saveHealth(p) { const r = check(await sb.rpc('nurse_health_save', { p })); if (r) this.merge('nurseHealth', [r]); else this.drop('nurseHealth', p.student_id); },
+    async nurseAlert(id) { const r = check(await sb.rpc('nurse_alert', { p_student: id })); return { health: r.health ? fromRow('nurseHealth', r.health) : null, given: r.given || [] }; },
     async restoreCase(id) {
       const r = check(await sb.rpc('restore_case', { p_id: id }));
       if (r === 'ok') await this.refresh('cases', 'progress', ...(this.isAdmin() ? ['history'] : []));
@@ -499,7 +503,7 @@
     async backup() {
       const tables = { students: 'id', profiles: 'id', app_settings: 'id', teacher_rooms: 'user_id,grade,room', teacher_grades: 'user_id,grade', grade_staff: 'grade,name', teacher_subjects: 'id', parent_links: 'user_id,student_id',
         registry_history: 'id', behavior_rules: 'id', behavior_incidents: 'id', behavior_records: 'id', care_screenings: 'id', care_visits: 'id', care_needs: 'id', care_referrals: 'id', health_logs: 'id',
-        counsel_cases: 'id', counsel_case_sessions: 'case_id,session_no', counsel_appt_log: 'id', drug_cases: 'id', nurse_visits: 'id', feedback: 'id' };
+        counsel_cases: 'id', counsel_case_sessions: 'case_id,session_no', counsel_appt_log: 'id', drug_cases: 'id', nurse_visits: 'id', nurse_health: 'student_id', feedback: 'id' };
       const out = { at: new Date().toISOString(), tables: {} };
       for (const [t, key] of Object.entries(tables)) out.tables[t] = await paged((a, b) => key.split(',').reduce((q, k) => q.order(k), sb.from(t).select('*')).range(a, b));
       return out;
@@ -517,6 +521,10 @@
     },
     // students the nurse app may record: everyone for a nurse-room teacher the admin chose
     nurseStudents() { return this.profile.role === 'teacher' ? this.directory.filter((s) => s.status === 'studying') : this.activeStudents(); },
+    nurseStaff() { return !!(this.profile.apps && this.profile.apps.nurse_staff === true); },
+    // whose allergies / chronic illness this person may read, and may edit (both enforced in the database)
+    healthStudents() { return this.seesAll() || this.nurseStaff() ? this.nurseStudents() : this.myStudents(); },
+    canHealth(s) { return this.isAdmin() || this.nurseStaff() || this.homeroomOf(s); },
     activeStudents() { return this.data.students.filter((s) => s.status === 'studying'); },
     // students whose full record the signed-in user may see (all for admin/counselor, own rooms for teachers)
     myStudents() { return this.data.students.filter((s) => s.status === 'studying' && s.mine); },
@@ -532,8 +540,9 @@
       if (!s || !this.profile) return false;
       if (this.isAdmin()) return true;
       if (this.profile.role === 'grade_head' && this.myGrades().includes(Number(s.grade))) return true;
-      return this.myRooms().some((t) => Number(t.grade) === Number(s.grade) && Number(t.room) === Number(s.room));
+      return this.homeroomOf(s);
     },
+    homeroomOf(s) { return this.myRooms().some((t) => Number(t.grade) === Number(s.grade) && Number(t.room) === Number(s.room)); },
     async setStudentPhoto(id, blob) {
       await this.uploadPhoto(id, blob);
       check(await sb.rpc('set_student_photo', { p_id: id }));

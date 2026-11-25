@@ -138,6 +138,36 @@ const tests = {
     ctx.setInterval = (f) => { pop.closed = true; setTimeout(f, 0); return 1; };
     assert.equal(await Store.googleAnswer(pop), null);
   },
+  'nurse: no information is never shown as "not allergic"; text is escaped': () => {
+    const t = ctx.NurseApp._test;
+    for (const h of [null, { allergyStatus: 'unknown', conditionStatus: 'yes', conditions: 'x' }]) { assert.match(t.healthNotices(h), /ยังไม่มีข้อมูลการแพ้/); assert.ok(t.healthState(h).missing); assert.ok(!t.healthState(h).none); }
+    assert.match(t.healthNotices({ allergyStatus: 'none', conditionStatus: 'none', allergies: [] }), /ยืนยันแล้วว่าไม่มีประวัติแพ้/);
+    const html = t.healthNotices({ allergyStatus: 'yes', conditionStatus: 'yes', conditions: '<img>', careNote: '<b x>', allergies: [{ name: '<script>', kind: 'drug', severity: 'severe', reaction: '<i>' }] });
+    assert.ok(!/<(img|script|i>|b x)/.test(html.replace(/<i data-lucide[^>]*>/g, '')), html);
+  },
+  'nurse: the same medicine within 24 h is found; first aid and the visit being edited are not': () => {
+    const t = ctx.NurseApp._test, given = [{ visit: 'a', at: '2026-11-25T02:10:00Z', medicine: 'พาราเซตามอล, ทำแผล' }];
+    assert.equal(t.repeats(given, ['พาราเซตามอล', 'ทำแผล'], 'b').length, 1);
+    assert.equal(t.repeats(given, ['พาราเซตามอล'], 'a').length, 0);
+    assert.equal(t.repeats(given, ['ยาแก้แพ้'], 'b').length, 0);
+    assert.deepEqual(Array.from(t.newDrugs(['พาราเซตามอล', 'ยาแก้แพ้', 'ทำแผล'], ['พาราเซตามอล'])), ['ยาแก้แพ้']);
+  },
+  'nurse health: who may edit, whose data is listed, saved with the version that was opened': async () => {
+    const s = Store.data.students[0]; s.mine = false;
+    const set = (role, apps, rooms = []) => { Store.profile = { id: 'u', role, apps }; Store.data.teacherRooms = rooms; Store.directory = [s]; };
+    set('admin'); assert.ok(Store.canHealth(s));
+    set('teacher', {}); assert.ok(!Store.canHealth(s)); assert.equal(Store.healthStudents().length, 0);
+    set('teacher', {}, [{ userId: 'u', grade: 4, room: 12 }]); assert.ok(Store.canHealth(s));
+    set('teacher', { nurse_staff: true }); assert.ok(Store.canHealth(s)); assert.equal(Store.healthStudents().length, 1);
+    for (const r of ['counselor', 'grade_head', 'inspector']) { set(r, {}); assert.ok(!Store.canHealth(s), r); }
+    Store.data.nurseHealth = [];
+    answer = () => ({ data: { student_id: '30001', allergy_status: 'none', updated_at: 't2' }, error: null });
+    await Store.saveHealth({ student_id: '30001', seen: 't1' });
+    assert.equal(Store.data.nurseHealth[0].updatedAt, 't2');
+    answer = () => ({ data: null, error: null });
+    await Store.saveHealth({ student_id: '30001' });
+    assert.equal(Store.data.nurseHealth.length, 0);
+  },
   'earlier terms: only for admin, grade head and inspector, never a later term': () => {
     for (const [role, n] of [['admin', 1], ['grade_head', 1], ['inspector', 1], ['teacher', 0], ['counselor', 0]]) {
       Store.profile.role = role;

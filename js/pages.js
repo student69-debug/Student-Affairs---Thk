@@ -150,6 +150,7 @@
           <div class="kv"><span><b>รหัส</b><span class="mono">${esc(s.id)}</span></span><span><b>ชั้น</b>${klass(s)} เลขที่ ${s.no}</span><span><b>ครูที่ปรึกษา</b>${esc(s.advisor) || '—'}</span></div></div>
         <div class="actions no-print">${on('behavior') && reach ? `<button class="btn accent" data-action="behavior-record" data-student="${esc(s.id)}">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}${on('drugs') && reach ? `<button class="btn secondary" data-action="drug-record" data-student="${esc(s.id)}">${icon('cigarette-off')}บันทึกบุหรี่ / สารเสพติด</button>` : ''}${on('nurse') ? `<button class="btn secondary" data-action="nurse-record" data-student="${esc(s.id)}">${icon('bed')}บันทึกเข้าห้องพยาบาล</button>` : ''}</div></div>
       <div class="notice">${icon('lock', 'i16')}<span>นักเรียนคนนี้ไม่ได้อยู่ใน${Store.user().role === 'grade_head' ? 'ระดับชั้น' : 'ห้องที่ปรึกษา'}ของคุณ — ${reach ? 'บันทึกพฤติกรรมได้' : 'บันทึกห้องพยาบาลได้'} แต่รายละเอียด (คะแนนรวม ผลคัดกรอง การให้คำปรึกษา ข้อมูลผู้ปกครอง) เห็นเฉพาะครูที่ปรึกษาของห้องนี้ หัวหน้าระดับ ครูแนะแนว และผู้ดูแลระบบ</span></div>
+      ${on('nurse') && Store.nurseStaff() ? Apps.get('nurse').healthCard(s) : ''}
       ${s.taught && on('behavior') ? `<div class="card"><div class="card-body" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><div class="muted small">คะแนนพฤติกรรม · นักเรียนในรายวิชาที่คุณสอน</div>${UI.meter(B_.score(s.id))}</div></div></div>` : ''}
       ${on('behavior') ? `<div class="card"><div class="card-head"><h3>${s.taught ? 'รายการพฤติกรรมในภาคเรียนนี้' : 'พฤติกรรมที่คุณบันทึกให้นักเรียนคนนี้'}</h3><span class="muted small">${mine.length} รายการ</span></div>
         ${mine.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>วันที่</th><th>รายการ</th><th class="num">คะแนน</th><th>หมายเหตุ</th></tr></thead><tbody>
@@ -187,7 +188,7 @@
           ${on('counsel') && Store.seesAll() ? `<button class="btn secondary" data-action="counsel-record" data-student="${esc(s.id)}">${icon('message-square-plus')}บันทึกให้คำปรึกษา</button>` : ''}
           ${Store.canPhoto(s) ? `<button class="btn secondary" data-action="student-photo" data-id="${esc(s.id)}">${icon('camera')}${s.photoPath ? 'เปลี่ยนรูปถ่าย' : 'เพิ่มรูปถ่าย'}</button>` : ''}
           <button class="btn ghost" data-action="print">${icon('printer')}พิมพ์รายงาน</button></div></div>
-
+      ${on('nurse') ? Apps.get('nurse').healthCard(s) : ''}
       <div class="grid g-auto">${apps.map((a) => { const m = a.summary(s.id); return `<a class="card app-card ${a.rule}" href="#/apps/${a.id}" title="เปิดแอป${esc(a.name)}">
         <div class="top">${icon(a.icon)}<h4>${esc(a.name)}</h4>${m.badge}</div><div class="muted small">${m.label}</div><div class="big">${m.big}</div>${m.extra || ''}
         ${m.rows.map(([k, v]) => `<div class="row"><span>${k}</span><span style="color:var(--ink-900)">${v}</span></div>`).join('')}</a>`; }).join('')}</div>

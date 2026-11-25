@@ -99,6 +99,7 @@
       onDone: (r) => { UI.toast(r === 'ok' ? 'ลบแล้ว · เก็บไว้ 30 วัน ที่แท็บ "ที่ลบไว้" ของแอปบุหรี่ / สารเสพติด' : 'ไม่พบรายการนี้'); render(); } }),
     'nurse-record': (el) => Apps.get('nurse').openRecord(S(el)),
     'nurse-out': (el) => Apps.get('nurse').openOut(el.dataset.id),
+    'nurse-health': (el) => Apps.get('nurse').openHealth(el.dataset.id),
     'nurse-edit': (el) => Apps.get('nurse').openEdit(el.dataset.id),
     'nurse-refresh': () => Store.refresh('nurseNow', 'nurse').then(render, fail),
     'nurse-del': (el) => UI.deleteDialog({ title: 'ลบบันทึกห้องพยาบาล', text: `<p style="margin:0 0 10px">ต้องการลบบันทึกการพักห้องพยาบาลนี้ใช่หรือไม่?</p><div class="notice warn">${UI.icon('info', 'i16')}<span>· รายการจะหายทันที<br>· ระบบ<b>เก็บไว้ 30 วัน</b> กู้คืนได้ที่แท็บ "ที่ลบไว้ (30 วัน)" ของแอปนี้<br>· ครบ 30 วันแล้วลบถาวร · การลบถูกบันทึกพร้อมชื่อคุณ</span></div>`, label: 'ลบรายการ',

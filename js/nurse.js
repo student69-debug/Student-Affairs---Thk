@@ -27,6 +27,11 @@
   };
   const PERIODS = ['ก่อนเข้าเรียน', 'คาบ 1', 'คาบ 2', 'คาบ 3', 'คาบ 4', 'พักกลางวัน', 'คาบ 5', 'คาบ 6', 'คาบ 7', 'คาบ 8', 'หลังเลิกเรียน'];
   const MEDS = ['พาราเซตามอล', 'ยาธาตุน้ำขาว', 'ผงเกลือแร่ (ORS)', 'ยาแก้แพ้', 'ยาดม / ยาหม่อง', 'ทำแผล', 'ประคบเย็น', 'ประคบร้อน', 'ไม่ได้ให้ยา'];
+  const NOT_DRUG = ['ทำแผล', 'ประคบเย็น', 'ประคบร้อน', 'ไม่ได้ให้ยา'];
+  const QUICK = ['ไข้', 'ไอ', 'เจ็บคอ', 'น้ำมูก', 'ปวดศีรษะ', 'เวียนศีรษะ', 'ปวดท้อง', 'ท้องเสีย', 'คลื่นไส้', 'ผื่นคัน', 'เป็นลม', 'หกล้ม', 'ไม่ได้กินข้าวเช้า'];
+  const ALLERGY_KINDS = { drug: 'ยา', food: 'อาหาร', other: 'อื่น ๆ' };
+  const SEVERITY = { unknown: 'ไม่ทราบระดับ', mild: 'เล็กน้อย', moderate: 'ปานกลาง', severe: 'รุนแรง' };
+  const SOURCES = { parent: 'ผู้ปกครองแจ้ง', student: 'นักเรียนแจ้ง', doctor: 'เอกสารจากแพทย์ / สมุดสุขภาพ' };
   const LONG_MIN = 60; // resting longer than this is highlighted
 
   const all = () => D().nurse || [];
@@ -47,6 +52,54 @@
   const opt = (list, sel) => list.map(([k, l]) => `<option value="${esc(k)}" ${String(k) === String(sel ?? '') ? 'selected' : ''}>${esc(l)}</option>`).join('');
   const checks = (name, list, on = []) => `<div class="checks" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(170px,100%),1fr));gap:6px 16px">${list.map((a) => `<label><input type="checkbox" name="${name}" value="${esc(a)}" ${on.includes(a) ? 'checked' : ''}> ${esc(a)}</label>`).join('')}</div>`;
   const splitMeds = (s) => String(s || '').split(/\s*,\s*/).filter(Boolean);
+  /* ---- แพ้ยา / โรคประจำตัว: ไม่มีแถว = ยังไม่มีข้อมูล (ห้ามแสดงเหมือน "ไม่แพ้") ---- */
+  const healthMap = () => new Map((D().nurseHealth || []).map((h) => [h.id, h]));
+  const allergyText = (h) => (h.allergies || []).map((a) => [a.name, a.kind !== 'drug' && ALLERGY_KINDS[a.kind], a.severity !== 'unknown' && SEVERITY[a.severity], a.reaction].filter(Boolean).join(' · ')).join(' , ');
+  const isAllergic = (h) => !!h && h.allergyStatus === 'yes';
+  const healthState = (h) => ({ allergy: isAllergic(h), condition: !!h && h.conditionStatus === 'yes', missing: !h || h.allergyStatus === 'unknown' || h.conditionStatus === 'unknown', none: !!h && h.allergyStatus === 'none' && h.conditionStatus === 'none' });
+  const HEALTH_FILTER = [['', 'ทุกสถานะ'], ['allergy', 'มีประวัติแพ้'], ['condition', 'มีโรคประจำตัว'], ['none', 'ยืนยันว่าไม่มีทั้งสองอย่าง'], ['missing', 'ยังไม่มีข้อมูล / ไม่ครบ']];
+  function healthNotices(h) {
+    const n = (cls, ic, html) => `<div class="notice ${cls}">${icon(ic, 'i16')}<span>${html}</span></div>`;
+    const a = !h || h.allergyStatus === 'unknown' ? n('mute', 'circle-help', '<b>ยังไม่มีข้อมูลการแพ้</b> — ถามนักเรียนก่อนให้ยา')
+      : isAllergic(h) ? n('allergy', 'triangle-alert', `<b>แพ้:</b> ${esc(allergyText(h))}`) : n('ok', 'circle-check', 'ยืนยันแล้วว่าไม่มีประวัติแพ้');
+    const c = !h || h.conditionStatus === 'unknown' ? (h ? n('mute', 'circle-help', 'ยังไม่มีข้อมูลโรคประจำตัว') : '')
+      : h.conditionStatus === 'yes' ? n('warn', 'heart-pulse', `<b>โรคประจำตัว:</b> ${esc(h.conditions)}`) : n('ok', 'circle-check', 'ยืนยันแล้วว่าไม่มีโรคประจำตัว');
+    return a + c + (h && h.careNote ? n('warn', 'siren', `<b>ข้อควรปฏิบัติ:</b> ${esc(h.careNote)}`) : '');
+  }
+  // medicines given in the last 24 hours that are being given again (visitId = the visit being edited, not counted)
+  const repeats = (given, meds, visitId) => given.filter((g) => g.visit !== visitId).flatMap((g) => splitMeds(g.medicine).filter((m) => meds.includes(m) && !NOT_DRUG.includes(m)).map((m) => `${m} ให้ไปแล้วเมื่อ ${fmtDate(g.at)} ${timeOf(g.at)}`));
+  const newDrugs = (meds, before) => meds.filter((m) => !NOT_DRUG.includes(m) && !before.includes(m));
+  const checkedMeds = (form) => [...form.querySelectorAll('input[name=meds]:checked')].map((c) => c.value);
+  // warning box inside a visit form; follows the chosen student. Returns ok(): asks before giving medicine to an allergic student or the same medicine again
+  function bindAlert(form, sid, visitId, before = []) {
+    const box = form.querySelector('[data-nh]'), rep = form.querySelector('[data-nh-rep]');
+    let cur = null;
+    const drawRep = (a) => { const l = a ? repeats(a.given, newDrugs(checkedMeds(form), before), visitId) : []; rep.innerHTML = l.map((t) => `<div class="notice warn">${icon('clock', 'i16')}<span>${esc(t)}</span></div>`).join(''); UI.refreshIcons(); };
+    const load = (id) => {
+      if (cur && cur.id === id) return cur;
+      const me = cur = { id, data: null };
+      box.innerHTML = '<div class="muted small">กำลังตรวจประวัติแพ้ยา…</div>'; rep.innerHTML = '';
+      me.p = Store.nurseAlert(id).then((a) => { me.data = a; if (cur === me) { box.innerHTML = healthNotices(a.health); drawRep(a); } },
+        () => { if (cur === me) { box.innerHTML = `<div class="notice danger">${icon('circle-alert', 'i16')}<span>โหลดประวัติแพ้ยาไม่ได้ — ถามนักเรียนก่อนให้ยา</span></div>`; UI.refreshIcons(); cur = null; } });
+      return me;
+    };
+    const follow = () => { const id = sid || parseStudent(form.student.value); if (id) load(id); else { cur = null; box.innerHTML = rep.innerHTML = ''; } };
+    if (!sid) form.student.addEventListener('input', follow);
+    form.addEventListener('change', (e) => { if (e.target.name === 'meds') drawRep(cur && cur.data); });
+    form.querySelectorAll('[data-quick]').forEach((b) => b.addEventListener('click', () => { const v = form.symptom.value.trim(); if (!v.split(' ').includes(b.dataset.quick)) form.symptom.value = (v ? v + ' ' : '') + b.dataset.quick; }));
+    follow();
+    return async (id) => {
+      const give = newDrugs(checkedMeds(form), before);
+      if (!give.length) return true;
+      const me = load(id); await me.p;
+      const a = me.data, ask = !a ? ['โหลดประวัติแพ้ยาไม่ได้ ตรวจสอบกับนักเรียนแล้วหรือยัง'] : [
+        ...(isAllergic(a.health) ? [`นักเรียนมีประวัติแพ้: ${allergyText(a.health)}`] : []), ...repeats(a.given, give, visitId)];
+      return !ask.length || confirm(`${ask.join('\n')}\n\nกำลังให้: ${give.join(', ')}\nตรวจสอบแล้วและยืนยันให้ยา?`);
+    };
+  }
+  const alertBox = '<div class="field full nh-box" data-nh></div>';
+  const repBox = '<div class="field full nh-box" data-nh-rep></div>';
+  const quickHtml = `<div class="chips" style="margin-top:6px">${QUICK.map((t) => `<button type="button" class="chip" data-quick="${t}">${t}</button>`).join('')}</div>`;
   // the period now (school day 08:30–15:30, 50-minute periods) — only a suggestion, the teacher can change it
   function periodNow() {
     const d = new Date(), m = d.getHours() * 60 + d.getMinutes();
@@ -86,86 +139,95 @@
 
     /* ---- บันทึกเข้าพัก ---- */
     openRecord(sid) {
-      dialog({ title: 'บันทึกเข้าห้องพยาบาล', accent: true, submitLabel: 'บันทึก', submitClass: 'accent',
-        body: `<div class="form-grid">${studentField('student', sid, false, Store.nurseStudents())}
+      let okMeds;
+      const d = dialog({ title: 'บันทึกเข้าห้องพยาบาล', accent: true, submitLabel: 'บันทึก', submitClass: 'accent',
+        body: `<div class="form-grid">${studentField('student', sid, false, Store.nurseStudents())}${alertBox}
           <div class="field"><label>เวลาเข้า</label><input class="input" type="datetime-local" name="at" value="${localInput()}"></div>
           <div class="field"><label>คาบ</label><select class="select" name="period"><option value="">— ไม่ระบุ —</option>${opt(PERIODS.map((p) => [p, p]), periodNow())}</select></div>
           <div class="field"><label>อาการ <span class="req">*</span></label><select class="select" name="group" required>${opt(Object.entries(GROUPS), 'headache')}</select></div>
           <div class="field"><label>อุณหภูมิ (°C)</label><input class="input mono" type="number" name="temp" min="34" max="43" step="0.1" placeholder="เช่น 37.5"></div>
-          <div class="field full"><label>อาการโดยละเอียด</label><input class="input" name="symptom" placeholder="เช่น ปวดหัวตั้งแต่เช้า ไม่ได้กินข้าวเช้า"></div>
-          <div class="field full"><label>ยา / การปฐมพยาบาล</label>${checks('meds', MEDS)}</div>
+          <div class="field full"><label>อาการโดยละเอียด</label><input class="input" name="symptom" placeholder="เช่น ปวดหัวตั้งแต่เช้า ไม่ได้กินข้าวเช้า">${quickHtml}</div>
+          <div class="field full"><label>ยา / การปฐมพยาบาล</label>${checks('meds', MEDS)}</div>${repBox}
           <div class="field full"><label>การดูแล</label><input class="input" name="care" placeholder="เช่น นอนพัก วัดไข้ซ้ำ เช็ดตัว"></div>
           <div class="field full"><label>ผล</label><div class="radio-row">${Object.entries(OUTCOMES).map(([k, [l]]) => `<label><input type="radio" name="outcome" value="${k}" ${k === 'resting' ? 'checked' : ''}> ${esc(l)}</label>`).join('')}</div><span class="help">"กำลังพัก" = นักเรียนยังอยู่ในห้องพยาบาล ขึ้นบอร์ด กดให้ออกภายหลัง</span></div>
           <div class="field"><label><input type="checkbox" name="parentNotified"> แจ้งผู้ปกครองแล้ว</label></div>
-          <div class="field full"><label>หมายเหตุ</label><textarea class="textarea" name="note" placeholder="เช่น มีประวัติแพ้ยา · ส่งต่อครูที่ปรึกษา"></textarea></div></div>
+          <div class="field full"><label>หมายเหตุ</label><textarea class="textarea" name="note" placeholder="เช่น ส่งต่อครูที่ปรึกษา"></textarea></div></div>
           <div class="notice">${icon('shield-check', 'i16')}<span>อาการและการดูแลเห็นเฉพาะผู้ดูแลระบบ ครูแนะแนว สารวัตร หัวหน้าระดับ ครูที่ปรึกษาของนักเรียน และผู้บันทึก · ครูคนอื่นเห็นเพียงว่านักเรียนกำลังพักอยู่ · ผู้ปกครองไม่เห็นในระบบผู้ปกครอง</span></div>`,
         onSubmit: async (v, form) => {
           const id = parseStudent(v.student);
           if (!id) { toast('ไม่พบรหัสนักเรียน กรุณาเลือกจากรายการ'); return false; }
           const open = now().find((x) => x.studentId === id);
           if (open && !confirm(`${fullName(Store.student(id))} ยังพักอยู่ในห้องพยาบาล (เข้า ${timeOf(open.at)}) — บันทึกครั้งใหม่ซ้ำหรือไม่?`)) return false;
+          if (!(await okMeds(id))) return false;
           const meds = [...form.querySelectorAll('input[name=meds]:checked')].map((c) => c.value);
           await Store.saveNurse({ student_id: id, at: new Date(v.at || Date.now()).toISOString(), period: v.period, symptom_group: v.group, symptom: v.symptom.trim(),
             temp: v.temp || '', care: v.care.trim(), medicine: meds.join(', '), outcome: v.outcome, parent_notified: !!v.parentNotified, note: v.note.trim() });
           toast(`บันทึกแล้ว · ${fullName(Store.student(id))}${v.outcome === 'resting' ? ' · กำลังพัก' : ''}`);
           App.render();
         } });
+      okMeds = bindAlert(d.form);
     },
 
     /* ---- ให้ออกจากห้องพยาบาล (ครูทุกคน ขณะนักเรียนยังพักอยู่) ---- */
     openOut(id) {
       const full = all().find((r) => r.id === id), x = full || now().find((r) => r.id === id);
       if (!x) return;
-      dialog({ title: 'ให้นักเรียนออกจากห้องพยาบาล', submitLabel: 'บันทึก', submitClass: 'primary',
+      let okMeds;
+      const d = dialog({ title: 'ให้นักเรียนออกจากห้องพยาบาล', submitLabel: 'บันทึก', submitClass: 'primary',
         body: `<div class="notice">${icon('info', 'i16')}<span>${sLink(x.studentId)} · เข้า ${timeOf(x.at)} (${dur(mins(x.at))})${x.period ? ' · ' + esc(x.period) : ''}${x.symptomGroup ? ' · ' + what(x) : ''}</span></div>
           <div class="form-grid">
           <div class="field full"><label>ผล <span class="req">*</span></label><div class="radio-row">${Object.entries(OUTCOMES).filter(([k]) => k !== 'resting').map(([k, [l]], i) => `<label><input type="radio" name="outcome" value="${k}" ${i === 0 ? 'checked' : ''}> ${esc(l)}</label>`).join('')}</div></div>
           <div class="field"><label>เวลาออก</label><input class="input" type="datetime-local" name="outAt" value="${localInput()}"></div>
           ${full ? `<div class="field"><label><input type="checkbox" name="parentNotified" ${x.parentNotified ? 'checked' : ''}> แจ้งผู้ปกครองแล้ว</label></div>
-          <div class="field full"><label>ยา / การปฐมพยาบาล (เพิ่ม)</label>${checks('meds', MEDS, splitMeds(x.medicine))}</div>
+          <div class="field full"><label>ยา / การปฐมพยาบาล (เพิ่ม)</label>${checks('meds', MEDS, splitMeds(x.medicine))}</div>${repBox}${alertBox}
           <div class="field full"><label>การดูแล</label><input class="input" name="care" value="${esc(x.care || '')}" placeholder="เช่น นอนพัก 1 คาบ อาการดีขึ้น"></div>` : ''}</div>`,
         onSubmit: async (v, form) => {
           const meds = [...new Set(splitMeds(x.medicine).filter((m) => !MEDS.includes(m)).concat([...form.querySelectorAll('input[name=meds]:checked')].map((c) => c.value)))];
           const out = new Date(v.outAt || Date.now());
           if (out < new Date(x.at) - 60000) { toast('เวลาออกต้องไม่ก่อนเวลาเข้า'); return false; }
+          if (full && !(await okMeds(x.studentId))) return false;
           const p = { outcome: v.outcome, out_at: out.toISOString(), ...(full ? { parent_notified: !!v.parentNotified, care: v.care.trim(), medicine: meds.join(', ') } : {}) };
           await Store.updateNurse(id, p);
           toast(`${fullName(Store.student(x.studentId))} · ${OUTCOMES[v.outcome][0]}`); App.render();
         } });
+      if (full) okMeds = bindAlert(d.form, x.studentId, id, splitMeds(x.medicine));
     },
 
     openEdit(id) {
       const x = all().find((r) => r.id === id);
       if (!x) return;
-      dialog({ title: 'แก้ไขบันทึกห้องพยาบาล',
+      let okMeds;
+      const d = dialog({ title: 'แก้ไขบันทึกห้องพยาบาล',
         body: `<div class="notice">${icon('info', 'i16')}<span>${sLink(x.studentId)} · เข้า ${fmtDate(x.at, true)} · บันทึกโดย ${esc(x.by)}</span></div>
           <div class="form-grid">
           <div class="field"><label>คาบ</label><select class="select" name="period"><option value="">— ไม่ระบุ —</option>${opt(PERIODS.concat(x.period && !PERIODS.includes(x.period) ? [x.period] : []).map((p) => [p, p]), x.period)}</select></div>
           <div class="field"><label>อาการ</label><select class="select" name="group">${opt(Object.entries(GROUPS), x.symptomGroup)}</select></div>
           <div class="field"><label>อุณหภูมิ (°C)</label><input class="input mono" type="number" name="temp" min="34" max="43" step="0.1" value="${x.temp ?? ''}"></div>
-          <div class="field full"><label>อาการโดยละเอียด</label><input class="input" name="symptom" value="${esc(x.symptom)}"></div>
-          <div class="field full"><label>ยา / การปฐมพยาบาล</label>${checks('meds', MEDS.concat(splitMeds(x.medicine).filter((m) => !MEDS.includes(m))), splitMeds(x.medicine))}</div>
+          <div class="field full"><label>อาการโดยละเอียด</label><input class="input" name="symptom" value="${esc(x.symptom)}">${quickHtml}</div>
+          <div class="field full"><label>ยา / การปฐมพยาบาล</label>${checks('meds', MEDS.concat(splitMeds(x.medicine).filter((m) => !MEDS.includes(m))), splitMeds(x.medicine))}</div>${repBox}${alertBox}
           <div class="field full"><label>การดูแล</label><input class="input" name="care" value="${esc(x.care)}"></div>
           <div class="field full"><label>ผล</label><div class="radio-row">${Object.entries(OUTCOMES).map(([k, [l]]) => `<label><input type="radio" name="outcome" value="${k}" ${k === x.outcome ? 'checked' : ''}> ${esc(l)}</label>`).join('')}</div></div>
           <div class="field"><label>เวลาออก</label><input class="input" type="datetime-local" name="outAt" value="${x.outAt ? localInput(x.outAt) : ''}"><span class="help">ว่างไว้ = ใช้เวลาตอนกดบันทึก</span></div>
           <div class="field"><label><input type="checkbox" name="parentNotified" ${x.parentNotified ? 'checked' : ''}> แจ้งผู้ปกครองแล้ว</label></div>
           <div class="field full"><label>หมายเหตุ</label><textarea class="textarea" name="note">${esc(x.note)}</textarea></div></div>`,
         onSubmit: async (v, form) => {
-          const meds = [...form.querySelectorAll('input[name=meds]:checked')].map((c) => c.value);
+          const meds = checkedMeds(form);
+          if (!(await okMeds(x.studentId))) return false;
           if (v.outcome !== 'resting' && v.outAt && new Date(v.outAt) < new Date(x.at) - 60000) { toast('เวลาออกต้องไม่ก่อนเวลาเข้า'); return false; }
           await Store.updateNurse(x.id, { period: v.period, symptom_group: v.group, symptom: v.symptom.trim(), temp: v.temp || '', care: v.care.trim(), medicine: meds.join(', '),
             outcome: v.outcome, out_at: v.outcome !== 'resting' && v.outAt ? new Date(v.outAt).toISOString() : '', parent_notified: !!v.parentNotified, note: v.note.trim() });
           toast('บันทึกการแก้ไขแล้ว'); App.render();
         } });
+      okMeds = bindAlert(d.form, x.studentId, id, splitMeds(x.medicine));
     },
 
     /* ---- บอร์ด "กำลังพักอยู่" ---- */
     boardHtml() {
       const l = now().slice().sort((a, b) => (a.at < b.at ? -1 : 1));
-      const full = new Map(all().map((x) => [x.id, x]));
+      const full = new Map(all().map((x) => [x.id, x])), hm = healthMap();
       return `<div class="card" id="nurse-board"><div class="card-head"><h3>${icon('bed', 'i16')} กำลังพักอยู่ตอนนี้</h3><span class="muted small">${l.length} คน · อัปเดตอัตโนมัติทุก 1 นาที <button class="btn ghost sm" data-action="nurse-refresh" title="โหลดใหม่">${icon('refresh-cw', 'i16')}</button></span></div>
         ${l.length ? `<div class="list">${l.map((b) => { const x = full.get(b.id), m = mins(b.at);
-          return `<div class="list-row"><span class="badge ${m >= LONG_MIN ? 'b-warning' : 'b-info'}" title="เวลาที่พักแล้ว">${dur(m)}</span><div class="grow"><div class="t">${sLink(b.studentId)}</div>
+          return `<div class="list-row"><span class="badge ${m >= LONG_MIN ? 'b-warning' : 'b-info'}" title="เวลาที่พักแล้ว">${dur(m)}</span><div class="grow"><div class="t">${sLink(b.studentId)} ${isAllergic(hm.get(b.studentId)) ? `<span class="badge b-danger">${icon('triangle-alert', 'i16')}แพ้</span>` : ''}</div>
             <div class="s">เข้า ${timeOf(b.at)}${b.period ? ' · ' + esc(b.period) : ''} · รับโดย ${esc(b.by || '—')}${x ? ' · ' + what(x) + ' ' + tempHtml(x.temp) : ''}${m >= LONG_MIN ? ' · <b>พักนานเกิน 1 ชั่วโมง — พิจารณาแจ้งผู้ปกครอง</b>' : ''}</div></div>
             <button class="btn primary sm" data-action="nurse-out" data-id="${b.id}">${icon('log-out', 'i16')}ให้ออก</button></div>`; }).join('')}</div>`
           : empty('ไม่มีนักเรียนพักอยู่ในห้องพยาบาล', 'bed')}</div>`;
@@ -183,22 +245,26 @@
 
     page(q) {
       const tab = q.tab || 'overview', base = '#/apps/nurse';
-      const tabs = Apps.tabsBar([['overview', 'ภาพรวม'], ['records', 'รายการบันทึก'], ['report', 'รายงาน']], tab, base);
+      const hs = Store.healthStudents(), hm = healthMap(), states = hs.map((s) => healthState(hm.get(s.id)));
+      const tabs = Apps.tabsBar([['overview', 'ภาพรวม'], ['records', 'รายการบันทึก'], ...(hs.length ? [['health', 'แพ้ยา / โรคประจำตัว']] : []), ['report', 'รายงาน']], tab, base);
       const actions = `<button class="btn accent" data-action="nurse-record">${icon('plus')}บันทึกเข้าห้องพยาบาล</button>`;
       // summary cards stay on top of every tab (app standard, like the care app); each opens its list below
       const t = Store.termKey(), cur = all().filter((x) => x.term === t), td = all().filter((x) => dayOf(x.at) === today());
       const sent = cur.filter((x) => x.outcome === 'home' || x.outcome === 'hospital');
-      const cards = `<div class="grid g4">
+      const cards = `<div class="grid ${hs.length ? 'g3' : 'g4'}">
           ${Apps.stat('bed', 'กำลังพักอยู่', now().length, 'คน', '', 'ครูทุกคนเห็นบอร์ดนี้', '#/apps/nurse?tab=overview&go=nurse-board')}
           ${Apps.stat('calendar-check', 'วันนี้', td.length, 'ครั้ง', '', `${new Set(td.map((x) => x.studentId)).size} คน`, '#/apps/nurse?tab=records&from=' + today() + '&to=' + today())}
           ${Apps.stat('file-text', 'ภาคเรียนนี้', cur.length, 'ครั้ง', '', `${new Set(cur.map((x) => x.studentId)).size} คน · ภาคเรียน ${t}`, '#/apps/nurse?tab=records')}
-          ${Apps.stat('ambulance', 'กลับบ้าน / ส่ง รพ.', sent.length, 'ครั้ง', 'red', `กลับบ้าน ${sent.filter((x) => x.outcome === 'home').length} · ส่ง รพ. ${sent.filter((x) => x.outcome === 'hospital').length}`, '#/apps/nurse?tab=records&outcome=home,hospital')}</div>`;
+          ${Apps.stat('ambulance', 'กลับบ้าน / ส่ง รพ.', sent.length, 'ครั้ง', 'red', `กลับบ้าน ${sent.filter((x) => x.outcome === 'home').length} · ส่ง รพ. ${sent.filter((x) => x.outcome === 'hospital').length}`, '#/apps/nurse?tab=records&outcome=home,hospital')}
+          ${hs.length ? Apps.stat('triangle-alert', 'มีประวัติแพ้', states.filter((x) => x.allergy).length, 'คน', 'red', 'แพ้ยา อาหาร หรืออื่น ๆ', '#/apps/nurse?tab=health&hs=allergy')
+            + Apps.stat('circle-help', 'ยังไม่มีข้อมูลสุขภาพ', states.filter((x) => x.missing).length, 'คน', 'amber', `จาก ${hs.length.toLocaleString()} คนที่คุณดูแล`, '#/apps/nurse?tab=health&hs=missing') : ''}</div>`;
       // app standard: search → summary cards → tabs → content, on every tab
       const search = Apps.searchCard({ id: 'nurse', title: 'ค้นหาบันทึกห้องพยาบาล', typeLabel: 'อาการ', typeHtml: '<option value="">ทุกอาการ</option>' + Apps.optList(Object.entries(GROUPS), q.group), q });
       const bindS = () => Apps.bindSearch('nurse', (v) => Apps.hashOf('#/apps/nurse', { tab: 'records', term: v.from || v.to ? 'all' : '', grade: v.grade, group: v.type, from: v.from, to: v.to }));
       const out = (html, after) => ({ title: this.name, actions, html: search + cards + tabs + html, after: () => { bindS(); if (after) after(); } });
       if (tab === 'trash') return out(Apps.trashView('nurse', 'บันทึกห้องพยาบาล'));
       if (tab === 'records') return out(this.recordsHtml(q), () => this.bindRecords());
+      if (tab === 'health' && hs.length) return out(this.healthHtml(q, hs), () => this.bindHealth());
       if (tab === 'report') return out(this.reportHtml(q), () => this.bindReport());
       return out(this.boardHtml() + `
         ${this.dashHtml(cur, t)}
@@ -225,6 +291,78 @@
       if (Store.isAdmin() || r === 'counselor' || r === 'inspector') return 'คุณเห็นบันทึกห้องพยาบาลของนักเรียนทั้งโรงเรียน';
       if (r === 'grade_head') return 'คุณเห็นรายละเอียดของนักเรียนในระดับชั้นที่ดูแล และรายการที่คุณบันทึกเอง · บอร์ด "กำลังพักอยู่" ครูทุกคนเห็น (ไม่มีอาการ)';
       return 'คุณเห็นรายละเอียดของนักเรียนในห้องที่ปรึกษา และรายการที่คุณบันทึกเอง — ครูทุกคนบันทึกนักเรียนคนใดก็ได้ · บอร์ด "กำลังพักอยู่" ครูทุกคนเห็น (ไม่มีอาการ)';
+    },
+
+    /* ---- แท็บ แพ้ยา / โรคประจำตัว ---- */
+    healthHtml(q, hs) {
+      const rooms = [...new Map(hs.map((s) => [s.grade + '/' + s.room, s])).entries()].sort(([, a], [, b]) => a.grade - b.grade || a.room - b.room).map(([k]) => [k, 'ม.' + k]);
+      return `<div class="card"><div class="toolbar no-print">
+          <input class="input grow" id="nh-q" placeholder="ค้นหาชื่อ / รหัสนักเรียน / สิ่งที่แพ้ / โรค" value="${esc(q.q || '')}">
+          <select class="select" id="nh-room" aria-label="ห้อง">${rooms.length > 1 ? '<option value="">ทุกห้อง</option>' : ''}${opt(rooms, q.room)}</select>
+          <select class="select" id="nh-state" aria-label="สถานะ">${opt(HEALTH_FILTER, q.hs)}</select></div><div id="nh-list"></div></div>
+        <div class="notice">${icon('shield-check', 'i16')}<span>ข้อมูลสุขภาพเป็นข้อมูลอ่อนไหว: แก้ได้เฉพาะครูห้องพยาบาล ครูที่ปรึกษาของห้อง และผู้ดูแลระบบ · หัวหน้าระดับและครูแนะแนวดูได้ · ผู้ปกครองไม่เห็นในระบบผู้ปกครอง · ครูที่กำลังบันทึกเข้าพักเห็นคำเตือนของนักเรียนคนนั้น</span></div>`;
+    },
+    bindHealth() {
+      const $ = (i) => document.getElementById(i);
+      if (!$('nh-list')) return;
+      const hm = healthMap(), hs = Store.healthStudents().slice().sort((a, b) => a.grade - b.grade || a.room - b.room || a.no - b.no);
+      const st = (v, yes, none) => (v === 'yes' ? yes : v === 'none' ? `<span class="badge b-success">${none}</span>` : '<span class="badge b-neutral">ยังไม่มีข้อมูล</span>');
+      const draw = () => {
+        const t = $('nh-q').value.trim().toLowerCase(), room = $('nh-room').value, f = $('nh-state').value;
+        const list = hs.filter((s) => { const h = hm.get(s.id); return (!room || s.grade + '/' + s.room === room) && (!f || healthState(h)[f]) && (!t || s.id.includes(t) || fullName(s).toLowerCase().includes(t) || (h && (allergyText(h) + ' ' + h.conditions).toLowerCase().includes(t))); });
+        $('nh-list').innerHTML = `<div class="card-body bf-sum"><b>${list.length.toLocaleString()}</b> คน</div>` + (list.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>นักเรียน</th><th>แพ้</th><th>โรคประจำตัว</th><th>ข้อควรปฏิบัติ</th><th>บันทึกโดย</th><th></th></tr></thead><tbody>
+          ${list.slice(0, 300).map((s) => { const h = hm.get(s.id) || {}; return `<tr><td>${sLink(s.id)}<div class="muted small mono">${esc(s.id)} · เลขที่ ${esc(s.no)}</div></td>
+            <td>${st(h.allergyStatus, `<span class="badge b-danger">แพ้</span> ${esc(allergyText(h))}`, 'ไม่แพ้')}</td><td>${st(h.conditionStatus, esc(h.conditions), 'ไม่มี')}</td><td class="small">${esc(h.careNote) || '—'}</td>
+            <td class="small">${h.id ? `${esc(h.by)}<div class="muted">${fmtDate(h.updatedAt)} · ${esc(SOURCES[h.source] || '')}</div>` : '—'}</td>
+            <td style="text-align:right">${Store.canHealth(s) ? `<button class="btn secondary sm" data-action="nurse-health" data-id="${esc(s.id)}">${icon('pencil', 'i16')}${h.id ? 'แก้ไข' : 'กรอก'}</button>` : ''}</td></tr>`; }).join('')}</tbody></table></div>${list.length > 300 ? '<div class="card-body muted small">แสดง 300 คนแรก เลือกห้องเพื่อดูให้แคบลง</div>' : ''}` : empty('ไม่พบนักเรียนตามเงื่อนไข', 'search-x'));
+        UI.refreshIcons();
+      };
+      const keep = () => { draw(); Apps.markStats(Apps.hashOf('#/apps/nurse', { tab: 'health', hs: $('nh-state').value, room: $('nh-room').value, q: $('nh-q').value.trim() })); }; // the filter stays after saving one student
+      ['nh-q', 'nh-room', 'nh-state'].forEach((i) => $(i).addEventListener('input', keep));
+      draw();
+    },
+    healthCard(s) {
+      const h = healthMap().get(s.id);
+      return `<div class="card no-print"><div class="card-head"><h3>${icon('heart-pulse', 'i16')} แพ้ยา / โรคประจำตัว</h3><span class="muted small">${h ? `${esc(h.by)} · ${fmtDate(h.updatedAt)} · ${esc(SOURCES[h.source] || '')}` : ''}</span>${Store.canHealth(s) ? `<button class="btn ghost sm" data-action="nurse-health" data-id="${esc(s.id)}">${icon('pencil', 'i16')}${h ? 'แก้ไข' : 'กรอกข้อมูล'}</button>` : ''}</div>
+        <div class="card-body nh-box">${healthNotices(h)}</div></div>`;
+    },
+    openHealth(sid) {
+      const s = Store.student(sid);
+      if (!s || !Store.canHealth(s)) return;
+      const h = healthMap().get(sid);
+      const radios = (name, cur, labels) => `<div class="radio-row">${labels.map(([k, l]) => `<label><input type="radio" name="${name}" value="${k}" ${k === cur ? 'checked' : ''}> ${l}</label>`).join('')}</div>`;
+      const row = (a = {}) => `<div class="nh-row"><input class="input" data-f="name" maxlength="120" placeholder="แพ้อะไร เช่น ไอบูโพรเฟน กุ้ง" aria-label="สิ่งที่แพ้" value="${esc(a.name || '')}">
+        <select class="select" data-f="kind" aria-label="ประเภท">${opt(Object.entries(ALLERGY_KINDS), a.kind || 'drug')}</select><select class="select" data-f="severity" aria-label="ความรุนแรง">${opt(Object.entries(SEVERITY), a.severity || 'unknown')}</select>
+        <input class="input" data-f="reaction" maxlength="200" placeholder="อาการที่เป็น เช่น ผื่น หายใจลำบาก" aria-label="อาการที่แพ้" value="${esc(a.reaction || '')}"><button type="button" class="icon-btn" data-nh-del title="เอาออก" aria-label="เอาออก">${icon('x', 'i16')}</button></div>`;
+      const d = dialog({ title: 'แพ้ยา / โรคประจำตัว',
+        body: `<div class="notice">${icon('info', 'i16')}<span>${sLink(sid)}</span></div><div class="form-grid">
+          <div class="field full"><label>ประวัติแพ้</label>${radios('as', h ? h.allergyStatus : 'unknown', [['unknown', 'ยังไม่มีข้อมูล'], ['none', 'ยืนยันว่าไม่แพ้'], ['yes', 'แพ้']])}</div>
+          <div class="field full" data-for="as"><div data-nh-rows>${(h && h.allergies.length ? h.allergies : [{}]).map(row).join('')}</div><button type="button" class="btn ghost sm" data-nh-add>${icon('plus', 'i16')}เพิ่มรายการ</button></div>
+          <div class="field full"><label>โรคประจำตัว</label>${radios('cs', h ? h.conditionStatus : 'unknown', [['unknown', 'ยังไม่มีข้อมูล'], ['none', 'ยืนยันว่าไม่มี'], ['yes', 'มี']])}</div>
+          <div class="field full" data-for="cs"><input class="input" name="conditions" maxlength="500" aria-label="โรคประจำตัว" placeholder="เช่น หอบหืด ลมชัก เบาหวาน และยาที่ใช้ประจำ" value="${esc(h ? h.conditions : '')}"></div>
+          <div class="field full"><label>ข้อควรปฏิบัติเมื่อมีอาการ</label><textarea class="textarea" name="careNote" maxlength="500" placeholder="เช่น พกยาพ่น ให้พ่น 2 ครั้งแล้วโทรหาผู้ปกครอง">${esc(h ? h.careNote : '')}</textarea></div>
+          <div class="field full"><label>ที่มาของข้อมูล</label><select class="select" name="source"><option value="">— เลือก —</option>${opt(Object.entries(SOURCES), h ? h.source : '')}</select></div>
+          <div class="field full"><label><input type="checkbox" name="consent" ${h ? 'checked' : ''}> ได้รับความยินยอมจากผู้ปกครองให้โรงเรียนเก็บและใช้ข้อมูลนี้แล้ว</label></div></div>
+          <div class="notice">${icon('shield-check', 'i16')}<span>ข้อมูลอ่อนไหว เก็บเท่าที่จำเป็นต่อการดูแล · ทุกการแก้ไขเก็บประวัติค่าเดิมไว้ · กรอกผิดคน: เลือก "ยังไม่มีข้อมูล" ทั้งสองข้อแล้วบันทึก</span></div>`,
+        onSubmit: async (v, form) => {
+          const clear = v.as === 'unknown' && v.cs === 'unknown';
+          const allergies = v.as === 'yes' ? [...form.querySelectorAll('.nh-row')].map((r) => Object.fromEntries([...r.querySelectorAll('[data-f]')].map((i) => [i.dataset.f, i.value.trim()]))).filter((a) => a.name) : [];
+          const bad = (m) => { toast(m); return false; };
+          if (clear && !h) return bad('เลือกสถานะอย่างน้อยหนึ่งข้อ');
+          if (clear && !confirm('ล้างข้อมูลแพ้ยา / โรคประจำตัวของนักเรียนคนนี้?')) return false;
+          if (v.as === 'yes' && !allergies.length) return bad('กรุณาระบุสิ่งที่แพ้');
+          if (v.cs === 'yes' && !v.conditions.trim()) return bad('กรุณาระบุโรคประจำตัว');
+          if (!clear && !v.source) return bad('กรุณาเลือกที่มาของข้อมูล');
+          if (!clear && !v.consent) return bad('ต้องได้รับความยินยอมจากผู้ปกครองก่อนบันทึก');
+          await Store.saveHealth({ student_id: sid, allergy_status: v.as, allergies, condition_status: v.cs, conditions: v.conditions, care_note: v.careNote, source: v.source, consent: !!v.consent, seen: h ? h.updatedAt : null });
+          toast(`บันทึกแล้ว · ${fullName(s)}`); App.render();
+        } });
+      const form = d.form, rows = form.querySelector('[data-nh-rows]');
+      const sync = () => form.querySelectorAll('[data-for]').forEach((el) => { el.hidden = form.elements[el.dataset.for].value !== 'yes'; });
+      form.addEventListener('change', sync);
+      form.querySelector('[data-nh-add]').addEventListener('click', () => { if (rows.children.length < 20) { rows.insertAdjacentHTML('beforeend', row()); UI.refreshIcons(); } });
+      rows.addEventListener('click', (e) => { const b = e.target.closest('[data-nh-del]'); if (b) b.closest('.nh-row').remove(); });
+      sync();
     },
 
     recordsHtml(q) {
@@ -315,5 +453,6 @@
   };
 
   Apps.all.push(app);
+  app._test = { healthNotices, healthState, repeats, newDrugs };
   window.NurseApp = app;
 })();
