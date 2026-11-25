@@ -188,7 +188,9 @@
         const r = Math.min(1, max / Math.max(img.width, img.height));
         const c = document.createElement('canvas');
         c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        const g = c.getContext('2d');
+        g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); // a see-through PNG would turn black in a JPEG
+        g.drawImage(img, 0, 0, c.width, c.height);
         c.toBlob((b) => (b ? resolve(b) : reject(new Error('แปลงรูปไม่ได้'))), 'image/jpeg', quality);
         URL.revokeObjectURL(img.src);
       };

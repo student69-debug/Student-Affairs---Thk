@@ -268,9 +268,18 @@
     // copy of each new photo to the school Google Drive (folder per app / year / room); runs in the background,
     // a failure never blocks saving (it is logged in private.drive_sync_log)
     driveSync(bucket, path) {
-      sb.functions.invoke('drive-sync', { body: { bucket, path } })
-        .then(({ error }) => { if (error) console.warn('drive-sync', path, error.message); })
-        .catch((e) => console.warn('drive-sync', path, e));
+      return sb.functions.invoke('drive-sync', { body: { bucket, path } })
+        .then(({ error }) => { if (error) console.warn('drive-sync', path, error.message); return !error; })
+        .catch((e) => { console.warn('drive-sync', path, e); return false; });
+    },
+    // bulk import (admin): never replaces a photo that is already there; photo_path is set only after the Drive copy exists,
+    // so running the import again picks up exactly the students that did not finish
+    async importPhoto(id, blob) {
+      const path = id + '.jpg';
+      const { error } = await sb.storage.from('student-photos').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '3600' });
+      if (error && !/exists|duplicate/i.test(error.message)) throw new Error(error.message);
+      if (!await this.driveSync('student-photos', path)) throw new Error('เก็บลง Google Drive ไม่สำเร็จ');
+      check(await sb.from('students').update({ photo_path: path }).eq('id', id));
     },
 
     async loadProfile() {

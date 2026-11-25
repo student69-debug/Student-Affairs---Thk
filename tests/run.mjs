@@ -60,6 +60,27 @@ const tests = {
     assert.equal(go(['30001', '', '', '', '0812345678'], ['30001', '', '', '', '0812345679']).out.length, 0);
     assert.ok(Pages.contactRows([['รหัสนักเรียน', 'ชื่อ'], ['30001', 'ก']]).error);
   },
+  'photo import: matched by id, doubtful rows are left out, a student with a photo is not touched': () => {
+    const u = 'https://cdn.example/';
+    Store.data.students = [['30001', 'กานดา', 'ใจดี'], ['30002', 'ขวัญ', 'มีสุข'], ['30003', 'คมกริช', 'ทองคำ'], ['30004', 'งามตา', 'ศรี']].map(([id, first, last]) => ({ id, first, last, prefix: 'เด็กหญิง', photoPath: id === '30004' ? '30004.jpg' : null }));
+    const r = Pages.photoRows([['เลขที่', 'รหัสประจำตัว', 'ชื่อ-สกุล', 'ลิงก์รูปภาพ'], ['1', '30001', 'เด็กหญิงกานดา ใจดีี', u + '1.JPG'], ['2', '30002', 'เด็กชายประยุทธ์ วงศ์ใหญ่', u + '2.jpg'], ['3', '30003', 'คมกริช ทองคํา', 'javascript:alert(1)'], ['4', '30004', '', u + '4.jpg'], ['5', '39999', '', u + '5.jpg']]);
+    assert.deepEqual([r.out.map((x) => x.id).join(), r.have, r.skipped.map((x) => x[2]).join('|')], ['30001', 1, 'ชื่อไม่ตรงกับทะเบียน|ลิงก์ไม่ถูกต้อง|ไม่มีรหัสนี้ในทะเบียน']);
+    const same = Pages.photoRows([['รหัสนักเรียน', 'ลิงก์'], ['30001', u + 'd.png'], ['30002', u + 'd.png']]);
+    assert.deepEqual([same.out.length, same.skipped.length], [0, 2]);
+    assert.ok(Pages.photoRows([['รหัสนักเรียน', 'ชื่อ']]).error);
+  },
+  'photo import: photo_path is set only after the Drive copy; an existing file is kept': async () => {
+    const keep = sb.storage.from, drive = Store.driveSync, opts = [];
+    let up = { error: null }, copied = false;
+    sb.storage.from = () => ({ upload: async (p, b, o) => { opts.push(o); return up; } }); Store.driveSync = async () => copied;
+    try {
+      await assert.rejects(Store.importPhoto('30001', {}), /Drive/); assert.ok(!calls.some((c) => c.table === 'students'));
+      copied = true; up = { error: { message: 'The resource already exists' } };
+      await Store.importPhoto('30001', {}); assert.equal(op(calls.find((c) => c.table === 'students'), 'update')[1].photo_path, '30001.jpg');
+      up = { error: { message: 'row-level security' } }; await assert.rejects(Store.importPhoto('30001', {}), /security/);
+      assert.ok(opts.every((o) => !o.upsert));
+    } finally { sb.storage.from = keep; Store.driveSync = drive; }
+  },
   'settings: only the changed value is sent': async () => {
     await Store.saveSettings({ apps: { care: false } });
     assert.deepEqual(Object.keys(op(calls[0], 'update')[1]), ['apps']);

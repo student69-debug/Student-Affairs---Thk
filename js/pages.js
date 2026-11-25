@@ -500,7 +500,7 @@
         UI.toast(`นำเข้าเบอร์ผู้ปกครองแล้ว ${out.length} คน`); App.render();
       } : undefined });
     const b = document.getElementById('ct-skip');
-    if (b) b.addEventListener('click', () => UI.download('แถวที่ข้าม.csv', [['แถว', 'รหัสนักเรียน', 'เหตุผล'], ...skipped].map(csvRow).join('\n')));
+    if (b) b.addEventListener('click', () => skipCSV('แถวที่ข้าม.csv', skipped));
     return false;
   }
   // every studying student with the numbers known so far, to fill in and bring back
@@ -508,10 +508,87 @@
     const list = Store.activeStudents().slice().sort((a, b) => a.grade - b.grade || a.room - b.room || a.no - b.no);
     UI.download('แม่แบบเบอร์ผู้ปกครอง.csv', [['รหัสนักเรียน', 'ชั้น', 'ห้อง', 'เลขที่', 'ชื่อ', 'นามสกุล', 'ผู้ปกครอง', 'เบอร์โทร'], ...list.map((s) => [s.id, s.grade, s.room, s.no, s.first, s.last, s.guardian, s.guardianPhone])].map(csvRow).join('\n'));
   }
+  // photo links: which students get a photo, and which rows are left out (and why)
+  function photoRows(rows) {
+    const tidy = (x) => String(x ?? '').replace(/[\u200b-\u200d\ufeff]/g, '').trim();
+    const key = (x) => tidy(x).normalize('NFC').replace(/ํา/g, 'ำ').replace(/เเ/g, 'แ').replace(/[\s.]/g, '').replace(/^(เด็กชาย|เด็กหญิง|นางสาว|นาย|ดช|ดญ|นส)/, '');
+    const at = rows.slice(0, 10).findIndex((r) => r.some((h) => CONTACT.id.includes(tidy(h))));
+    const head = at < 0 ? [] : rows[at].map(tidy);
+    const iId = head.findIndex((h) => CONTACT.id.includes(h)), iUrl = head.findIndex((h) => /ลิงก์|ลิงค์|link|url/i.test(h)), iName = head.findIndex((h) => /^ชื่อ/.test(h));
+    if (iId < 0 || iUrl < 0) return { out: [], skipped: [], have: 0, error: 'ไม่พบคอลัมน์ "รหัสนักเรียน / รหัสประจำตัว" และ "ลิงก์รูปภาพ"' };
+    const body = rows.slice(at + 1), count = (i) => body.reduce((m, r) => m.set(tidy(r[i]), (m.get(tidy(r[i])) || 0) + 1), new Map());
+    const ids = count(iId), urls = count(iUrl), out = [], skipped = [];
+    let have = 0;
+    body.forEach((r, i) => {
+      const id = tidy(r[iId]), url = tidy(r[iUrl]), s = Store.student(id), name = key(iName < 0 ? '' : r[iName]);
+      if (!id && !url) return;
+      const near = () => !name || name.includes(key(s.first)) || letterDiff(name, key(s.first + s.last)) <= 3;
+      const why = !s ? 'ไม่มีรหัสนี้ในทะเบียน' : ids.get(id) > 1 ? 'รหัสซ้ำในไฟล์' : !url ? 'ไม่มีลิงก์' : !/^https:\/\/\S+$/.test(url) ? 'ลิงก์ไม่ถูกต้อง'
+        : urls.get(url) > 1 ? 'ลิงก์เดียวกันหลายคน (รูปเริ่มต้น)' : !near() ? 'ชื่อไม่ตรงกับทะเบียน' : '';
+      if (why) skipped.push([at + i + 2, id, why]);
+      else if (s.photoPath) have++;
+      else out.push({ id, url, row: at + i + 2 });
+    });
+    return { out, skipped, have, error: '' };
+  }
+  const skipCSV = (name, list) => UI.download(name, [['แถว', 'รหัสนักเรียน', 'เหตุผล'], ...list].map(csvRow).join('\n'));
+  async function importPhotos(f) {
+    const rows = await UI.readSheet(f);
+    await Store.refresh('students');
+    const { out, skipped, have, error } = photoRows(rows);
+    if (error) { UI.toast('นำเข้าไม่ได้: ' + error, 'error'); return false; }
+    UI.dialog({ title: 'ตรวจก่อนนำเข้ารูปถ่าย', submitLabel: 'เริ่มนำเข้า ' + out.length + ' คน', cancelLabel: out.length ? 'ยกเลิก' : 'ปิด',
+      body: `<div class="notice">${icon('info', 'i16')}<span>นำเข้า <b>${out.length}</b> คน · มีรูปอยู่แล้ว ${have} คน (ไม่เปลี่ยน) · ข้าม <b>${skipped.length}</b> แถว<br>แต่ละรูปถูกย่อ เก็บในระบบ และเก็บสำเนาลง Google Drive โฟลเดอร์ ทะเบียนนักเรียน › ปีการศึกษา › ห้อง</span></div>
+        ${out.length ? `<div class="notice warn">${icon('clock', 'i16')}<span>รูปจำนวนมากใช้เวลาหลายชั่วโมง เปิดหน้านี้ค้างไว้และอย่าให้คอมพิวเตอร์หลับ หยุดเมื่อไรก็ได้ นำเข้าไฟล์เดิมอีกครั้งระบบจะทำต่อจากที่ค้าง</span></div>` : ''}
+        ${skipped.length ? `<div class="notice warn">${icon('circle-alert', 'i16')}<span><b>แถวที่ข้าม</b><br>${skipped.slice(0, 15).map(([n, id, why]) => esc(`แถว ${n} รหัส ${id || '—'}: ${why}`)).join('<br>')}${skipped.length > 15 ? '<br>… ดูทั้งหมดในไฟล์' : ''}</span></div>
+        <button type="button" class="btn secondary sm" id="ph-skip" style="align-self:flex-start">${icon('download', 'i16')}ดาวน์โหลดรายการที่ข้าม</button>` : ''}`,
+      onSubmit: out.length ? () => { setTimeout(() => runPhotos(out, f.name)); return false; } : undefined });
+    const b = document.getElementById('ph-skip');
+    if (b) b.addEventListener('click', () => skipCSV('รูปที่ข้าม.csv', skipped));
+    return false;
+  }
+  async function runPhotos(list, fileName) {
+    const { form, close } = UI.dialog({ title: 'กำลังนำเข้ารูปถ่าย', footer: `<button type="button" class="btn ghost" data-close>หยุด</button>`,
+      body: '<progress id="ph-bar" style="width:100%" max="' + list.length + '" value="0" aria-label="ความคืบหน้า"></progress><p id="ph-text" style="margin:0" role="status"></p><p class="muted" style="margin:0">เปิดหน้านี้ค้างไว้ ปิดหน้าต่างนี้ = หยุด</p>' });
+    const started = Date.now(), failed = [];
+    let next = 0, ok = 0, inRow = 0, lock = null;
+    const warn = (e) => { e.preventDefault(); e.returnValue = ''; };
+    addEventListener('beforeunload', warn);
+    try { lock = await navigator.wakeLock.request('screen'); } catch (e) { /* not supported: the note above tells the user */ }
+    const show = () => {
+      const n = ok + failed.length, left = n ? Math.round((Date.now() - started) / n * (list.length - n) / 60000) : 0;
+      if (form.isConnected) { form.querySelector('#ph-bar').value = n; form.querySelector('#ph-text').textContent = `สำเร็จ ${ok} จาก ${list.length} คน · ไม่สำเร็จ ${failed.length}` + (n ? ` · เหลือประมาณ ${left} นาที` : ''); }
+    };
+    const worker = async () => {
+      while (next < list.length && form.isConnected && inRow < 10) {
+        const x = list[next++];
+        try {
+          const r = await fetch(x.url, { credentials: 'omit', referrerPolicy: 'no-referrer' });
+          if (!r.ok) throw new Error('เปิดลิงก์ไม่ได้ (' + r.status + ')');
+          await Store.importPhoto(x.id, await UI.shrinkImage(await r.blob(), 600, 0.82));
+          ok++; inRow = 0;
+        } catch (e) { failed.push([x.row, x.id, e.message]); inRow++; }
+        show();
+      }
+    };
+    show();
+    // the Drive script saves one file at a time; three workers keep it busy while the next photos are fetched
+    await Promise.all([worker(), worker(), worker()]);
+    removeEventListener('beforeunload', warn);
+    if (lock) lock.release().catch(() => {});
+    if (form.isConnected) close();
+    if (ok) { await Store.log('', 'นำเข้าข้อมูล', `นำเข้ารูปถ่ายจากลิงก์ในไฟล์ ${fileName} · สำเร็จ ${ok} คน · ไม่สำเร็จ ${failed.length} คน`); await Store.refresh('students'); App.render(); }
+    const rest = list.length - ok - failed.length;
+    UI.dialog({ title: rest || inRow >= 10 ? 'หยุดนำเข้ารูปถ่าย' : 'นำเข้ารูปถ่ายเสร็จแล้ว', cancelLabel: 'ปิด',
+      body: `<div class="notice ${failed.length || rest ? 'warn' : ''}">${icon('info', 'i16')}<span>สำเร็จ <b>${ok}</b> คน · ไม่สำเร็จ <b>${failed.length}</b> คน · ยังไม่ได้ทำ <b>${rest}</b> คน${inRow >= 10 ? '<br>หยุดเองเพราะผิดพลาดติดกัน 10 ครั้ง: ' + esc(failed[failed.length - 1][2]) : ''}${failed.length || rest ? '<br>นำเข้าไฟล์เดิมอีกครั้งเพื่อทำต่อ' : ''}</span></div>
+        ${failed.length ? `<button type="button" class="btn secondary sm" id="ph-fail" style="align-self:flex-start">${icon('download', 'i16')}ดาวน์โหลดรายการที่ไม่สำเร็จ</button>` : ''}` });
+    const b = document.getElementById('ph-fail');
+    if (b) b.addEventListener('click', () => skipCSV('รูปที่ไม่สำเร็จ.csv', failed));
+  }
   function importDialog() {
     UI.dialog({ title: 'นำเข้าข้อมูลนักเรียนจาก Excel', submitLabel: 'นำเข้า',
-      body: `<div class="field"><label>นำเข้าอะไร</label><select class="select" name="what"><option value="all">ข้อมูลทะเบียนทั้งหมด (ไฟล์ CSV)</option><option value="contact">เฉพาะผู้ปกครองและเบอร์โทร (ไฟล์ Excel หรือ CSV)</option></select></div>
-        <p style="margin:0"><b>ข้อมูลทะเบียนทั้งหมด:</b> ใน Excel เลือก <b>บันทึกเป็น → CSV UTF-8</b> แถวแรกต้องเป็นหัวคอลัมน์ตามแม่แบบ<br><b>เฉพาะผู้ปกครองและเบอร์โทร:</b> ใช้คอลัมน์ รหัสนักเรียน, ผู้ปกครอง, เบอร์โทร คอลัมน์อื่นไม่ถูกนำเข้า และตรวจรายการก่อนบันทึกได้</p>
+      body: `<div class="field"><label>นำเข้าอะไร</label><select class="select" name="what"><option value="all">ข้อมูลทะเบียนทั้งหมด (ไฟล์ CSV)</option><option value="contact">เฉพาะผู้ปกครองและเบอร์โทร (ไฟล์ Excel หรือ CSV)</option><option value="photo">รูปถ่ายจากลิงก์ (ไฟล์ Excel หรือ CSV)</option></select></div>
+        <p style="margin:0"><b>ข้อมูลทะเบียนทั้งหมด:</b> ใน Excel เลือก <b>บันทึกเป็น → CSV UTF-8</b> แถวแรกต้องเป็นหัวคอลัมน์ตามแม่แบบ<br><b>เฉพาะผู้ปกครองและเบอร์โทร:</b> ใช้คอลัมน์ รหัสนักเรียน, ผู้ปกครอง, เบอร์โทร คอลัมน์อื่นไม่ถูกนำเข้า และตรวจรายการก่อนบันทึกได้<br><b>รูปถ่ายจากลิงก์:</b> ใช้คอลัมน์ รหัสนักเรียน (หรือรหัสประจำตัว) และ ลิงก์รูปภาพ คนที่มีรูปแล้วไม่ถูกเปลี่ยน</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn secondary sm" data-action="registry-template">${icon('download', 'i16')}แม่แบบทะเบียน</button><button type="button" class="btn secondary sm" data-action="contact-template">${icon('download', 'i16')}แม่แบบเบอร์ผู้ปกครอง (มีรายชื่อ)</button></div>
         <div class="field"><label>ไฟล์ <span class="req">*</span></label><input class="input" type="file" name="file" accept=".csv,text/csv,.xlsx,.xls" required style="padding-top:6px"></div>
         <div class="notice">${icon('info', 'i16')}<span>ข้อมูลทะเบียนทั้งหมด: รหัสที่มีอยู่แล้วจะถูกอัปเดต (ช่องว่าง = คงข้อมูลเดิม) รหัสใหม่จะถูกเพิ่ม · ถ้ามีแถวใดผิด ระบบจะไม่นำเข้าเลย</span></div>`,
@@ -519,6 +596,7 @@
         const f = form.file.files[0];
         if (!f) return false;
         if (v.what === 'contact') return importContacts(f);
+        if (v.what === 'photo') return importPhotos(f);
         if (!/\.csv$/i.test(f.name)) { UI.toast('ข้อมูลทะเบียนทั้งหมดต้องเป็นไฟล์ CSV', 'error'); return false; }
         return f.text().then(async (txt) => {
           const rows = UI.parseCSV(txt);
@@ -907,5 +985,5 @@
     });
   }
 
-  window.Pages = { home, search, student, registry, teachers, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES, approveRequest, planFor, importRows, contactRows, contactTemplate, backupDialog };
+  window.Pages = { home, search, student, registry, teachers, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES, approveRequest, planFor, importRows, contactRows, contactTemplate, photoRows, backupDialog };
 })();
