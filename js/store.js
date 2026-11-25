@@ -104,7 +104,10 @@
       if (kind === 'users') q = q.neq('role', 'parent'); // parent accounts are counted separately, not listed
       return q;
     });
-    return rows.map((r) => fromRow(kind, r));
+    const list = rows.map((r) => fromRow(kind, r));
+    if (kind !== 'students' || Store.profile.role !== 'teacher') return list;
+    Store.directory = list; // own rooms and classes; for a nurse-room teacher everyone (names and rooms only), used by the nurse app alone
+    return list.filter((s) => s.mine || s.taught);
   }
 
   // ตำแหน่งของแต่ละชนิดข้อมูลใน Store.data
@@ -123,6 +126,7 @@
     sb,
     data: null,
     profile: null,
+    directory: [],
 
     async session() {
       const s = check(await sb.auth.getSession()).session;
@@ -488,8 +492,10 @@
     student(id) {
       const arr = this.data.students;
       if (this._sArr !== arr) { this._sArr = arr; this._sMap = new Map(arr.map((s) => [s.id, s])); }
-      return this._sMap.get(id);
+      return this._sMap.get(id) || this.directory.find((s) => s.id === id);
     },
+    // students the nurse app may record: everyone for a nurse-room teacher the admin chose
+    nurseStudents() { return this.profile.role === 'teacher' ? this.directory.filter((s) => s.status === 'studying') : this.activeStudents(); },
     activeStudents() { return this.data.students.filter((s) => s.status === 'studying'); },
     // students whose full record the signed-in user may see (all for admin/counselor, own rooms for teachers)
     myStudents() { return this.data.students.filter((s) => s.status === 'studying' && s.mine); },

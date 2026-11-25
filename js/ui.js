@@ -53,15 +53,15 @@
   }
 
   // Student picker using datalist
-  function studentOptions(mineOnly) {
-    return (mineOnly ? Store.myStudents() : Store.activeStudents()).map((s) => `<option value="${esc(s.id)} — ${esc(fullName(s))} (${klass(s)})"></option>`).join('');
+  function studentOptions(mineOnly, list) {
+    return (list || (mineOnly ? Store.myStudents() : Store.activeStudents())).map((s) => `<option value="${esc(s.id)} — ${esc(fullName(s))} (${klass(s)})"></option>`).join('');
   }
-  function studentField(name = 'student', value = '', mineOnly = false) {
+  function studentField(name = 'student', value = '', mineOnly = false, list = null) {
     const s = value ? Store.student(value) : null;
     const v = s ? `${esc(s.id)} — ${fullName(s)} (${klass(s)})` : '';
     return `<div class="field full"><label>นักเรียน <span class="req">*</span></label>
       <input class="input" name="${name}" list="dl-students" value="${esc(v)}" placeholder="พิมพ์รหัสหรือชื่อนักเรียน" required autocomplete="off">
-      <datalist id="dl-students">${studentOptions(mineOnly)}</datalist></div>`;
+      <datalist id="dl-students">${studentOptions(mineOnly, list)}</datalist></div>`;
   }
   const parseStudent = (v) => { const id = String(v || '').split(' ')[0].trim(); return Store.student(id) ? id : null; };
   // for apps that hold personal data: only students the user may see in full

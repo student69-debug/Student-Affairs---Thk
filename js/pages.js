@@ -142,14 +142,14 @@
   /* ---------------- หน้านักเรียนรายคน ---------------- */
   // A student outside the teacher's own rooms: directory info + record behaviour, no personal details
   function limitedStudent(s) {
-    const B_ = Apps.get('behavior');
+    const B_ = Apps.get('behavior'), reach = D().students.includes(s);
     const mine = B_.records(s.id); // records this teacher made, or every record when they teach this student (database rule)
     return { title: fullName(s), html: `
       <div class="card rule profile">${avatar(s, true)}
         <div class="who"><h2>${esc(fullName(s))} ${statusBadge(s.status)}</h2>
           <div class="kv"><span><b>รหัส</b><span class="mono">${esc(s.id)}</span></span><span><b>ชั้น</b>${klass(s)} เลขที่ ${s.no}</span><span><b>ครูที่ปรึกษา</b>${esc(s.advisor) || '—'}</span></div></div>
-        <div class="actions no-print">${on('behavior') ? `<button class="btn accent" data-action="behavior-record" data-student="${esc(s.id)}">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}${on('drugs') ? `<button class="btn secondary" data-action="drug-record" data-student="${esc(s.id)}">${icon('cigarette-off')}บันทึกบุหรี่ / สารเสพติด</button>` : ''}${on('nurse') ? `<button class="btn secondary" data-action="nurse-record" data-student="${esc(s.id)}">${icon('bed')}บันทึกเข้าห้องพยาบาล</button>` : ''}</div></div>
-      <div class="notice">${icon('lock', 'i16')}<span>นักเรียนคนนี้ไม่ได้อยู่ใน${Store.user().role === 'grade_head' ? 'ระดับชั้น' : 'ห้องที่ปรึกษา'}ของคุณ — บันทึกพฤติกรรมได้ แต่รายละเอียด (คะแนนรวม ผลคัดกรอง การให้คำปรึกษา ข้อมูลผู้ปกครอง) เห็นเฉพาะครูที่ปรึกษาของห้องนี้ หัวหน้าระดับ ครูแนะแนว และผู้ดูแลระบบ</span></div>
+        <div class="actions no-print">${on('behavior') && reach ? `<button class="btn accent" data-action="behavior-record" data-student="${esc(s.id)}">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}${on('drugs') && reach ? `<button class="btn secondary" data-action="drug-record" data-student="${esc(s.id)}">${icon('cigarette-off')}บันทึกบุหรี่ / สารเสพติด</button>` : ''}${on('nurse') ? `<button class="btn secondary" data-action="nurse-record" data-student="${esc(s.id)}">${icon('bed')}บันทึกเข้าห้องพยาบาล</button>` : ''}</div></div>
+      <div class="notice">${icon('lock', 'i16')}<span>นักเรียนคนนี้ไม่ได้อยู่ใน${Store.user().role === 'grade_head' ? 'ระดับชั้น' : 'ห้องที่ปรึกษา'}ของคุณ — ${reach ? 'บันทึกพฤติกรรมได้' : 'บันทึกห้องพยาบาลได้'} แต่รายละเอียด (คะแนนรวม ผลคัดกรอง การให้คำปรึกษา ข้อมูลผู้ปกครอง) เห็นเฉพาะครูที่ปรึกษาของห้องนี้ หัวหน้าระดับ ครูแนะแนว และผู้ดูแลระบบ</span></div>
       ${s.taught && on('behavior') ? `<div class="card"><div class="card-body" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><div class="muted small">คะแนนพฤติกรรม · นักเรียนในรายวิชาที่คุณสอน</div>${UI.meter(B_.score(s.id))}</div></div></div>` : ''}
       ${on('behavior') ? `<div class="card"><div class="card-head"><h3>${s.taught ? 'รายการพฤติกรรมในภาคเรียนนี้' : 'พฤติกรรมที่คุณบันทึกให้นักเรียนคนนี้'}</h3><span class="muted small">${mine.length} รายการ</span></div>
         ${mine.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>วันที่</th><th>รายการ</th><th class="num">คะแนน</th><th>หมายเหตุ</th></tr></thead><tbody>
@@ -542,7 +542,7 @@
     if (u.role === 'admin') return '<span class="muted small">ทุกแอป</span>';
     if (u.role === 'pending') return '<span class="muted small">—</span>';
     const blocked = Apps.all.filter((a) => u.apps && u.apps[a.id] === false);
-    return `<div class="chips">${blocked.length ? Apps.all.filter((a) => !blocked.includes(a)).map((a) => `<span class="badge b-info">${esc(a.short)}</span>`).join('') || '<span class="badge b-danger">ไม่มีแอป</span>' : '<span class="badge b-success">ทุกแอป</span>'}
+    return `<div class="chips">${blocked.length ? Apps.all.filter((a) => !blocked.includes(a)).map((a) => `<span class="badge b-info">${esc(a.short)}</span>`).join('') || '<span class="badge b-danger">ไม่มีแอป</span>' : '<span class="badge b-success">ทุกแอป</span>'}${u.role === 'teacher' && u.apps && u.apps.nurse_staff === true ? '<span class="badge b-navy">ครูห้องพยาบาล</span>' : ''}
       ${admin ? `<button class="icon-btn" title="กำหนดแอปที่ใช้ได้" data-action="apps-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>`;
   }
   function appsDialog(userId) {
@@ -553,11 +553,14 @@
       body: `<div><b>${esc(u.name)}</b><div class="muted small">${esc(ROLES[u.role] || '')} · ${esc(u.email || '')}</div></div>
         <div class="list" style="border:1px solid var(--ink-200);border-radius:var(--radius-md)">${Apps.all.map((a) => `<label class="list-row" style="cursor:pointer"><span class="app-ic">${icon(a.icon)}</span>
           <div class="grow"><div class="t">${esc(a.name)}</div><div class="s">${esc(NOTE[a.id] || '')}</div></div>
-          <span class="switch"><input type="checkbox" name="app_${a.id}" ${cur[a.id] === false ? '' : 'checked'}><span></span></span></label>`).join('')}</div>
+          <span class="switch"><input type="checkbox" name="app_${a.id}" ${cur[a.id] === false ? '' : 'checked'}><span></span></span></label>`).join('')}
+          ${u.role === 'teacher' ? `<label class="list-row" style="cursor:pointer"><span class="app-ic">${icon('stethoscope')}</span><div class="grow"><div class="t">ครูห้องพยาบาล</div><div class="s">บันทึกห้องพยาบาลให้นักเรียนทุกห้อง เห็นชื่อ ชั้น และห้องของนักเรียนทั้งโรงเรียนในแอปนี้ (ต้องเปิดแอปห้องพยาบาล)</div></div>
+          <span class="switch"><input type="checkbox" name="nurse_staff" ${cur.nurse_staff === true ? 'checked' : ''}><span></span></span></label>` : ''}</div>
         <div class="notice">${icon('shield', 'i16')}<span>ปิดแล้ว แอปนั้นจะหายจากเมนูและหน้านักเรียนของคนนี้ และฐานข้อมูลจะไม่ให้อ่านหรือบันทึกข้อมูลของแอปนั้น — ผู้ดูแลระบบใช้ได้ทุกแอปเสมอ</span></div>`,
       onSubmit: async (v) => {
         const apps = {};
         Apps.all.forEach((a) => { if (!v['app_' + a.id]) apps[a.id] = false; });
+        if (v.nurse_staff) apps.nurse_staff = true;
         await Store.update('users', userId, { apps });
         UI.toast('บันทึกแอปที่ใช้ได้แล้ว · ' + u.name); App.render();
       } });

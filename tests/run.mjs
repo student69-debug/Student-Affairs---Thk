@@ -11,7 +11,7 @@ let calls = [], answer = () => ({ data: [], error: null });
 const query = (table) => {
   const c = { table, ops: [] };
   const p = new Proxy({}, { get: (_, k) => (k === 'then'
-    ? (res) => { calls.push(c); res(answer(c)); }
+    ? (res, rej) => { calls.push(c); return Promise.resolve(answer(c)).then(res, rej); }
     : (...a) => { c.ops.push([k, ...a]); return p; }) });
   return p;
 };
@@ -87,6 +87,17 @@ const tests = {
     await Store.add('records', { studentId: '30001', points: -5 });
     assert.equal(calls.length, 1);
     assert.deepEqual(Array.from(Store.data.behavior.records, (r) => r.id), ['old', 'new', 'older']);
+  },
+  'nurse-room teacher: the school list stays inside the nurse app': async () => {
+    Store.profile.role = 'teacher';
+    answer = (c) => ({ data: c.table.startsWith('rpc:students_list') ? [{ id: '1', status: 'studying', mine: true }, { id: '2', status: 'studying', mine: false, taught: false }] : [], error: null });
+    await Store.refresh('students');
+    assert.deepEqual(Array.from(Store.activeStudents(), (s) => s.id), ['1']);
+    assert.deepEqual(Array.from(Store.nurseStudents(), (s) => s.id), ['1', '2']);
+    assert.equal(Store.student('2').id, '2');
+    Store.profile.role = 'grade_head';
+    await Store.refresh('students');
+    assert.equal(Store.activeStudents().length, 2);
   },
   'earlier terms: only for admin, grade head and inspector, never a later term': () => {
     for (const [role, n] of [['admin', 1], ['grade_head', 1], ['inspector', 1], ['teacher', 0], ['counselor', 0]]) {

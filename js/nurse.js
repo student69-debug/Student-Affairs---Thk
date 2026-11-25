@@ -87,7 +87,7 @@
     /* ---- บันทึกเข้าพัก ---- */
     openRecord(sid) {
       dialog({ title: 'บันทึกเข้าห้องพยาบาล', accent: true, submitLabel: 'บันทึก', submitClass: 'accent',
-        body: `<div class="form-grid">${studentField('student', sid)}
+        body: `<div class="form-grid">${studentField('student', sid, false, Store.nurseStudents())}
           <div class="field"><label>เวลาเข้า</label><input class="input" type="datetime-local" name="at" value="${localInput()}"></div>
           <div class="field"><label>คาบ</label><select class="select" name="period"><option value="">— ไม่ระบุ —</option>${opt(PERIODS.map((p) => [p, p]), periodNow())}</select></div>
           <div class="field"><label>อาการ <span class="req">*</span></label><select class="select" name="group" required>${opt(Object.entries(GROUPS), 'headache')}</select></div>
