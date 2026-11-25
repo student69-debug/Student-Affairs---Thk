@@ -234,6 +234,8 @@ a.app-card:hover{box-shadow:var(--shadow-2);border-color:var(--navy-300);color:i
 .notice.mute{background:var(--ink-100);color:var(--ink-700)}
 .notice.allergy{background:var(--red-700);color:var(--white);font-weight:500}
 .nh-box{display:grid;gap:8px}
+.nh-call{align-items:center;flex-wrap:wrap}
+.nh-call>span{flex:1;min-width:140px}
 .nurse-cards{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
 .nurse-row{flex-wrap:wrap}
 .nurse-row>.grow{min-width:min(200px,60%)}

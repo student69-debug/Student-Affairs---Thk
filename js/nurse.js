@@ -99,6 +99,12 @@
       : h.conditionStatus === 'yes' ? n('warn', 'heart-pulse', `<b>โรคประจำตัว:</b> ${esc(h.conditions)}`) : n('ok', 'circle-check', 'ยืนยันแล้วว่าไม่มีโรคประจำตัว');
     return a + c + (h && h.careNote ? n('warn', 'siren', `<b>ข้อควรปฏิบัติ:</b> ${esc(h.careNote)}`) : '');
   }
+  // guardian's phone: null = this person may not see it (decided in the database). Several numbers may share the field ("081-234-5678, 02…")
+  function guardianHtml(g) {
+    if (!g) return '';
+    const nums = String(g.phone || '').split(/[,/;]|\s{2,}/).map((t) => t.trim()).filter((t) => t.replace(/\D/g, '').length >= 9);
+    return `<div class="notice nh-call">${icon('phone', 'i16')}<span><b>ผู้ปกครอง:</b> ${esc(g.name) || ''} ${nums.length ? '' : `<span class="muted">${g.phone ? esc(g.phone) : 'ยังไม่มีเบอร์โทรในทะเบียน'}</span>`}</span>${nums.map((t) => `<a class="btn primary sm" href="tel:${t.replace(/[^\d+]/g, '')}">${icon('phone-call', 'i16')}โทร ${esc(t)}</a>`).join('')}</div>`;
+  }
   // medicines given in the last 24 hours that are being given again (visitId = the visit being edited, not counted)
   const repeats = (given, meds, visitId) => given.filter((g) => g.visit !== visitId).flatMap((g) => splitMeds(g.medicine).filter((m) => meds.includes(m) && !NOT_DRUG.includes(m)).map((m) => `${m} ให้ไปแล้วเมื่อ ${fmtDate(g.at)} ${timeOf(g.at)}`));
   const newDrugs = (meds, before) => meds.filter((m) => !NOT_DRUG.includes(m) && !before.includes(m));
@@ -112,7 +118,7 @@
       if (cur && cur.id === id) return cur;
       const me = cur = { id, data: null };
       box.innerHTML = '<div class="muted small">กำลังตรวจประวัติแพ้ยา…</div>'; rep.innerHTML = '';
-      me.p = Store.nurseAlert(id).then((a) => { me.data = a; if (cur === me) { box.innerHTML = healthNotices(a.health); drawRep(a); } },
+      me.p = Store.nurseAlert(id).then((a) => { me.data = a; if (cur === me) { box.innerHTML = healthNotices(a.health) + guardianHtml(a.guardian); drawRep(a); } },
         () => { if (cur === me) { box.innerHTML = `<div class="notice danger">${icon('circle-alert', 'i16')}<span>โหลดประวัติแพ้ยาไม่ได้ — ถามนักเรียนก่อนให้ยา</span></div>`; UI.refreshIcons(); cur = null; } });
       return me;
     };
@@ -534,6 +540,6 @@
   };
 
   Apps.all.push(app);
-  app._test = { healthNotices, healthState, repeats, newDrugs, flag, measures, vitalChips, dayAdd, followVals, isDue, badBp };
+  app._test = { guardianHtml, healthNotices, healthState, repeats, newDrugs, flag, measures, vitalChips, dayAdd, followVals, isDue, badBp };
   window.NurseApp = app;
 })();

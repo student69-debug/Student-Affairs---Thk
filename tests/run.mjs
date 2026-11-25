@@ -168,6 +168,15 @@ const tests = {
     await Store.saveHealth({ student_id: '30001' });
     assert.equal(Store.data.nurseHealth.length, 0);
   },
+  'nurse: guardian phone — hidden without the right, each number dials, nothing else gets into the link': () => {
+    const g = ctx.NurseApp._test.guardianHtml;
+    assert.equal(g(null), '');
+    assert.match(g({ name: '', phone: '' }), /ยังไม่มีเบอร์โทร/);
+    assert.deepEqual([...g({ name: 'ก', phone: '081-234-5678, 02 123 4567' }).matchAll(/href="([^"]*)"/g)].map((m) => m[1]), ['tel:0812345678', 'tel:021234567']);
+    const bad = g({ name: '<img>', phone: '0812345678"><script>' });
+    assert.ok(!/<img>|<script>/.test(bad)); assert.match(bad, /href="tel:0812345678"/);
+    assert.ok(!g({ name: '', phone: '12<b>' }).includes('<b>1')); assert.ok(!g({ name: '', phone: '12<i x>' }).includes('<i x>'));
+  },
   'nurse vitals: limits, old visits keep their temperature, values are escaped': () => {
     const t = ctx.NurseApp._test;
     for (const [k, v, f] of [['temp', 37.4, ''], ['temp', 37.5, '↑'], ['pulse', 100, ''], ['pulse', 101, '↑'], ['pulse', 59, '↓'], ['sys', 130, '↑'], ['dia', 59, '↓'], ['spo2', 94, '↓'], ['spo2', 100, '']]) assert.equal(t.flag(k, v), f, k + v);

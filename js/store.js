@@ -407,7 +407,7 @@
     async nurseFollowUp(id, p) { check(await sb.rpc('nurse_follow', { p_id: id, p })); await this.pull('nurse', id); await this.refresh('nurseFollow'); },
     // allergies / chronic illness: the database checks who may write and refuses to overwrite a newer version (seen)
     async saveHealth(p) { const r = check(await sb.rpc('nurse_health_save', { p })); if (r) this.merge('nurseHealth', [r]); else this.drop('nurseHealth', p.student_id); },
-    async nurseAlert(id) { const r = check(await sb.rpc('nurse_alert', { p_student: id })); return { health: r.health ? fromRow('nurseHealth', r.health) : null, given: r.given || [] }; },
+    async nurseAlert(id) { const r = check(await sb.rpc('nurse_alert', { p_student: id })); return { health: r.health ? fromRow('nurseHealth', r.health) : null, given: r.given || [], guardian: r.guardian || null }; },
     async restoreCase(id) {
       const r = check(await sb.rpc('restore_case', { p_id: id }));
       if (r === 'ok') await this.refresh('cases', 'progress', ...(this.isAdmin() ? ['history'] : []));
