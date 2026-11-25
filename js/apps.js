@@ -3,7 +3,7 @@
 (function () {
   const { esc, fmtDate, icon, signed, fullName, klass, meter, scoreLevel, screenBadge, empty, studentField, parseStudent, parseMyStudent, dialog, toast, localInput } = UI;
   const D = () => Store.data;
-  const sLink = (id) => { const s = Store.student(id); return s ? `<a href="#/student/${s.id}">${esc(fullName(s))}</a> <span class="muted small">${klass(s)}</span>` : esc(id); };
+  const sLink = (id) => { const s = Store.student(id); return s ? `<a href="#/student/${esc(s.id)}">${esc(fullName(s))}</a> <span class="muted small">${klass(s)}</span>` : esc(id); };
   const byDate = (a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0);
   // index rows by studentId; cached per array, so a refreshed table rebuilds automatically
   const groups = new WeakMap();
@@ -126,7 +126,7 @@
     openRecord(sid, restoreOnly = false) {
       const past = Store.pastTerms();
       const rules = activeRules().filter((r) => (restoreOnly ? r.restore : true));
-      const opt = (list) => list.map((r) => `<option value="${r.id}" data-p="${r.points}" data-info="${esc(ruleInfo(r))}">${esc(ruleLabel(r))}</option>`).join('');
+      const opt = (list) => list.map((r) => `<option value="${esc(r.id)}" data-p="${r.points}" data-info="${esc(ruleInfo(r))}">${esc(ruleLabel(r))}</option>`).join('');
       const d = dialog({
         title: restoreOnly ? 'บันทึกกิจกรรมคืนคะแนน' : 'บันทึกพฤติกรรม', accent: true, submitLabel: 'ยืนยันการบันทึก', submitClass: 'accent',
         body: `<div class="form-grid">${studentField('student', sid)}
@@ -238,7 +238,7 @@
         const shown = lvl ? list.filter(lvl[1]) : list;
         body = `
           <div class="card" id="score-list"><div class="card-head"><h3>คะแนนคงเหลือรายคน (น้อยไปมาก)${lvl ? ' · ' + lvl[0] : ''}</h3>${lvl ? `<span class="muted small">${shown.length.toLocaleString()} คน · <a href="${base}?level=all&go=score-list">แสดงทุกคน</a></span>` : ''}</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชั้น</th><th>คะแนน</th><th>สถานะ</th><th class="num">รายการ</th></tr></thead><tbody>
-          ${shown.length ? '' : `<tr><td colspan="6">${empty('ไม่มีนักเรียนในกลุ่มนี้', 'smile')}</td></tr>`}${shown.slice(0, LIMIT).map(({ s, sc }) => { const lv = scoreLevel(sc); return `<tr class="clickable" data-action="go" data-href="#/student/${s.id}"><td class="mono">${s.id}</td><td>${esc(fullName(s))}</td><td>${klass(s)}</td><td>${meter(sc)}</td><td><span class="badge ${lv.cls}">${lv.label}</span></td><td class="num">${this.records(s.id).length}</td></tr>`; }).join('')}
+          ${shown.length ? '' : `<tr><td colspan="6">${empty('ไม่มีนักเรียนในกลุ่มนี้', 'smile')}</td></tr>`}${shown.slice(0, LIMIT).map(({ s, sc }) => { const lv = scoreLevel(sc); return `<tr class="clickable" data-action="go" data-href="#/student/${esc(s.id)}"><td class="mono">${esc(s.id)}</td><td>${esc(fullName(s))}</td><td>${klass(s)}</td><td>${meter(sc)}</td><td><span class="badge ${lv.cls}">${lv.label}</span></td><td class="num">${this.records(s.id).length}</td></tr>`; }).join('')}
           </tbody></table></div>${more(shown.length, 'คน (เรียงจากคะแนนน้อยสุด)')}</div>`;
         body = body.replace('<div class="card" id="score-list">', this.dashHtml(list.map((x) => x.s)) + '<div class="card" id="score-list">');
       } else if (tab === 'records') {
@@ -251,7 +251,7 @@
         const row = (r) => `<tr${r.active === false ? ' class="muted"' : ''}><td class="mono small" style="white-space:nowrap">${esc(r.code || '—')}</td><td>${esc(r.name)}${r.note ? `<div class="small" style="color:var(--red-700)">${esc(r.note)}</div>` : ''}</td>
           <td>${r.level ? `<span class="badge ${LEVEL_BADGE[r.level] || 'b-neutral'}">${esc(r.level)}</span>` : r.restore ? '<span class="badge b-info">คืนคะแนน</span>' : r.points < 0 ? '' : '<span class="badge b-success">เพิ่มคะแนน</span>'}</td>
           <td class="num ${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${signed(r.points)}</td>
-          <td style="text-align:right">${admin ? `<button class="icon-btn" title="แก้ไข" data-action="behavior-rule" data-id="${r.id}">${icon('pencil', 'i16')}</button>` : ''}</td></tr>`;
+          <td style="text-align:right">${admin ? `<button class="icon-btn" title="แก้ไข" data-action="behavior-rule" data-id="${esc(r.id)}">${icon('pencil', 'i16')}</button>` : ''}</td></tr>`;
         const head = '<thead><tr><th style="width:72px">ข้อ</th><th>พฤติกรรม</th><th style="width:110px">ระดับความผิด</th><th class="num" style="width:70px">คะแนน</th><th style="width:44px"></th></tr></thead>';
         const nNeg = rules.filter((r) => r.points < 0).length, nPos = rules.filter((r) => r.points > 0 && !r.restore).length;
         body = `<div class="card"><div class="card-head"><div><h3>ตารางพฤติกรรมและคะแนนมาตรฐาน</h3><div class="muted small">ตามระเบียบโรงเรียนธรรมศาสตร์คลองหลวงวิทยาคม (ประกาศ 20 ก.พ. 2569) · ตัดคะแนน ${nNeg} ข้อ (ข้อ 50) · เพิ่มคะแนน ${nPos} ข้อ (ข้อ 53)</div></div>${admin ? `<button class="btn secondary sm" data-action="behavior-rule">${icon('plus', 'i16')}เพิ่มพฤติกรรม</button>` : ''}</div>
@@ -356,7 +356,7 @@
         } else {
           body = `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>วันที่</th><th>นักเรียน</th><th>รายการ</th><th class="num">คะแนน</th><th>ผู้บันทึก</th><th></th></tr></thead><tbody>
             ${rec.slice(0, LIMIT).map((r) => `<tr><td>${fmtDate(r.at, true)}</td><td>${sLink(r.studentId)}</td><td>${esc(r.title)}${r.note ? `<div class="muted small">${esc(r.note)}</div>` : ''}${this.incidentLine(r)}</td><td class="num ${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${signed(r.points)}</td><td>${esc(r.by)}</td>
-            <td>${Store.isAdmin() || r.byUser === Store.user().id ? `<button class="icon-btn" title="ลบรายการ" data-action="behavior-del" data-id="${r.id}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}
+            <td>${Store.isAdmin() || r.byUser === Store.user().id ? `<button class="icon-btn" title="ลบรายการ" data-action="behavior-del" data-id="${esc(r.id)}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}
             </tbody></table></div>${more(rec.length, 'รายการล่าสุด')}`;
         }
         $('bf-out').innerHTML = head + body;
@@ -422,7 +422,7 @@
       const canDel = (x) => Store.isAdmin() || x.byUser === Store.user().id;
       this._n = { health: hl.length, screen: sc.length, visit: vi.length, needs: ne.length, referral: rf.length };
       return {
-        health: hl.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>อาการ</th><th>รายละเอียด</th><th>การดูแล</th><th>ส่งต่อ</th><th>ผู้บันทึก</th><th></th></tr></thead><tbody>${hl.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.date)}</td><td>${esc(x.symptom)}</td><td class="muted">${esc(x.detail) || '—'}</td><td>${esc(x.action) || '—'}</td><td>${x.referred ? '<span class="badge b-warning">ส่งต่อ</span>' : '—'}</td><td>${esc(x.by)}</td><td>${canDel(x) ? `<button class="icon-btn" title="ลบ" data-action="care-health-del" data-id="${x.id}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>${more(hl.length, 'รายการ')}` : empty('ยังไม่มีบันทึกสุขภาพ', 'thermometer'),
+        health: hl.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>อาการ</th><th>รายละเอียด</th><th>การดูแล</th><th>ส่งต่อ</th><th>ผู้บันทึก</th><th></th></tr></thead><tbody>${hl.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.date)}</td><td>${esc(x.symptom)}</td><td class="muted">${esc(x.detail) || '—'}</td><td>${esc(x.action) || '—'}</td><td>${x.referred ? '<span class="badge b-warning">ส่งต่อ</span>' : '—'}</td><td>${esc(x.by)}</td><td>${canDel(x) ? `<button class="icon-btn" title="ลบ" data-action="care-health-del" data-id="${esc(x.id)}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>${more(hl.length, 'รายการ')}` : empty('ยังไม่มีบันทึกสุขภาพ', 'thermometer'),
         screen: sc.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>เครื่องมือ</th><th>ผล</th><th>ผู้ประเมิน</th><th>หมายเหตุ</th></tr></thead><tbody>${sc.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${esc(x.tool)}</td><td>${screenBadge(x.result)}</td><td>${esc(x.by)}</td><td class="muted">${esc(x.note) || '—'}</td></tr>`).join('')}</tbody></table></div>${more(sc.length, 'รายการ')}` : empty('ยังไม่มีผลคัดกรอง', 'clipboard-check'),
         visit: vi.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>ผู้เยี่ยม</th><th>บันทึก</th><th>รูป</th></tr></thead><tbody>${vi.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${esc(x.by)}</td><td>${esc(x.note)}</td><td>${x.photo ? `<img src="${x.photo}" alt="รูปเยี่ยมบ้าน" style="width:56px;height:42px;object-fit:cover;border-radius:4px">` : '<span class="muted">—</span>'}</td></tr>`).join('')}</tbody></table></div>${more(vi.length, 'รายการ')}` : empty('ยังไม่มีบันทึกเยี่ยมบ้าน', 'house'),
         needs: ne.length ? `<div class="list">${ne.map((x) => `<div class="list-row"><span class="badge ${x.kind === 'สุขภาพ' ? 'b-info' : 'b-warning'}">${esc(x.kind)}</span><div class="grow">${st ? `<div class="t">${sLink(x.studentId)}</div>` : ''}<div>${esc(x.text)}</div></div></div>`).join('')}</div>` : empty('ไม่มีข้อมูลความต้องการพิเศษ / สุขภาพ', 'heart-pulse'),

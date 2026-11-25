@@ -100,6 +100,7 @@
     const rows = await paged((a, b) => {
       let q = kind === 'students' ? sb.rpc('students_list').range(a, b) : sb.from(m.table).select(m.cols.map((c) => c[1]).join(',')).range(a, b);
       if (m.order && kind !== 'students') q = q.order(m.order, { ascending: !m.desc });
+      if (kind !== 'students' && m.order !== 'id' && m.cols.some((c) => c[1] === 'id')) q = q.order('id');
       if (kind === 'users') q = q.neq('role', 'parent'); // parent accounts are counted separately, not listed
       return q;
     });
@@ -163,8 +164,8 @@
       return check(await sb.auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: location.origin + location.pathname } }));
     },
     // new staff say who they are while waiting for approval (checked in the database: own pending account only)
-    async profileRequest({ name, duty, rooms = [], grades = [], note = '' }) {
-      check(await sb.rpc('profile_request', { p_name: name, p_duty: duty, p_rooms: rooms, p_grades: grades, p_note: note }));
+    async profileRequest(name) {
+      check(await sb.rpc('profile_request', { p_name: name }));
       return this.loadProfile();
     },
     async signOut() { const wasParent = this.profile && this.profile.role === 'parent'; ss.set('sa-recovery', null); await sb.auth.signOut(); location.hash = wasParent ? '#/parent' : '#/'; location.reload(); },
@@ -212,10 +213,8 @@
       const paths = check(await sb.rpc('admin_photo_purge_queue')) || [];
       if (!paths.length) return 0;
       const ev = paths.filter((p) => p.startsWith('drug-evidence/')), st = paths.filter((p) => !p.startsWith('drug-evidence/'));
-      try {
-        if (st.length) await sb.storage.from('student-photos').remove(st);
-        if (ev.length) await sb.storage.from('drug-evidence').remove(ev.map((p) => p.slice('drug-evidence/'.length)));
-      } catch (e) { return 0; }
+      if (st.length) check(await sb.storage.from('student-photos').remove(st));
+      if (ev.length) check(await sb.storage.from('drug-evidence').remove(ev.map((p) => p.slice('drug-evidence/'.length))));
       check(await sb.rpc('admin_photo_purged', { p_paths: paths }));
       return paths.length;
     },
@@ -271,8 +270,6 @@
       kinds.forEach((k, i) => setSlot(k, lists[i]));
       this.data.trash = [];
       // 30-day bins: one per app (+ the student registry); who may use each is set per role in Settings
-      // grade heads: read-only teacher registry of the grades they look after
-      this.data.myStaff = [];
       if (this.binOk('registry')) { try { await this.loadTrash(); } catch (e) { /* bin not available */ } }
       this.data.appTrash = {};
       for (const app of Object.keys(this.s.restoreRoles || {})) {
@@ -283,14 +280,27 @@
       if (this.binOk('counsel')) { try { await this.loadCaseTrash(); } catch (e) { /* bin not available */ } }
       if (this.isAdmin()) this.purgePhotos().catch(() => {});
     },
+    // put rows just written (as returned by the database) into the list, newest first / drop a deleted one
+    merge(kind, rows) {
+      const m = MAPS[kind], list = rows.map((r) => fromRow(kind, r)), ids = new Set(list.map((o) => o.id)), p = SLOT[kind];
+      const old = p.length === 1 ? this.data[p[0]] : this.data[p[0]][p[1]], k = (m.cols.find((c) => c[1] === m.order) || [])[0];
+      const all = list.concat(old.filter((o) => !ids.has(o.id)));
+      setSlot(kind, m.desc ? all.sort((a, b) => new Date(b[k]) - new Date(a[k])) : all);
+    },
+    async pull(kind, id) { const m = MAPS[kind]; this.merge(kind, check(await sb.from(m.table).select(m.cols.map((c) => c[1]).join(',')).eq('id', id))); },
+    drop(kind, id) { const p = SLOT[kind], old = p.length === 1 ? this.data[p[0]] : this.data[p[0]][p[1]]; setSlot(kind, old.filter((o) => o.id !== id)); },
     async refresh(...kinds) { const lists = await Promise.all(kinds.map(fetchAll)); kinds.forEach((k, i) => setSlot(k, lists[i])); },
 
     /* ---- writes ---- */
     async add(kind, obj) {
       const rows = (Array.isArray(obj) ? obj : [obj]).map((o) => toRow(kind, o));
       rows.forEach((r) => { if (kind !== 'students' && kind !== 'rules') delete r.id; });
-      for (let i = 0; i < rows.length; i += 500) check(await sb.from(MAPS[kind].table).insert(rows.slice(i, i + 500)));
-      await this.refresh(kind);
+      const m = MAPS[kind], small = ['records', 'screenings', 'visits', 'needs', 'referrals', 'health'].includes(kind);
+      for (let i = 0; i < rows.length; i += 500) {
+        const q = sb.from(m.table).insert(rows.slice(i, i + 500));
+        if (small) this.merge(kind, check(await q.select(m.cols.map((c) => c[1]).join(',')))); else check(await q);
+      }
+      if (!small) await this.refresh(kind);
     },
     async update(kind, id, patch) {
       check(await sb.from(MAPS[kind].table).update(toRow(kind, patch)).eq('id', id));
@@ -310,8 +320,14 @@
     },
     async deleteItem(kind, id, password) {
       const r = check(await sb.rpc('delete_item', { p_kind: kind, p_id: String(id), p_password: password }));
-      const slots = { record: ['records'], health: ['health'], drug: ['drugs', 'records'], nurse: ['nurse', 'nurseNow'], case: ['cases', 'progress'], subjects: ['subjects'] }[kind];
-      if (r === 'ok') await this.refresh(...slots, ...(this.isAdmin() ? ['history'] : []));
+      const slots = { nurse: ['nurseNow'], case: ['cases', 'progress'], subjects: ['subjects'] }[kind];
+      const list = { record: 'records', health: 'health', drug: 'drugs', nurse: 'nurse' }[kind];
+      if (r === 'ok') {
+        const d = kind === 'drug' && this.data.drugs.find((x) => x.id === id);
+        if (d && d.recordId) this.drop('records', d.recordId);
+        if (list) this.drop(list, id);
+        await this.refresh(...(slots || []), ...(this.isAdmin() ? ['history'] : []));
+      }
       if (r === 'ok' && kind === 'case') await this.loadCaseTrash();
       if (r === 'ok' && (kind === 'record' || kind === 'health' || kind === 'drug' || kind === 'nurse')) await this.loadAppTrash({ record: 'behavior', health: 'care', drug: 'drugs', nurse: 'nurse' }[kind]);
       return r;
@@ -334,7 +350,13 @@
       return r;
     },
     /* ---- บุหรี่ / สารเสพติด: writes go through functions (a deduction also lands in behaviour records) ---- */
-    async saveDrug(p) { const id = check(await sb.rpc('drug_save', { p })); await this.refresh('drugs', 'records'); return id; },
+    async saveDrug(p) {
+      const id = check(await sb.rpc('drug_save', { p }));
+      await this.pull('drugs', id);
+      const d = this.data.drugs.find((x) => x.id === id);
+      if (d && d.recordId) await this.pull('records', d.recordId);
+      return id;
+    },
     // evidence photos: private bucket drug-evidence, <case id>/<name>.jpg, short-lived signed links
     _evUrls: new Map(),
     async evidenceUrls(paths) {
@@ -349,33 +371,25 @@
       return path;
     },
     async removeEvidence(paths) { if (paths.length) check(await sb.storage.from('drug-evidence').remove(paths)); paths.forEach((p) => this._evUrls.delete(p)); },
-    async updateDrug(id, p) { const r = check(await sb.rpc('drug_update', { p_id: id, p })); await this.refresh('drugs'); return r; },
+    async updateDrug(id, p) { const r = check(await sb.rpc('drug_update', { p_id: id, p })); await this.pull('drugs', id); return r; },
     /* ---- ห้องพยาบาล: writes go through nurse_save / nurse_update (any staff may check a resting student out) ---- */
-    async saveNurse(p) { const id = check(await sb.rpc('nurse_save', { p })); await this.refresh('nurse', 'nurseNow'); return id; },
-    async updateNurse(id, p) { const r = check(await sb.rpc('nurse_update', { p_id: id, p })); await this.refresh('nurse', 'nurseNow'); return r; },
-    async loadMyStaff() {
-      this.data.myStaff = (check(await sb.rpc('grade_staff_view')) || []).map((r) => ({ id: r.id, name: r.name, email: r.email, role: r.role, rooms: r.rooms || [], grades: r.grades || [] }));
-      return this.data.myStaff;
-    },
+    async saveNurse(p) { const id = check(await sb.rpc('nurse_save', { p })); await this.pull('nurse', id); await this.refresh('nurseNow'); return id; },
+    async updateNurse(id, p) { const r = check(await sb.rpc('nurse_update', { p_id: id, p })); await this.pull('nurse', id); await this.refresh('nurseNow'); return r; },
     async restoreCase(id) {
       const r = check(await sb.rpc('restore_case', { p_id: id }));
       if (r === 'ok') await this.refresh('cases', 'progress', ...(this.isAdmin() ? ['history'] : []));
       await this.loadCaseTrash();
       return r;
     },
-    async remove(kind, id) {
-      const res = check(await sb.from(MAPS[kind].table).delete().eq('id', id).select('id'));
-      if (!res.length) throw new Error('ไม่มีสิทธิ์ลบรายการนี้');
-      await this.refresh(kind);
-    },
     /* ---- one incident, several students (e.g. a fight) ---- */
     async recordIncident({ at, place, detail, rule, people, term = this.termKey() }) {
-      const inc = check(await sb.from('behavior_incidents').insert({ occurred_at: at, place: place || '', detail: detail || '' }).select('id').single());
-      check(await sb.from('behavior_records').insert(people.map((p) => ({
+      const inc = check(await sb.from('behavior_incidents').insert({ occurred_at: at, place: place || '', detail: detail || '' }).select(MAPS.incidents.cols.map((c) => c[1]).join(',')).single());
+      const rows = check(await sb.from('behavior_records').insert(people.map((p) => ({
         student_id: p.studentId, rule_id: rule.id, title: rule.name, points: p.points, note: detail || '', at, term,
         incident_id: inc.id, involvement: p.involvement,
-      }))));
-      await this.refresh('records', 'incidents', 'incidentPeople');
+      }))).select(MAPS.records.cols.map((c) => c[1]).join(',')));
+      this.merge('incidents', [inc]); this.merge('records', rows);
+      this.data.behavior.people.push(...rows.map((r) => ({ incidentId: inc.id, studentId: r.student_id, involvement: r.involvement })));
       return inc.id;
     },
 
@@ -392,8 +406,17 @@
         appt_after_session: Math.min(50, (c.sessions || []).filter((s) => s.date).length) };
       if (c.legacyId) row.legacy_id = c.legacyId;
       let id = c.id;
-      if (id) check(await sb.from('counsel_cases').update(row).eq('id', id));
-      else id = check(await sb.from('counsel_cases').insert(row).select('id').single()).id;
+      const ret = 'id,updated_at';
+      if (id) {
+        let q = sb.from('counsel_cases').update(row).eq('id', id);
+        if (c.updatedAt) q = q.eq('updated_at', c.updatedAt);
+        const rows = check(await q.select(ret));
+        if (!rows.length) throw new Error('มีผู้แก้ไขหรือลบเคสนี้หลังจากที่คุณเปิด ยังไม่ได้บันทึกของคุณ · คัดลอกข้อความของคุณไว้ก่อน แล้วโหลดหน้าใหม่');
+        if (c.updatedAt) c.updatedAt = rows[0].updated_at; // a retry after a failed session save must not look like someone else's edit
+      } else {
+        const r = check(await sb.from('counsel_cases').insert(row).select(ret).single());
+        id = c.id = r.id; c.updatedAt = r.updated_at; // a retry updates this case instead of adding a second one
+      }
       const sessions = (c.sessions || []).slice(0, 6);
       if (sessions.length) {
         check(await sb.from('counsel_case_sessions').upsert(sessions.map((s, i) => ({
@@ -402,7 +425,8 @@
           checklist: Array.from({ length: 6 }, (_, j) => !!(s.check && s.check[j])),
         })), { onConflict: 'case_id,session_no' }));
       }
-      check(await sb.from('counsel_case_sessions').delete().eq('case_id', id).gt('session_no', sessions.length));
+      // an import (no updatedAt) never removes sessions recorded here
+      if (c.updatedAt) check(await sb.from('counsel_case_sessions').delete().eq('case_id', id).gt('session_no', sessions.length));
       return id;
     },
     // old app case id -> our case id (so importing the same export twice updates instead of duplicating)
@@ -438,23 +462,22 @@
       await this.refresh('teacherGrades', 'history', 'students', 'records', 'progress', 'screenings', 'visits', 'needs', 'referrals', 'health');
     },
     async saveSettings(patch) {
+      const COL = { year: 'year', term: 'term', baseScore: 'base_score', warnBelow: 'warn_below', alertBelow: 'alert_below', apps: 'apps', parentView: 'parent_view', restoreRoles: 'restore_roles', drugPoints: 'drug_points', terms: 'terms' };
+      check(await sb.from('app_settings').update(Object.fromEntries(Object.entries(patch).map(([k, v]) => [COL[k], v]))).eq('id', 1));
       Object.assign(this.s, patch);
-      const s = this.s;
-      check(await sb.from('app_settings').update({ year: s.year, term: s.term, base_score: s.baseScore, warn_below: s.warnBelow, alert_below: s.alertBelow, apps: s.apps, parent_view: s.parentView, restore_roles: s.restoreRoles, drug_points: s.drugPoints, terms: s.terms }).eq('id', 1));
     },
+    async promote(year) { check(await sb.rpc('promote_students', { p_year: year })); await this.load(); },
     async log(studentId, action, detail) {
       await this.add('history', { studentId: studentId || '', action, detail });
     },
-    async importSample() {
-      const d = window.buildSampleData();
-      const strip = (list) => list.map(({ id, ...rest }) => rest);
-      await this.add('students', d.students);
-      await this.add('records', strip(d.behavior.records));
-      await this.add('screenings', strip(d.care.screenings));
-      await this.add('visits', strip(d.care.visits));
-      await this.add('needs', strip(d.care.needs));
-      await this.add('referrals', strip(d.care.referrals));
-      await this.log('', 'นำเข้าข้อมูล', `นำเข้าข้อมูลตัวอย่าง ${d.students.length} คน`);
+    // every table the admin may read, as rows (no photos, passwords or bins); paging needs a fixed order
+    async backup() {
+      const tables = { students: 'id', profiles: 'id', app_settings: 'id', teacher_rooms: 'user_id,grade,room', teacher_grades: 'user_id,grade', grade_staff: 'grade,name', teacher_subjects: 'id', parent_links: 'user_id,student_id',
+        registry_history: 'id', behavior_rules: 'id', behavior_incidents: 'id', behavior_records: 'id', care_screenings: 'id', care_visits: 'id', care_needs: 'id', care_referrals: 'id', health_logs: 'id',
+        counsel_cases: 'id', counsel_case_sessions: 'case_id,session_no', counsel_appt_log: 'id', drug_cases: 'id', nurse_visits: 'id', feedback: 'id' };
+      const out = { at: new Date().toISOString(), tables: {} };
+      for (const [t, key] of Object.entries(tables)) out.tables[t] = await paged((a, b) => key.split(',').reduce((q, k) => q.order(k), sb.from(t).select('*')).range(a, b));
+      return out;
     },
 
     /* ---- reads ---- */

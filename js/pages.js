@@ -18,7 +18,7 @@
       const s = Store.student(e.studentId);
       const app = Apps.get(e.app);
       return `<div class="tl-item"><div class="tl-dot ${e.dot}">${icon(e.ic)}</div><div>
-        <div class="tl-title">${showStudent && s ? `<a href="#/student/${s.id}">${esc(fullName(s))}</a><span class="muted small">${klass(s)}</span> · ` : ''}${e.title}</div>
+        <div class="tl-title">${showStudent && s ? `<a href="#/student/${esc(s.id)}">${esc(fullName(s))}</a><span class="muted small">${klass(s)}</span> · ` : ''}${e.title}</div>
         ${e.note ? `<div class="small">${esc(e.note)}</div>` : ''}
         <div class="tl-meta">${fmtDate(e.at, true)}${e.by ? ' · ' + esc(e.by) : ''} · ${esc(app ? app.short : '')}</div></div></div>`;
     }).join('')}</div>`;
@@ -108,7 +108,7 @@
       <div class="grid g-main">
         <div class="card" id="recent-list"><div class="card-head"><h3>${showToday ? 'บันทึกวันนี้ (ทุกรายการ)' : 'บันทึกล่าสุด'}</h3><span class="muted small">วันนี้ ${today.length} รายการ · ${showToday ? '<a href="#/?go=recent-list">แสดงล่าสุด 10 รายการ</a>' : '<a href="#/?show=today&go=recent-list">ดูทั้งหมดของวันนี้</a>'}</span></div>${showToday ? (today.length ? timeline(today, true) : empty('วันนี้ยังไม่มีบันทึก', 'calendar')) : timeline(ev.slice(0, 10), true)}</div>
         <div class="card" id="watch-list"><div class="card-head"><h3>นักเรียนที่ต้องเฝ้าระวัง${showWatch ? ` (${watch.length.toLocaleString()} คน)` : ''}</h3>${showWatch ? '<a class="small" href="#/?go=watch-list">ย่อ</a>' : watch.length > 8 ? `<a class="small" href="#/?show=watch&go=watch-list">ดูทั้งหมด ${watch.length.toLocaleString()} คน</a>` : ''}</div>
-          ${watch.length ? `<div class="list">${watch.slice(0, showWatch ? 300 : 8).map(({ s, reasons }) => `<a class="list-row" href="#/student/${s.id}">${avatar(s)}<div class="grow"><div class="t">${esc(fullName(s))}</div><div class="s">${klass(s)} · ${esc(s.advisor)}</div></div><div class="chips">${reasons.join('')}</div></a>`).join('')}</div>` : empty('ไม่มีนักเรียนที่ต้องเฝ้าระวัง', 'smile')}</div>
+          ${watch.length ? `<div class="list">${watch.slice(0, showWatch ? 300 : 8).map(({ s, reasons }) => `<a class="list-row" href="#/student/${esc(s.id)}">${avatar(s)}<div class="grow"><div class="t">${esc(fullName(s))}</div><div class="s">${klass(s)} · ${esc(s.advisor)}</div></div><div class="chips">${reasons.join('')}</div></a>`).join('')}</div>` : empty('ไม่มีนักเรียนที่ต้องเฝ้าระวัง', 'smile')}</div>
       </div>
       ${window.Feedback ? Feedback.homeCard() : ''}
       <div><h3 style="font-size:17px;font-weight:500;margin-bottom:12px">ทางลัดไปแต่ละแอป</h3>
@@ -128,7 +128,7 @@
         const run = () => {
           const t = inp.value.trim().toLowerCase();
           const list = D().students.filter((s) => !t || [s.id, s.first, s.last, s.nick, fullName(s), klass(s)].some((x) => String(x).toLowerCase().includes(t)));
-          out.innerHTML = `<div class="card-head"><h3>ผลการค้นหา</h3><span class="muted small">${list.length} คน</span></div>` + (list.length ? `<div class="list">${list.slice(0, 60).map((s) => `<a class="list-row" href="#/student/${s.id}">${avatar(s)}<div class="grow"><div class="t">${esc(fullName(s))} <span class="muted small">(${esc(s.nick)})</span></div><div class="s"><span class="mono">${s.id}</span> · ${klass(s)} เลขที่ ${s.no} · ${esc(s.advisor)}</div></div>${s.status !== 'studying' ? statusBadge(s.status) : ''}${on('behavior') && s.status === 'studying' && s.mine ? meter(B().score(s.id)) : ''}</a>`).join('')}</div>` : empty('ไม่พบนักเรียนที่ตรงกับคำค้น', 'search-x'));
+          out.innerHTML = `<div class="card-head"><h3>ผลการค้นหา</h3><span class="muted small">${list.length} คน</span></div>` + (list.length ? `<div class="list">${list.slice(0, 60).map((s) => `<a class="list-row" href="#/student/${esc(s.id)}">${avatar(s)}<div class="grow"><div class="t">${esc(fullName(s))} <span class="muted small">(${esc(s.nick)})</span></div><div class="s"><span class="mono">${esc(s.id)}</span> · ${klass(s)} เลขที่ ${s.no} · ${esc(s.advisor)}</div></div>${s.status !== 'studying' ? statusBadge(s.status) : ''}${on('behavior') && s.status === 'studying' && s.mine ? meter(B().score(s.id)) : ''}</a>`).join('')}</div>` : empty('ไม่พบนักเรียนที่ตรงกับคำค้น', 'search-x'));
           UI.refreshIcons();
           UI.hydratePhotos(out);
         };
@@ -147,8 +147,8 @@
     return { title: fullName(s), html: `
       <div class="card rule profile">${avatar(s, true)}
         <div class="who"><h2>${esc(fullName(s))} ${statusBadge(s.status)}</h2>
-          <div class="kv"><span><b>รหัส</b><span class="mono">${s.id}</span></span><span><b>ชั้น</b>${klass(s)} เลขที่ ${s.no}</span><span><b>ครูที่ปรึกษา</b>${esc(s.advisor) || '—'}</span></div></div>
-        <div class="actions no-print">${on('behavior') ? `<button class="btn accent" data-action="behavior-record" data-student="${s.id}">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}${on('drugs') ? `<button class="btn secondary" data-action="drug-record" data-student="${s.id}">${icon('cigarette-off')}บันทึกบุหรี่ / สารเสพติด</button>` : ''}${on('nurse') ? `<button class="btn secondary" data-action="nurse-record" data-student="${s.id}">${icon('bed')}บันทึกเข้าห้องพยาบาล</button>` : ''}</div></div>
+          <div class="kv"><span><b>รหัส</b><span class="mono">${esc(s.id)}</span></span><span><b>ชั้น</b>${klass(s)} เลขที่ ${s.no}</span><span><b>ครูที่ปรึกษา</b>${esc(s.advisor) || '—'}</span></div></div>
+        <div class="actions no-print">${on('behavior') ? `<button class="btn accent" data-action="behavior-record" data-student="${esc(s.id)}">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}${on('drugs') ? `<button class="btn secondary" data-action="drug-record" data-student="${esc(s.id)}">${icon('cigarette-off')}บันทึกบุหรี่ / สารเสพติด</button>` : ''}${on('nurse') ? `<button class="btn secondary" data-action="nurse-record" data-student="${esc(s.id)}">${icon('bed')}บันทึกเข้าห้องพยาบาล</button>` : ''}</div></div>
       <div class="notice">${icon('lock', 'i16')}<span>นักเรียนคนนี้ไม่ได้อยู่ใน${Store.user().role === 'grade_head' ? 'ระดับชั้น' : 'ห้องที่ปรึกษา'}ของคุณ — บันทึกพฤติกรรมได้ แต่รายละเอียด (คะแนนรวม ผลคัดกรอง การให้คำปรึกษา ข้อมูลผู้ปกครอง) เห็นเฉพาะครูที่ปรึกษาของห้องนี้ หัวหน้าระดับ ครูแนะแนว และผู้ดูแลระบบ</span></div>
       ${s.taught && on('behavior') ? `<div class="card"><div class="card-body" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><div class="muted small">คะแนนพฤติกรรม · นักเรียนในรายวิชาที่คุณสอน</div>${UI.meter(B_.score(s.id))}</div></div></div>` : ''}
       ${on('behavior') ? `<div class="card"><div class="card-head"><h3>${s.taught ? 'รายการพฤติกรรมในภาคเรียนนี้' : 'พฤติกรรมที่คุณบันทึกให้นักเรียนคนนี้'}</h3><span class="muted small">${mine.length} รายการ</span></div>
@@ -165,27 +165,27 @@
     const apps = Apps.enabled();
     const filter = q.filter || 'all';
     const tab = q.tab || (apps[0] ? apps[0].id : 'info');
-    const base = `#/student/${s.id}`;
+    const base = `#/student/${esc(s.id)}`;
     const qs = (o) => base + '?' + new URLSearchParams({ filter, tab, ...o }).toString();
     const ev = Apps.events(s.id).filter((e) => filter === 'all' || e.app === filter);
     const app = Apps.get(tab);
     const info = `<div class="card-body"><div class="form-grid">${[
-      ['รหัสนักเรียน', `<span class="mono">${s.id}</span>`], ['เลขประจำตัวประชาชน', `<span class="mono">${Store.isAdmin() ? s.cid : s.cid.slice(0, 1) + '-XXXX-XXXXX-' + s.cid.slice(-3)}</span>`],
+      ['รหัสนักเรียน', `<span class="mono">${esc(s.id)}</span>`], ['เลขประจำตัวประชาชน', `<span class="mono">${Store.isAdmin() ? esc(s.cid) : esc(s.cid).slice(0, 1) + '-XXXX-XXXXX-' + s.cid.slice(-3)}</span>`],
       ['ชื่อ – นามสกุล', esc(fullName(s))], ['ชื่อเล่น', esc(s.nick)], ['ชั้น / ห้อง / เลขที่', `${klass(s)} เลขที่ ${s.no}`], ['ครูที่ปรึกษา', esc(s.advisor)],
       ['ผู้ปกครอง', esc(s.guardian)], ['เบอร์โทร', `<span class="mono">${esc(s.guardianPhone)}</span>`], ['ที่อยู่', esc(s.address)], ['สถานะ', statusBadge(s.status)],
     ].map(([k, v]) => `<div class="field"><label class="muted" style="font-weight:500;color:var(--ink-500)">${k}</label><div>${v}</div></div>`).join('')}</div>
-      <p class="muted small" style="margin:16px 0 0">${icon('database', 'i16')} ข้อมูลจากฐานข้อมูลกลาง — แอปย่อยอ่านได้อย่างเดียว ${Store.isAdmin() ? `· <a href="#" data-action="registry-edit" data-id="${s.id}">แก้ไขในทะเบียน</a>` : ''}</p></div>`;
+      <p class="muted small" style="margin:16px 0 0">${icon('database', 'i16')} ข้อมูลจากฐานข้อมูลกลาง — แอปย่อยอ่านได้อย่างเดียว ${Store.isAdmin() ? `· <a href="#" data-action="registry-edit" data-id="${esc(s.id)}">แก้ไขในทะเบียน</a>` : ''}</p></div>`;
 
     return { title: fullName(s), html: `
       <div class="print-only"><h2>รายงานรายบุคคล · กลุ่มบริหารกิจการนักเรียน</h2><p class="muted">โรงเรียนธรรมศาสตร์คลองหลวงวิทยาคม · พิมพ์เมื่อ ${fmtDate(new Date().toISOString(), true)}</p></div>
       <div class="card rule profile">${avatar(s, true)}
         <div class="who"><h2>${esc(fullName(s))} ${statusBadge(s.status)}</h2>
-          <div class="kv"><span><b>รหัส</b><span class="mono">${s.id}</span></span><span><b>ชื่อเล่น</b>${esc(s.nick)}</span><span><b>ชั้น</b>${klass(s)} เลขที่ ${s.no}</span><span><b>ครูที่ปรึกษา</b>${esc(s.advisor)}</span></div>
+          <div class="kv"><span><b>รหัส</b><span class="mono">${esc(s.id)}</span></span><span><b>ชื่อเล่น</b>${esc(s.nick)}</span><span><b>ชั้น</b>${klass(s)} เลขที่ ${s.no}</span><span><b>ครูที่ปรึกษา</b>${esc(s.advisor)}</span></div>
           <div class="kv"><span><b>ผู้ปกครอง</b>${esc(s.guardian)} · <span class="mono">${esc(s.guardianPhone)}</span></span></div></div>
         <div class="actions no-print">
-          ${on('behavior') ? `<button class="btn accent" data-action="behavior-record" data-student="${s.id}">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}
-          ${on('counsel') && Store.seesAll() ? `<button class="btn secondary" data-action="counsel-record" data-student="${s.id}">${icon('message-square-plus')}บันทึกให้คำปรึกษา</button>` : ''}
-          ${Store.canPhoto(s) ? `<button class="btn secondary" data-action="student-photo" data-id="${s.id}">${icon('camera')}${s.photoPath ? 'เปลี่ยนรูปถ่าย' : 'เพิ่มรูปถ่าย'}</button>` : ''}
+          ${on('behavior') ? `<button class="btn accent" data-action="behavior-record" data-student="${esc(s.id)}">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}
+          ${on('counsel') && Store.seesAll() ? `<button class="btn secondary" data-action="counsel-record" data-student="${esc(s.id)}">${icon('message-square-plus')}บันทึกให้คำปรึกษา</button>` : ''}
+          ${Store.canPhoto(s) ? `<button class="btn secondary" data-action="student-photo" data-id="${esc(s.id)}">${icon('camera')}${s.photoPath ? 'เปลี่ยนรูปถ่าย' : 'เพิ่มรูปถ่าย'}</button>` : ''}
           <button class="btn ghost" data-action="print">${icon('printer')}พิมพ์รายงาน</button></div></div>
 
       <div class="grid g-auto">${apps.map((a) => { const m = a.summary(s.id); return `<a class="card app-card ${a.rule}" href="#/apps/${a.id}" title="เปิดแอป${esc(a.name)}">
@@ -309,8 +309,8 @@
           const list = D().students.filter((s) => grades.includes(Number(s.grade)) && (!g || String(s.grade) === g) && (!st || s.status === st) && (!t || [s.id, fullName(s), s.nick].some((x) => x.toLowerCase().includes(t))))
             .sort((a, b) => a.grade - b.grade || a.room - b.room || a.no - b.no);
           document.getElementById('rg-table').innerHTML = `<table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชื่อเล่น</th><th>ชั้น</th><th class="num">เลขที่</th><th>ครูที่ปรึกษา</th><th>สถานะ</th><th></th></tr></thead><tbody>
-            ${list.slice(0, 300).map((s) => `<tr><td class="mono">${s.id}</td><td><a href="#/student/${s.id}">${esc(fullName(s))}</a></td><td>${esc(s.nick)}</td><td>${klass(s)}</td><td class="num">${s.no}</td><td>${esc(s.advisor)}</td><td>${statusBadge(s.status)}</td>
-            <td style="text-align:right;white-space:nowrap"><button class="icon-btn" title="แก้ไข" data-action="registry-edit" data-id="${s.id}">${icon('pencil', 'i16')}</button><button class="icon-btn" title="เปลี่ยนสถานะ" data-action="registry-status" data-id="${s.id}">${icon('user-cog', 'i16')}</button><button class="icon-btn" title="ลบ (เก็บไว้ 30 วันก่อนลบถาวร)" data-action="registry-delete" data-id="${s.id}">${icon('trash-2', 'i16')}</button></td></tr>`).join('') || `<tr><td colspan="8">${empty('ไม่พบข้อมูล')}</td></tr>`}</tbody></table>${list.length > 300 ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง 300 จาก ${list.length.toLocaleString()} คน — พิมพ์ค้นหาหรือเลือกชั้น/สถานะเพื่อกรอง</div>` : `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">ทั้งหมด ${list.length.toLocaleString()} คน</div>`}`;
+            ${list.slice(0, 300).map((s) => `<tr><td class="mono">${esc(s.id)}</td><td><a href="#/student/${esc(s.id)}">${esc(fullName(s))}</a></td><td>${esc(s.nick)}</td><td>${klass(s)}</td><td class="num">${s.no}</td><td>${esc(s.advisor)}</td><td>${statusBadge(s.status)}</td>
+            <td style="text-align:right;white-space:nowrap"><button class="icon-btn" title="แก้ไข" data-action="registry-edit" data-id="${esc(s.id)}">${icon('pencil', 'i16')}</button><button class="icon-btn" title="เปลี่ยนสถานะ" data-action="registry-status" data-id="${esc(s.id)}">${icon('user-cog', 'i16')}</button><button class="icon-btn" title="ลบ (เก็บไว้ 30 วันก่อนลบถาวร)" data-action="registry-delete" data-id="${esc(s.id)}">${icon('trash-2', 'i16')}</button></td></tr>`).join('') || `<tr><td colspan="8">${empty('ไม่พบข้อมูล')}</td></tr>`}</tbody></table>${list.length > 300 ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง 300 จาก ${list.length.toLocaleString()} คน — พิมพ์ค้นหาหรือเลือกชั้น/สถานะเพื่อกรอง</div>` : `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">ทั้งหมด ${list.length.toLocaleString()} คน</div>`}`;
           UI.refreshIcons();
         };
         ['rg-q', 'rg-grade', 'rg-status'].forEach((i) => document.getElementById(i).addEventListener('input', draw));
@@ -409,15 +409,12 @@
   }
 
   function promoteDialog() {
-    const act = Store.activeStudents();
+    const act = Store.activeStudents(), year = Store.s.year;
     const g6 = act.filter((s) => s.grade === 6).length, g3 = act.filter((s) => s.grade === 3).length;
     UI.confirmDialog('เลื่อนชั้นขึ้นปีการศึกษาใหม่',
       `นักเรียนที่กำลังศึกษาทั้งหมด <b>${act.length}</b> คน จะเลื่อนขึ้น 1 ชั้น<br>· ม.6 จำนวน ${g6} คน → <b>จบการศึกษา</b><br>· ม.3 จำนวน ${g3} คน → ม.4 (ตรวจสอบรายที่ไม่ศึกษาต่อแล้วเปลี่ยนสถานะเอง)<br>· ปีการศึกษาจะเปลี่ยนเป็น <b>${Store.s.year + 1}</b> ภาคเรียนที่ 1 และคะแนนพฤติกรรมเริ่มใหม่ตามคะแนนตั้งต้น`,
       'ยืนยันการเลื่อนชั้น', async () => {
-        const next = act.map((s) => (s.grade >= 6 ? { ...s, status: 'graduated' } : { ...s, grade: s.grade + 1 }));
-        await Store.upsert('students', next);
-        await Store.saveSettings({ year: Store.s.year + 1, term: 1 });
-        await Store.log('', 'เลื่อนชั้น', `เลื่อนชั้นนักเรียน ${act.length} คน · จบการศึกษา ${g6} คน · เริ่มปีการศึกษา ${Store.s.year}`);
+        await Store.promote(year);
         UI.toast('เลื่อนชั้นเรียบร้อยแล้ว'); App.render();
       }, true);
   }
@@ -427,30 +424,43 @@
     const rows = [FIELDS.map((f) => f[1]).concat('สถานะ')].concat(D().students.map((s) => FIELDS.map(([k]) => s[k]).concat(UI.STATUS[s.status][0])));
     UI.download(`ทะเบียนนักเรียน-${Store.s.year}.csv`, rows.map(csvRow).join('\n'));
   }
+  // CSV rows → students to save, or the list of what is wrong
+  function importRows(head, rows) {
+    const idx = FIELDS.map(([, l]) => head.findIndex((h) => h.trim() === l));
+    if (idx[0] < 0) return { out: [], add: 0, upd: 0, errors: ['ไม่พบคอลัมน์ "รหัสนักเรียน" — กรุณาใช้แม่แบบ'] };
+    const RULES = { id: /^\d{3,10}$/, cid: /^[0-9A-Z]{13}$/i, grade: /^[1-6]$/, room: /^([1-9]|[1-5]\d|60)$/, no: /^([1-9]|[1-9]\d)$/ };
+    const LABEL = Object.fromEntries(FIELDS), out = [], errors = [], seen = new Set();
+    let add = 0, upd = 0;
+    rows.forEach((r, i) => {
+      const o = {}, at = 'แถว ' + (i + 2) + ': ';
+      FIELDS.forEach(([k], j) => { const v = idx[j] >= 0 ? (r[idx[j]] || '').trim() : ''; if (v) o[k] = k === 'grade' ? v.replace(/^ม\.?\s*/, '') : v; });
+      if (!Object.keys(o).length) return;
+      const ex = o.id && Store.student(o.id);
+      ['id'].concat(ex ? [] : ['cid', 'first', 'last', 'grade', 'room', 'no']).forEach((k) => { if (!o[k]) errors.push(at + 'ไม่มี' + LABEL[k]); });
+      Object.keys(RULES).forEach((k) => { if (o[k] && !RULES[k].test(o[k])) errors.push(at + LABEL[k] + ' "' + o[k] + '" ไม่ถูกต้อง'); });
+      if (o.id && seen.has(o.id)) errors.push(at + 'รหัส ' + o.id + ' ซ้ำในไฟล์');
+      seen.add(o.id);
+      ['grade', 'room', 'no'].forEach((k) => { if (o[k]) o[k] = Number(o[k]); });
+      if (o.cid) o.cid = o.cid.toUpperCase();
+      if (ex) { out.push({ ...ex, ...o }); upd++; } else { out.push({ prefix: '', nick: '', advisor: '', guardian: '', guardianPhone: '', address: '', ...o, status: 'studying' }); add++; }
+    });
+    if (!out.length && !errors.length) errors.push('ไม่มีข้อมูลในไฟล์');
+    return { out, add, upd, errors };
+  }
   function importDialog() {
     UI.dialog({ title: 'นำเข้าข้อมูลนักเรียนจาก Excel', submitLabel: 'นำเข้า',
       body: `<p style="margin:0">ใน Excel เลือก <b>บันทึกเป็น → CSV UTF-8</b> แล้วเลือกไฟล์ที่นี่ แถวแรกต้องเป็นหัวคอลัมน์ตามแม่แบบ</p>
         <button type="button" class="btn secondary sm" data-action="registry-template" style="align-self:flex-start">${icon('download', 'i16')}ดาวน์โหลดแม่แบบ</button>
         <div class="field"><label>ไฟล์ CSV <span class="req">*</span></label><input class="input" type="file" name="file" accept=".csv,text/csv" required style="padding-top:6px"></div>
-        <div class="notice">${icon('info', 'i16')}<span>รหัสที่มีอยู่แล้วจะถูกอัปเดตข้อมูล รหัสใหม่จะถูกเพิ่มเป็นนักเรียนใหม่</span></div>`,
+        <div class="notice">${icon('info', 'i16')}<span>รหัสที่มีอยู่แล้วจะถูกอัปเดต (ช่องว่าง = คงข้อมูลเดิม) รหัสใหม่จะถูกเพิ่ม · ถ้ามีแถวใดผิด ระบบจะไม่นำเข้าเลย</span></div>`,
       onSubmit: (v, form) => {
         const f = form.file.files[0];
         if (!f) return false;
         return f.text().then(async (txt) => {
           const rows = UI.parseCSV(txt);
           const head = rows.shift() || [];
-          const idx = FIELDS.map(([, l]) => head.findIndex((h) => h.trim() === l));
-          if (idx[0] < 0) { UI.toast('ไม่พบคอลัมน์ "รหัสนักเรียน" — กรุณาใช้แม่แบบ'); return false; }
-          let add = 0, upd = 0;
-          const out = [];
-          rows.forEach((r) => {
-            const o = {};
-            FIELDS.forEach(([k], i) => { if (idx[i] >= 0) o[k] = (r[idx[i]] || '').trim(); });
-            if (!o.id) return;
-            ['grade', 'room', 'no'].forEach((k) => { if (k in o) o[k] = Number(o[k]) || 1; });
-            const ex = Store.student(o.id);
-            if (ex) { out.push({ ...ex, ...o }); upd++; } else { out.push({ prefix: '', nick: '', grade: 1, room: 1, no: 1, advisor: '', guardian: '', guardianPhone: '', address: '', cid: '', first: '', last: '', ...o, status: 'studying' }); add++; }
-          });
+          const { out, add, upd, errors } = importRows(head, rows);
+          if (errors.length) { UI.dialog({ title: 'ยังไม่ได้นำเข้า · พบข้อผิดพลาด ' + errors.length + ' จุด', cancelLabel: 'ปิด', body: `<div class="notice danger">${icon('circle-alert', 'i16')}<span>${errors.slice(0, 20).map(esc).join('<br>')}${errors.length > 20 ? '<br>…' : ''}</span></div><p class="muted" style="margin:0">แก้ไฟล์แล้วนำเข้าใหม่ ข้อมูลในระบบยังไม่ถูกเปลี่ยน</p>` }); return false; }
           await Store.upsert('students', out);
           await Store.log('', 'นำเข้าข้อมูล', `นำเข้าจากไฟล์ ${f.name} · เพิ่ม ${add} คน · อัปเดต ${upd} คน`);
           UI.toast(`นำเข้าเรียบร้อย · เพิ่ม ${add} คน · อัปเดต ${upd} คน`); App.render();
@@ -569,15 +579,6 @@
     return [...found].map((k) => k.split('/').map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   }
   const roomText = (list) => list.map(([g, r]) => g + '/' + r).join(', ');
-  // what a new staff member says they do (profiles.request.duty) → the role the admin grants
-  const DUTIES = {
-    homeroom: ['ครูที่ปรึกษา', 'teacher'], grade_head: ['หัวหน้า / รองหัวหน้าระดับ', 'grade_head'], subject: ['ครูประจำวิชา (ไม่มีห้องที่ปรึกษา)', 'teacher'],
-    counselor: ['ครูแนะแนว', 'counselor'], inspector: ['สารวัตรนักเรียน', 'inspector'], other: ['อื่น ๆ (ระบุในหมายเหตุ)', ''],
-  };
-  // "ครูที่ปรึกษา ม.1/2, ม.1/3" — one line for the request
-  const requestText = (rq) => !rq ? '' : [DUTIES[rq.duty] ? DUTIES[rq.duty][0] : rq.duty,
-    (rq.rooms || []).length ? (rq.rooms || []).map(([g, r]) => 'ม.' + g + '/' + r).join(', ') : '',
-    (rq.grades || []).length ? 'ระดับ ' + rq.grades.map((g) => 'ม.' + g).join(', ') : ''].filter(Boolean).join(' · ');
   function parseRooms(text) {
     const out = [], bad = [];
     String(text).split(/[,\s]+/).filter(Boolean).forEach((p) => {
@@ -627,16 +628,10 @@
     if (link) link.addEventListener('click', (e) => { e.preventDefault(); const gs = link.dataset.fillGrades.split(',').map(Number); [1, 2, 3, 4, 5, 6].forEach((g) => { document.querySelector(`.dialog input[name=g${g}]`).checked = gs.includes(g); }); });
   }
 
-  // what to grant a pending account: from the duty it chose (older requests) or, since 24 Nov 2026, by matching
-  // its Thai name with the grade-head list (→ grade head + grades) and the advisor list (→ homeroom teacher + rooms)
-  const roomOk = ([g, r]) => D().students.some((s) => s.status === 'studying' && Number(s.grade) === g && Number(s.room) === r);
+  // what to suggest for a pending account: match its Thai name with the grade-head list (→ grade head + grades) and the advisor list (→ homeroom teacher + rooms)
   function planFor(u) {
     const rq = u && u.request;
     if (!rq) return null;
-    if (rq.duty) {
-      const role = DUTIES[rq.duty] ? DUTIES[rq.duty][1] : '';
-      return { role, rooms: (role === 'teacher' || role === 'inspector') ? (rq.rooms || []).filter(roomOk) : [], grades: role === 'grade_head' ? (rq.grades || []) : [], asked: true };
-    }
     const grades = gradesByName(rq.name);
     if (grades.length) return { role: 'grade_head', rooms: [], grades };
     const rooms = roomsByName(rq.name);
@@ -650,12 +645,12 @@
     const rq = u.request;
     if (!rq) return `<div class="req-line"><span class="badge b-neutral">ยังไม่ได้กรอกชื่อยืนยันตัวตน</span></div>`;
     const pl = planFor(u);
-    const sent = rq.duty ? `ขอเป็น <b>${esc(requestText(rq))}</b>` : `ชื่อที่กรอก <b>${esc(rq.name)}</b>`;
     const match = pl.role
-      ? `<span class="badge b-success">✓ ${pl.asked ? 'อนุมัติตามคำขอได้' : 'พบในรายชื่อ'}: ${esc(planText(pl))}</span>`
+      ? `<span class="badge b-info">ชื่อตรงกับรายชื่อ: ${esc(planText(pl))}</span>`
       : `<span class="badge b-warning">✗ ไม่พบชื่อนี้ในรายชื่อครูที่ปรึกษา / หัวหน้าระดับ · ตรวจการสะกด หรือเลือกบทบาทเอง (เช่น ครูประจำวิชา)</span>`;
-    return `<div class="req-line">${icon('id-card', 'i16')} ${sent}${rq.note ? ` <span class="muted">· ${esc(rq.note)}</span>` : ''}</div><div class="req-line chips">${match}</div>`;
+    return `<div class="req-line">${icon('id-card', 'i16')} ชื่อที่กรอก <b>${esc(rq.name)}</b></div><div class="req-line chips">${match}${schoolMail(u) ? '' : '<span class="badge b-danger">ไม่ใช่อีเมลโรงเรียน</span>'}</div>`;
   }
+  const schoolMail = (u) => /@thk\.ac\.th$/i.test(u.email || '');
   const canApprove = (u) => { const pl = planFor(u); return !!(pl && pl.role); };
   // one click: role + rooms / grades from the plan (admin-only RPCs check it again)
   function approveRequest(userId) {
@@ -663,7 +658,8 @@
     const pl = planFor(u);
     if (!pl || !pl.role) { UI.toast('ไม่พบชื่อในรายชื่อ · เลือกบทบาทในตารางเอง'); return; }
     const name = u.request.name;
-    UI.confirmDialog('อนุมัติ', `อนุมัติ <b>${esc(name)}</b> เป็น <b>${esc(planText(pl))}</b> ?${pl.role === 'counselor' || pl.role === 'inspector' ? '<br><span class="muted small">บทบาทนี้เห็นข้อมูลนักเรียนทั้งโรงเรียนในบางแอป ตรวจสอบตัวบุคคลแล้วหรือยัง</span>' : ''}`, 'อนุมัติ', async () => {
+    // a matching name is not proof of identity (anyone can type it): the admin confirms the person
+    UI.confirmDialog('อนุมัติ', `อนุมัติ <b>${esc(name)}</b> (<b>${esc(u.email || '')}</b>) เป็น <b>${esc(planText(pl))}</b> ?<br><br>${schoolMail(u) ? '' : '<b style="color:var(--red-700)">ไม่ใช่อีเมลโรงเรียน</b> · '}ชื่อที่ตรงกันไม่ใช่หลักฐานยืนยันตัว กรุณายืนยันกับครูเจ้าของชื่อก่อนว่าเป็นผู้สมัครเอง`, 'อนุมัติ', async () => {
       await Store.update('users', u.id, { role: pl.role });
       if (pl.rooms.length) await Store.setRooms(u.id, pl.rooms);
       if (pl.grades.length) await Store.setGrades(u.id, pl.grades);
@@ -799,10 +795,18 @@
       body = `<div class="card" style="max-width:640px"><div class="card-head"><h3>ข้อมูลระบบ</h3></div><div class="card-body" style="display:flex;flex-direction:column;gap:12px">
         <p style="margin:0">${icon('database', 'i16')} เชื่อมต่อฐานข้อมูล Supabase · สิทธิ์การเข้าถึงคุมด้วย Row Level Security ที่ฝั่งฐานข้อมูล</p>
         <div class="kv"><span><b>นักเรียน</b>${D().students.length} คน</span><span><b>บันทึกพฤติกรรม</b>${D().behavior.records.length}</span><span><b>เคสให้คำปรึกษา</b>${(D().progress || []).length}</span><span><b>คัดกรอง</b>${D().care.screenings.length}</span></div>
-        ${admin && !D().students.length ? `<div class="notice warn">${icon('info', 'i16')}<span>ฐานข้อมูลยังว่าง — นำเข้าข้อมูลตัวอย่าง (ชื่อสมมติ 37 คน) เพื่อทดลองใช้ได้ แล้วค่อยเปลี่ยนสถานะ/แทนที่ด้วยข้อมูลจริงภายหลัง</span></div><button class="btn secondary" style="align-self:flex-start" data-action="import-sample">${icon('database')}นำเข้าข้อมูลตัวอย่าง</button>` : ''}</div></div>`;
+        ${admin ? `<button class="btn secondary" style="align-self:flex-start" data-action="backup">${icon('download')}ดาวน์โหลดข้อมูลสำรอง</button>` : ''}</div></div>`;
     }
     return { title: 'ตั้งค่า', html: lock + tabs + body };
   }
 
-  window.Pages = { home, search, student, registry, teachers, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES, DUTIES, parseRooms, roomText, requestText, approveRequest };
+  function backupDialog() {
+    UI.confirmDialog('ดาวน์โหลดข้อมูลสำรอง', 'ไฟล์จะมี<b>ข้อมูลนักเรียนทั้งหมด</b> รวมเลขบัตรประชาชนและเนื้อหาให้คำปรึกษา ไม่รวมรูปภาพ รหัสผ่าน และถังที่ลบไว้<br><br>เก็บในที่ที่มีเฉพาะผู้ดูแลเข้าถึงได้ ห้ามส่งทางแชตหรืออีเมล และลบไฟล์เก่าเมื่อไม่ใช้', 'ดาวน์โหลด', async () => {
+      const data = await Store.backup();
+      UI.download('สำรอง-กิจการนักเรียน-' + new Date().toLocaleDateString('sv') + '.json', JSON.stringify(data), 'application/json');
+      await Store.log('', 'สำรองข้อมูล', 'ดาวน์โหลดข้อมูลสำรอง ' + Object.values(data.tables).reduce((a, l) => a + l.length, 0) + ' แถว');
+    });
+  }
+
+  window.Pages = { home, search, student, registry, teachers, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES, approveRequest, importRows, backupDialog };
 })();

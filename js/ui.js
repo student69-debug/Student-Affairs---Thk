@@ -54,11 +54,11 @@
 
   // Student picker using datalist
   function studentOptions(mineOnly) {
-    return (mineOnly ? Store.myStudents() : Store.activeStudents()).map((s) => `<option value="${s.id} — ${esc(fullName(s))} (${klass(s)})"></option>`).join('');
+    return (mineOnly ? Store.myStudents() : Store.activeStudents()).map((s) => `<option value="${esc(s.id)} — ${esc(fullName(s))} (${klass(s)})"></option>`).join('');
   }
   function studentField(name = 'student', value = '', mineOnly = false) {
     const s = value ? Store.student(value) : null;
-    const v = s ? `${s.id} — ${fullName(s)} (${klass(s)})` : '';
+    const v = s ? `${esc(s.id)} — ${fullName(s)} (${klass(s)})` : '';
     return `<div class="field full"><label>นักเรียน <span class="req">*</span></label>
       <input class="input" name="${name}" list="dl-students" value="${esc(v)}" placeholder="พิมพ์รหัสหรือชื่อนักเรียน" required autocomplete="off">
       <datalist id="dl-students">${studentOptions(mineOnly)}</datalist></div>`;
@@ -147,7 +147,6 @@
     el.querySelector('.toast-x').addEventListener('click', bye);
     setTimeout(bye, kind === 'error' ? 8000 : 5000);
   }
-  const toastCount = () => toastSeq;
 
   function refreshIcons() { if (window.lucide) window.lucide.createIcons(); }
 
@@ -157,7 +156,7 @@
     if (window.XLSX) return Promise.resolve(window.XLSX);
     xlsxLoading = xlsxLoading || new Promise((resolve, reject) => {
       const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
       s.onload = () => resolve(window.XLSX);
       s.onerror = () => { xlsxLoading = null; reject(new Error('โหลดตัวอ่านไฟล์ Excel ไม่สำเร็จ')); };
       document.head.appendChild(s);
@@ -199,7 +198,7 @@
   }
 
   function download(filename, text, type = 'text/csv;charset=utf-8') {
-    const blob = new Blob(['﻿' + text], { type });
+    const blob = new Blob([(type.startsWith('text/csv') ? '﻿' : '') + text], { type });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = filename;

@@ -77,7 +77,7 @@
         ${list.slice(0, 300).map((x) => `<tr><td>${fmtDate(x.at)}<div class="muted small">${timeOf(x.at)}–${x.outAt ? timeOf(x.outAt) : 'ยังพักอยู่'} · ${dur(mins(x.at, x.outAt))}${x.period ? ' · ' + esc(x.period) : ''}</div></td>${withStudent ? `<td>${sLink(x.studentId)}</td>` : ''}
           <td>${what(x)} ${tempHtml(x.temp)}</td><td class="small">${esc(x.care) || '—'}${x.medicine ? `<div class="muted">ยา: ${esc(x.medicine)}</div>` : ''}${x.note ? `<div class="muted">${esc(x.note)}</div>` : ''}</td>
           <td>${outBadge(x.outcome)}${x.parentNotified ? '<div class="muted small">แจ้งผู้ปกครองแล้ว</div>' : ''}</td><td>${esc(x.by)}${x.outBy && x.outBy !== x.by ? `<div class="muted small">ออก: ${esc(x.outBy)}</div>` : ''}</td>
-          <td style="text-align:right;white-space:nowrap">${x.outcome === 'resting' ? `<button class="btn secondary sm" data-action="nurse-out" data-id="${x.id}">${icon('log-out', 'i16')}ให้ออก</button>` : ''}<button class="icon-btn" title="แก้ไข" data-action="nurse-edit" data-id="${x.id}">${icon('pencil', 'i16')}</button>${canDel(x) ? `<button class="icon-btn" title="ลบ (เก็บไว้ 30 วัน)" data-action="nurse-del" data-id="${x.id}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}
+          <td style="text-align:right;white-space:nowrap">${x.outcome === 'resting' ? `<button class="btn secondary sm" data-action="nurse-out" data-id="${esc(x.id)}">${icon('log-out', 'i16')}ให้ออก</button>` : ''}<button class="icon-btn" title="แก้ไข" data-action="nurse-edit" data-id="${esc(x.id)}">${icon('pencil', 'i16')}</button>${canDel(x) ? `<button class="icon-btn" title="ลบ (เก็บไว้ 30 วัน)" data-action="nurse-del" data-id="${esc(x.id)}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}
         </tbody></table></div>${list.length > 300 ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง 300 จาก ${list.length.toLocaleString()} รายการ — ใช้ตัวกรองเพื่อดูเพิ่ม</div>` : ''}`;
     },
     studentTab(sid) {
@@ -114,22 +114,21 @@
 
     /* ---- ให้ออกจากห้องพยาบาล (ครูทุกคน ขณะนักเรียนยังพักอยู่) ---- */
     openOut(id) {
-      const x = all().find((r) => r.id === id) || now().find((r) => r.id === id);
+      const full = all().find((r) => r.id === id), x = full || now().find((r) => r.id === id);
       if (!x) return;
       dialog({ title: 'ให้นักเรียนออกจากห้องพยาบาล', submitLabel: 'บันทึก', submitClass: 'primary',
         body: `<div class="notice">${icon('info', 'i16')}<span>${sLink(x.studentId)} · เข้า ${timeOf(x.at)} (${dur(mins(x.at))})${x.period ? ' · ' + esc(x.period) : ''}${x.symptomGroup ? ' · ' + what(x) : ''}</span></div>
           <div class="form-grid">
           <div class="field full"><label>ผล <span class="req">*</span></label><div class="radio-row">${Object.entries(OUTCOMES).filter(([k]) => k !== 'resting').map(([k, [l]], i) => `<label><input type="radio" name="outcome" value="${k}" ${i === 0 ? 'checked' : ''}> ${esc(l)}</label>`).join('')}</div></div>
           <div class="field"><label>เวลาออก</label><input class="input" type="datetime-local" name="outAt" value="${localInput()}"></div>
-          <div class="field"><label><input type="checkbox" name="parentNotified" ${x.parentNotified ? 'checked' : ''}> แจ้งผู้ปกครองแล้ว</label></div>
+          ${full ? `<div class="field"><label><input type="checkbox" name="parentNotified" ${x.parentNotified ? 'checked' : ''}> แจ้งผู้ปกครองแล้ว</label></div>
           <div class="field full"><label>ยา / การปฐมพยาบาล (เพิ่ม)</label>${checks('meds', MEDS, splitMeds(x.medicine))}</div>
-          <div class="field full"><label>การดูแล</label><input class="input" name="care" value="${esc(x.care || '')}" placeholder="เช่น นอนพัก 1 คาบ อาการดีขึ้น"></div></div>`,
+          <div class="field full"><label>การดูแล</label><input class="input" name="care" value="${esc(x.care || '')}" placeholder="เช่น นอนพัก 1 คาบ อาการดีขึ้น"></div>` : ''}</div>`,
         onSubmit: async (v, form) => {
           const meds = [...new Set(splitMeds(x.medicine).filter((m) => !MEDS.includes(m)).concat([...form.querySelectorAll('input[name=meds]:checked')].map((c) => c.value)))];
           const out = new Date(v.outAt || Date.now());
           if (out < new Date(x.at) - 60000) { toast('เวลาออกต้องไม่ก่อนเวลาเข้า'); return false; }
-          const p = { outcome: v.outcome, out_at: out.toISOString(), parent_notified: !!v.parentNotified, care: v.care.trim(), medicine: meds.join(', ') };
-          if (!all().some((r) => r.id === id)) { delete p.care; delete p.medicine; if (v.care.trim()) p.care = v.care.trim(); if (meds.length) p.medicine = meds.join(', '); }
+          const p = { outcome: v.outcome, out_at: out.toISOString(), ...(full ? { parent_notified: !!v.parentNotified, care: v.care.trim(), medicine: meds.join(', ') } : {}) };
           await Store.updateNurse(id, p);
           toast(`${fullName(Store.student(x.studentId))} · ${OUTCOMES[v.outcome][0]}`); App.render();
         } });

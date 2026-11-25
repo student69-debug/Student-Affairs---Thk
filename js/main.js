@@ -180,9 +180,7 @@
     'registry-template': () => Pages.template(),
     'registry-export': () => Pages.exportCSV(),
     'report-export': () => Pages.reportExport(),
-    'import-sample': () => UI.confirmDialog('นำเข้าข้อมูลตัวอย่าง', 'จะเพิ่มนักเรียนชื่อสมมติ 37 คน พร้อมบันทึกพฤติกรรม การให้คำปรึกษา และผลคัดกรองตัวอย่างลงฐานข้อมูล', 'นำเข้า', async () => {
-      await Store.importSample(); await Store.load(); UI.toast('นำเข้าข้อมูลตัวอย่างแล้ว'); render();
-    }),
+    backup: () => Pages.backupDialog(),
     'room-edit': (el) => Pages.roomDialog(el.dataset.id),
     'user-approve': (el) => Pages.approveRequest(el.dataset.id),
     'apps-edit': (el) => Pages.appsDialog(el.dataset.id),
@@ -256,8 +254,7 @@
         if (!t.start || !t.end || t.start >= t.end) { UI.toast('วันของภาคเรียน ' + k + ' ไม่ถูกต้อง: ใส่วันเริ่มและวันสิ้นสุดให้ครบ และวันเริ่มต้องก่อนวันสิ้นสุด'); return; }
         if (i && list[i - 1][1].end >= t.start) { UI.toast('วันของภาคเรียน ' + list[i - 1][0] + ' และ ' + k + ' ไม่ถูกต้อง: ซ้อนกัน'); return; }
       }
-      const old = Store.s.terms;
-      saving = Store.saveSettings({ terms }).catch((err) => { Store.s.terms = old; throw err; });
+      saving = Store.saveSettings({ terms });
     }
     if (f.dataset.form === 'term') saving = Store.saveSettings({ year: Number(v.year), term: Number(v.term) });
     if (f.dataset.form === 'parent-view') saving = Store.saveSettings({ parentView: { enabled: !!v.enabled, registry: !!v.registry, behavior: !!v.behavior, screening: v.screening, visits: v.visits, counsel: v.counsel, health: v.health } });
@@ -288,8 +285,8 @@
     qsItems = list.map((s) => '#/student/' + s.id);
     qsItems.push('#/search?q=' + encodeURIComponent(v));
     qsActive = 0;
-    qsBox.innerHTML = (list.length ? list.map((s, i) => `<a class="qs-item ${i === 0 ? 'on' : ''}" href="#/student/${s.id}" data-i="${i}">
-        <span class="mono">${s.id}</span><span class="grow">${esc(UI.fullName(s))}</span><span class="muted small">${UI.klass(s)}${s.no ? ' เลขที่ ' + s.no : ''}</span>${s.status !== 'studying' ? UI.statusBadge(s.status) : ''}</a>`).join('')
+    qsBox.innerHTML = (list.length ? list.map((s, i) => `<a class="qs-item ${i === 0 ? 'on' : ''}" href="#/student/${esc(s.id)}" data-i="${i}">
+        <span class="mono">${esc(s.id)}</span><span class="grow">${esc(UI.fullName(s))}</span><span class="muted small">${UI.klass(s)}${s.no ? ' เลขที่ ' + s.no : ''}</span>${s.status !== 'studying' ? UI.statusBadge(s.status) : ''}</a>`).join('')
       : '<div class="qs-empty">ไม่พบนักเรียนที่ตรงกับคำค้น</div>') +
       `<a class="qs-item qs-all ${list.length ? '' : 'on'}" href="${qsItems[qsItems.length - 1]}" data-i="${qsItems.length - 1}">${icon('search', 'i16')}<span class="grow">ดูผลการค้นหาทั้งหมด${total > list.length ? ` (${total.toLocaleString()} คน)` : ''}</span></a>`;
     if (!list.length) qsActive = qsItems.length - 1;
@@ -746,7 +743,7 @@
       const btn = f.querySelector('button[type=submit]');
       btn.disabled = true;
       try {
-        const np = await Store.profileRequest({ name, duty: null });
+        const np = await Store.profileRequest(name);
         UI.toast('ส่งข้อมูลแล้ว');
         pendingScreen(np);
       } catch (err) { btn.disabled = false; UI.toast(err.message); }
