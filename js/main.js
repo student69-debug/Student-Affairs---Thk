@@ -617,8 +617,10 @@
     form.querySelector('[data-google]').addEventListener('click', async (e) => {
       const b = e.currentTarget, label = b.innerHTML;
       b.disabled = true; b.querySelector('span:last-child').textContent = t('googleGo');
-      try { await Store.signInWithGoogle(form.remember ? !!form.remember.checked : true); }
-      catch (err) { b.disabled = false; b.innerHTML = label; UI.toast(err.message === 'google-off' ? t('googleOff') : authError(err.message)); }
+      try {
+        if (await Store.signInWithGoogle(form.remember ? !!form.remember.checked : true)) return boot();
+        if (window.top !== window.self) { b.disabled = false; b.innerHTML = label; } // pop-up closed
+      } catch (err) { b.disabled = false; b.innerHTML = label; UI.toast(err.message === 'google-off' ? t('googleOff') : err.message === 'google-fail' ? t('googleFail') : authError(err.message)); }
     });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();

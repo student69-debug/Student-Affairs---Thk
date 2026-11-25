@@ -149,15 +149,36 @@
       return this._authSettings;
     },
     // Google sign-in: leaves the page for Google and comes back signed in (a new account waits for approval like any sign-up).
-    // Google refuses to show inside a frame (the school domain frames this site), so a framed page moves the whole tab.
+    // Google refuses to show inside a frame (the school domain frames this site), so a framed page uses a pop-up that comes back
+    // to google.html and the address in the tab stays; with pop-ups blocked the whole tab moves. true = signed in here.
     async signInWithGoogle(remember = true) {
-      const st = await this.authSettings();
-      if (!(st.external && st.external.google)) throw new Error('google-off');
-      this.setRemember(remember);
       const framed = window.top !== window.self;
-      const { data, error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname, skipBrowserRedirect: framed, queryParams: { prompt: 'select_account' } } });
-      if (error) throw new Error(error.message);
-      if (framed && data && data.url) { try { window.top.location.href = data.url; } catch (e) { window.open(data.url, '_blank', 'noopener'); } }
+      const pop = framed ? window.open('', 'sa-google', 'width=500,height=680') : null; // before any await: a pop-up must come straight from the click
+      try {
+        const st = await this.authSettings();
+        if (!(st.external && st.external.google)) throw new Error('google-off');
+        this.setRemember(remember);
+        const redirectTo = pop ? new URL('google.html', location.href).href : location.origin + location.pathname;
+        const { data, error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo, skipBrowserRedirect: framed, queryParams: { prompt: 'select_account' } } });
+        if (error) throw new Error(error.message);
+        if (!framed) return false;
+        if (!pop) { try { window.top.location.href = data.url; } catch (e) { window.open(data.url, '_blank', 'noopener'); } return false; }
+        pop.location.href = data.url;
+        const answer = await this.googleAnswer(pop);
+        if (!answer) return false; // closed without choosing an account
+        if (!answer.get('access_token')) throw new Error(answer.get('error_description') || 'google-fail');
+        check(await sb.auth.setSession({ access_token: answer.get('access_token'), refresh_token: answer.get('refresh_token') }));
+        return true;
+      } catch (e) { if (pop) pop.close(); throw e; }
+    },
+    // what google.html sends back; only from our own pop-up on this same site. null = the pop-up was closed
+    googleAnswer(pop) {
+      return new Promise((resolve) => {
+        const end = (v) => { clearInterval(timer); removeEventListener('message', got); resolve(v); };
+        const got = (e) => { if (e.origin === location.origin && e.source === pop && e.data && typeof e.data.saGoogle === 'string') end(new URLSearchParams(e.data.saGoogle)); };
+        const timer = setInterval(() => { if (pop.closed) setTimeout(() => end(null), 500); }, 1000);
+        addEventListener('message', got);
+      });
     },
     // forgot password: Supabase emails a link back to this page (it never says whether the email has an account)
     async resetPassword(email) { check(await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname })); },

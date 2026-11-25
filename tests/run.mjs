@@ -124,6 +124,20 @@ const tests = {
     assert.deepEqual([two.role, two.near.length], ['', 2]);
     assert.equal(Pages.planFor({ request: null }), null);
   },
+  'Google pop-up: an answer counts only from our own pop-up on this site; closing it gives up': async () => {
+    let got; const pop = { closed: false }, off = [];
+    Object.assign(ctx, { addEventListener: (k, f) => { got = f; }, removeEventListener: (k) => off.push(k), clearInterval() {}, setInterval: () => 1 });
+    let done = null;
+    const p = Store.googleAnswer(pop).then((v) => { done = v; });
+    for (const e of [{ origin: 'https://evil.example', source: pop }, { origin: '', source: {} }, { origin: '', source: pop, data: {} }]) got({ data: { saGoogle: 'access_token=x' }, ...e });
+    await Promise.resolve();
+    assert.equal(done, null);
+    got({ origin: '', source: pop, data: { saGoogle: 'access_token=a&refresh_token=b' } });
+    await p;
+    assert.deepEqual([done.get('access_token'), done.get('refresh_token'), off.length], ['a', 'b', 1]);
+    ctx.setInterval = (f) => { pop.closed = true; setTimeout(f, 0); return 1; };
+    assert.equal(await Store.googleAnswer(pop), null);
+  },
   'earlier terms: only for admin, grade head and inspector, never a later term': () => {
     for (const [role, n] of [['admin', 1], ['grade_head', 1], ['inspector', 1], ['teacher', 0], ['counselor', 0]]) {
       Store.profile.role = role;

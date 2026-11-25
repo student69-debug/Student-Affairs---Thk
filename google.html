@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>เข้าสู่ระบบด้วย Google</title>
+</head>
+<body style="font-family:sans-serif;text-align:center;padding:40px">
+<p>กำลังเข้าสู่ระบบ…</p>
+<script>
+  // Google sign-in started inside a frame (the school domain) comes back here in a pop-up.
+  // The answer goes only to the page that opened it, and only if that page is this same site; nothing is stored here.
+  const answer = location.hash || (location.search ? '#' + location.search.slice(1) : '');
+  history.replaceState(null, '', location.pathname);
+  if (window.opener) { window.opener.postMessage({ saGoogle: answer.slice(1) }, location.origin); setTimeout(() => window.close(), 300); }
+  else location.replace('./' + answer); // no opener (some browsers): sign in here in the whole tab
+</script>
+</body>
+</html>
