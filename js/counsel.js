@@ -361,13 +361,35 @@
   }
 
   /* ---------- import from the old app's database / export ---------- */
+  // student_id is text on purpose (no real student matches, so an unedited sample is skipped);
+  // new ids on each page load, so an edited sample can't overwrite a case imported from an earlier one
+  let sampleIds;
+  function sample(name) {
+    const [c1, c2, s1, s2, s3, h1, h2] = sampleIds = sampleIds || Array.from({ length: 7 }, () => crypto.randomUUID());
+    const ID = 'ใส่รหัสนักเรียน', consent = '{t,t,t,t,t,t,t,t}';
+    return {
+      cases: [['id', 'student_id', 'open_date', 'problem_types', 'severity', 'plan', 'next_appt', 'owner_email', 'consent'],
+        [c1, ID, '2026-11-03', '{K1,K4}', SEV[1], PLANS[0], '2026-11-17', 'somsri@thk.ac.th', consent],
+        [c2, ID, '2026-11-05', '{K3}', SEV[0], CLOSED, '', 'somsri@thk.ac.th', consent]],
+      case_sessions: [['id', 'case_id', 'session_no', 'session_date', 'note_a', 'note_b', 'note_c', 'note_d', 'checklist'],
+        [s1, c1, 1, '2026-11-03', 'ตัวอย่าง: ประเด็นปัญหา', 'ตัวอย่าง: ข้อมูลจากการพูดคุย', 'ตัวอย่าง: การช่วยเหลือ', 'ตัวอย่าง: ข้อมูลเพิ่มเติม', '{t,t,t,f,t,t}'],
+        [s2, c1, 2, '2026-11-10', 'ตัวอย่าง: ความเปลี่ยนแปลง', '', '', '', '{t,f,t,t,t,t}'],
+        [s3, c2, 1, '2026-11-05', 'ตัวอย่าง: ประเด็นปัญหา', '', '', '', '{t,t,t,t,t,t}']],
+      health_logs: [['id', 'student_id', 'log_date', 'symptom', 'referred', 'detail', 'action_taken', 'recorded_by'],
+        [h1, ID, '2026-11-04', 'ปวดศีรษะ', 'f', 'ตัวอย่าง: พักผ่อนน้อย', 'นอนพัก 1 คาบ', 'ครูสมศรี ตัวอย่าง'],
+        [h2, ID, '2026-11-06', 'มีไข้', 't', 'ตัวอย่าง: ไข้ 38.5', 'แจ้งผู้ปกครองรับกลับ', 'ครูสมศรี ตัวอย่าง']],
+    }[name].map(csvLine).join('\n');
+  }
+  const sampleBtn = (name) => `<button type="button" class="btn ghost sm" data-sample="${name}" style="align-self:flex-start">${icon('download', 'i16')}ไฟล์ตัวอย่าง ${name}</button>`;
+
   function ioPage() {
     return `<div class="grid g2">
       <div class="card"><div class="card-head"><h3>นำเข้าจากระบบให้คำปรึกษาเดิม</h3></div><div class="card-body" style="display:flex;flex-direction:column;gap:12px;font-size:14px">
         <p style="margin:0">ใช้ไฟล์ CSV ที่ส่งออกจากฐานข้อมูลของระบบเดิม (Supabase → Table Editor → Export → CSV) นำเข้าซ้ำได้ — เคสที่เคยนำเข้าแล้วจะถูกอัปเดต ไม่ซ้ำ</p>
-        <div class="field"><label>ตาราง cases <span class="req">*</span></label><input class="input" type="file" id="io-cases" accept=".csv" style="padding-top:6px"></div>
-        <div class="field"><label>ตาราง case_sessions</label><input class="input" type="file" id="io-sessions" accept=".csv" style="padding-top:6px"></div>
-        <div class="field"><label>ตาราง health_logs (บันทึกสุขภาพ)</label><input class="input" type="file" id="io-health" accept=".csv" style="padding-top:6px"></div>
+        <div class="field"><label>ตาราง cases <span class="req">*</span></label><input class="input" type="file" id="io-cases" accept=".csv" style="padding-top:6px">${sampleBtn('cases')}</div>
+        <div class="field"><label>ตาราง case_sessions</label><input class="input" type="file" id="io-sessions" accept=".csv" style="padding-top:6px">${sampleBtn('case_sessions')}</div>
+        <div class="field"><label>ตาราง health_logs (บันทึกสุขภาพ)</label><input class="input" type="file" id="io-health" accept=".csv" style="padding-top:6px">${sampleBtn('health_logs')}</div>
+        <p class="muted small" style="margin:0">ก่อนใช้ไฟล์ตัวอย่าง: เปลี่ยน student_id เป็นรหัสจริง · id ต้องไม่ซ้ำกัน (รูปแบบ UUID) และ case_id ต้องตรงกับ id ในไฟล์ cases · วันที่เป็น ค.ศ. แบบ 2026-11-03 · ถ้าแก้ใน Excel ให้บันทึกเป็น “CSV UTF-8” และดูว่าวันที่ไม่ถูกเปลี่ยนรูปแบบ</p>
         <button class="btn primary" id="io-run" style="align-self:flex-start">${icon('upload', 'i16')}นำเข้า</button>
         <div id="io-result"></div>
       </div></div>
@@ -382,14 +404,19 @@
   const arr = (v) => String(v || '').replace(/^[[{]|[\]}]$/g, '').split(',').map((x) => x.trim().replace(/^"|"$/g, '')).filter(Boolean);
   const bool = (v) => /^(t|true|1)$/i.test(String(v).trim());
   const dateOnly = (v) => { const m = String(v || '').match(/\d{4}-\d{2}-\d{2}/); return m ? m[0] : ''; };
+  // Excel rewrites 2026-11-03 as 3/11/2026: stop here instead of saving the case under today's date
+  const DATE_COLS = ['open_date', 'next_appt', 'session_date', 'log_date'];
   async function csvObjects(file) {
     const rows = UI.parseCSV(await file.text());
     const head = (rows.shift() || []).map((h) => h.trim());
-    return rows.map((r) => Object.fromEntries(head.map((h, i) => [h, r[i] ?? ''])));
+    const list = rows.map((r) => Object.fromEntries(head.map((h, i) => [h, r[i] ?? ''])));
+    list.forEach((r, i) => DATE_COLS.forEach((k) => { if ((r[k] || '').trim() && !/^\s*20\d\d-\d\d-\d\d/.test(r[k])) throw new Error(`แถวที่ ${i + 2} ช่อง ${k}: "${r[k]}" ต้องเป็นวันที่ ค.ศ. แบบ 2026-11-03`); }));
+    return list;
   }
 
   function bindIo() {
     const $ = (id) => document.getElementById(id);
+    document.querySelectorAll('[data-sample]').forEach((b) => b.addEventListener('click', () => UI.download(`ตัวอย่าง-${b.dataset.sample}.csv`, sample(b.dataset.sample))));
     $('io-exp-cases').addEventListener('click', () => {
       const rows = [['เลขประจำตัว', 'ชื่อ - นามสกุล', 'ชั้น', 'วันที่เปิดเคส', 'ประเภทปัญหา', 'ความรุนแรง', 'แผนการดำเนินงาน', 'นัดหมายครั้งถัดไป', 'ผู้รับผิดชอบ', 'จำนวนครั้ง']]
         .concat(cases().map((c) => { const s = Store.student(c.studentId); return [c.studentId, s ? fullName(s) : '', s ? klass(s) : '', c.openDate, c.types.join(' '), c.severity, c.plan, c.nextAppt + (c.nextAppt && c.nextTime ? ' ' + c.nextTime : ''), ownerName(c.owner), sessionDates(c).length]; }));
@@ -482,6 +509,7 @@
   }
 
   window.CounselApp = {
+    sample, csvObjects,
     id: 'counsel', name: 'ให้คำปรึกษา', short: 'ให้คำปรึกษา', icon: 'messages-square', rule: 'rule',
     summary, events, studentTab, openRecord, page, cases, progress, KTYPES,
     resetDraft() { draft = null; },

@@ -17,7 +17,7 @@ const query = (table) => {
 };
 const sb = { from: query, rpc: (fn, a) => query('rpc:' + fn + ':' + JSON.stringify(a ?? null)), auth: { onAuthStateChange() {} }, storage: { from: () => ({ remove: async () => ({ data: null, error: { message: 'network' } }) }) } };
 const storage = { getItem: () => null, setItem() {}, removeItem() {} };
-const ctx = vm.createContext({ console, setTimeout, clearTimeout, setInterval: () => 0, localStorage: storage, sessionStorage: storage, location: { hash: '', pathname: '/', origin: '' }, URLSearchParams, Date, Math, JSON, Map, Set,
+const ctx = vm.createContext({ console, setTimeout, clearTimeout, setInterval: () => 0, localStorage: storage, sessionStorage: storage, location: { hash: '', pathname: '/', origin: '' }, URLSearchParams, Date, Math, JSON, Map, Set, crypto,
   document: { addEventListener() {}, getElementById: () => null, querySelector: () => null }, addEventListener() {}, MutationObserver: class { observe() {} } });
 ctx.window = ctx; ctx.supabase = { createClient: () => sb };
 for (const f of ['config.js', 'store.js', 'ui.js', 'charts.js', 'counsel.js', 'apps.js', 'drugs.js', 'nurse.js', 'pages.js']) vm.runInContext(read(f), ctx, { filename: f });
@@ -98,6 +98,15 @@ const tests = {
     Store.profile.role = 'grade_head';
     await Store.refresh('students');
     assert.equal(Store.activeStudents().length, 2);
+  },
+  'counsel import: the sample files read back, match no student, and a date rewritten by Excel is refused': async () => {
+    const { sample, csvObjects } = ctx.CounselApp;
+    const open = (text) => csvObjects({ text: async () => text });
+    const [cases, sess, health] = [await open(sample('cases')), await open(sample('case_sessions')), await open(sample('health_logs'))];
+    assert.ok(sess.length && sess.every((s) => cases.some((c) => c.id === s.case_id)));
+    for (const r of [...cases, ...health]) assert.ok(/^[0-9a-f-]{36}$/.test(r.id) && !/^\d+$/.test(r.student_id));
+    await assert.rejects(open(sample('cases').replace('2026-11-03', '3/11/2026')), /open_date/);
+    await assert.rejects(open(sample('cases').replace('2026-11-03', '2569-11-03')), /open_date/);
   },
   'earlier terms: only for admin, grade head and inspector, never a later term': () => {
     for (const [role, n] of [['admin', 1], ['grade_head', 1], ['inspector', 1], ['teacher', 0], ['counselor', 0]]) {
