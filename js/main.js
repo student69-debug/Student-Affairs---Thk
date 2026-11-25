@@ -738,7 +738,7 @@
     if (rq) document.getElementById('req-cancel').addEventListener('click', () => pendingScreen(p));
     f.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = f.name.value.trim().replace(/s+/g, ' ');
+      const name = f.name.value.trim().replace(/\s+/g, ' ');
       if (!thai(name) || name.length < 4) { UI.toast('กรอกชื่อ – นามสกุลภาษาไทยตามรายชื่อของโรงเรียน'); f.name.focus(); return; }
       const btn = f.querySelector('button[type=submit]');
       btn.disabled = true;
