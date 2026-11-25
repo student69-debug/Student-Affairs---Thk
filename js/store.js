@@ -256,7 +256,7 @@
 
     async load() {
       const s = check(await sb.from('app_settings').select('*').eq('id', 1).single());
-      this.data = { settings: { year: s.year, term: s.term, baseScore: s.base_score, warnBelow: s.warn_below, alertBelow: s.alert_below, apps: s.apps || {}, parentView: s.parent_view || {}, restoreRoles: s.restore_roles || {}, drugPoints: s.drug_points || {} },
+      this.data = { settings: { year: s.year, term: s.term, baseScore: s.base_score, warnBelow: s.warn_below, alertBelow: s.alert_below, apps: s.apps || {}, parentView: s.parent_view || {}, restoreRoles: s.restore_roles || {}, drugPoints: s.drug_points || {}, terms: s.terms || {} },
         behavior: {}, care: {}, history: [] };
       this.data.gradeStaff = [];
       this.data.subjects = [];
@@ -369,10 +369,10 @@
       await this.refresh(kind);
     },
     /* ---- one incident, several students (e.g. a fight) ---- */
-    async recordIncident({ at, place, detail, rule, people }) {
+    async recordIncident({ at, place, detail, rule, people, term = this.termKey() }) {
       const inc = check(await sb.from('behavior_incidents').insert({ occurred_at: at, place: place || '', detail: detail || '' }).select('id').single());
       check(await sb.from('behavior_records').insert(people.map((p) => ({
-        student_id: p.studentId, rule_id: rule.id, title: rule.name, points: p.points, note: detail || '', at, term: this.termKey(),
+        student_id: p.studentId, rule_id: rule.id, title: rule.name, points: p.points, note: detail || '', at, term,
         incident_id: inc.id, involvement: p.involvement,
       }))));
       await this.refresh('records', 'incidents', 'incidentPeople');
@@ -440,7 +440,7 @@
     async saveSettings(patch) {
       Object.assign(this.s, patch);
       const s = this.s;
-      check(await sb.from('app_settings').update({ year: s.year, term: s.term, base_score: s.baseScore, warn_below: s.warnBelow, alert_below: s.alertBelow, apps: s.apps, parent_view: s.parentView, restore_roles: s.restoreRoles, drug_points: s.drugPoints }).eq('id', 1));
+      check(await sb.from('app_settings').update({ year: s.year, term: s.term, base_score: s.baseScore, warn_below: s.warnBelow, alert_below: s.alertBelow, apps: s.apps, parent_view: s.parentView, restore_roles: s.restoreRoles, drug_points: s.drugPoints, terms: s.terms }).eq('id', 1));
     },
     async log(studentId, action, detail) {
       await this.add('history', { studentId: studentId || '', action, detail });
@@ -497,6 +497,12 @@
       return [g.length ? 'ระดับชั้น ' + g.map((x) => 'ม.' + x).join(', ') : '', r.length ? 'ห้องที่ปรึกษา ' + r.map((t) => 'ม.' + t.grade + '/' + t.room).join(', ') : ''].filter(Boolean).join(' · ');
     },
     termKey() { return this.s.term + '/' + this.s.year; },
+    // earlier terms this person may record behaviour into, newest first (the database checks role, term and date again)
+    pastTerms() {
+      const ord = (k) => k.slice(2) + k[0];
+      return ['admin', 'grade_head', 'inspector'].includes(this.profile && this.profile.role)
+        ? Object.keys(this.s.terms || {}).filter((k) => ord(k) < ord(this.termKey())).sort((a, b) => (ord(a) < ord(b) ? 1 : -1)) : [];
+    },
   };
 
   window.Store = Store;

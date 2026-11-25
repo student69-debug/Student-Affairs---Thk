@@ -247,6 +247,18 @@
       if (!(b > 0 && a < w && w <= b)) { UI.toast('เกณฑ์ไม่ถูกต้อง: เสี่ยงสูง < เฝ้าระวัง ≤ คะแนนตั้งต้น'); return; }
       saving = Store.saveSettings({ baseScore: b, warnBelow: w, alertBelow: a });
     }
+    if (f.dataset.form === 'term-dates') {
+      const terms = {};
+      Object.entries(v).forEach(([n, d]) => { const [k, p] = n.split('|'); if (d) (terms[k] = terms[k] || {})[p] = d; });
+      const list = Object.entries(terms).sort((a, b) => ((a[1].start || '') < (b[1].start || '') ? -1 : 1));
+      for (let i = 0; i < list.length; i++) {
+        const [k, t] = list[i];
+        if (!t.start || !t.end || t.start >= t.end) { UI.toast('วันของภาคเรียน ' + k + ' ไม่ถูกต้อง: ใส่วันเริ่มและวันสิ้นสุดให้ครบ และวันเริ่มต้องก่อนวันสิ้นสุด'); return; }
+        if (i && list[i - 1][1].end >= t.start) { UI.toast('วันของภาคเรียน ' + list[i - 1][0] + ' และ ' + k + ' ไม่ถูกต้อง: ซ้อนกัน'); return; }
+      }
+      const old = Store.s.terms;
+      saving = Store.saveSettings({ terms }).catch((err) => { Store.s.terms = old; throw err; });
+    }
     if (f.dataset.form === 'term') saving = Store.saveSettings({ year: Number(v.year), term: Number(v.term) });
     if (f.dataset.form === 'parent-view') saving = Store.saveSettings({ parentView: { enabled: !!v.enabled, registry: !!v.registry, behavior: !!v.behavior, screening: v.screening, visits: v.visits, counsel: v.counsel, health: v.health } });
     saving.then(() => { UI.toast('บันทึกการตั้งค่าแล้ว'); render(); }, fail);

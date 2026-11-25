@@ -76,6 +76,16 @@
   }
   const hashOf = (base, o) => base + '?' + new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== '')).toString();
 
+  // the date must belong to the chosen term (mirror of private.behavior_term_error); '' = fine. at = datetime-local value
+  function termDateError(term, at) {
+    const day = String(at || '').slice(0, 10), terms = Store.s.terms || {}, t = terms[term];
+    if (!day) return 'กรุณาระบุวันที่ / เวลาที่เกิดเหตุ';
+    if (term !== Store.termKey()) return t && day >= t.start && day <= t.end ? '' : 'วันที่เกิดเหตุต้องอยู่ในภาคเรียน ' + term;
+    const other = Object.keys(terms).find((k) => k !== term && day >= terms[k].start && day <= terms[k].end);
+    if (other) return `วันที่เกิดเหตุอยู่ในภาคเรียน ${other} ไม่ใช่ ${term}`;
+    return t && day < t.start ? 'วันที่เกิดเหตุอยู่ก่อนวันเริ่มภาคเรียน ' + term : '';
+  }
+
   /* ================= พฤติกรรม / ตัดคะแนน ================= */
   const behavior = {
     id: 'behavior', name: 'พฤติกรรม / ตัดคะแนน', short: 'พฤติกรรม', icon: 'clipboard-pen', rule: 'rule-red',
@@ -114,6 +124,7 @@
         </tbody></table></div>` : empty('ยังไม่มีบันทึกพฤติกรรมในภาคเรียนนี้')}`;
     },
     openRecord(sid, restoreOnly = false) {
+      const past = Store.pastTerms();
       const rules = activeRules().filter((r) => (restoreOnly ? r.restore : true));
       const opt = (list) => list.map((r) => `<option value="${r.id}" data-p="${r.points}" data-info="${esc(ruleInfo(r))}">${esc(ruleLabel(r))}</option>`).join('');
       const d = dialog({
@@ -123,7 +134,8 @@
             ${ruleGroups(rules).map(([cat, list]) => `<optgroup label="${esc(cat)}">${opt(list)}</optgroup>`).join('')}</select>
             <span class="help" data-rule-info>${esc(ruleInfo(rules[0]))}</span></div>
           <div class="field"><label>คะแนน <span class="req">*</span></label><input class="input mono" type="number" name="points" required value="${rules[0] ? rules[0].points : 0}"><span class="help">ติดลบ = ตัดคะแนน · ลดได้ แต่ไม่เกินที่ระเบียบกำหนด</span></div>
-          <div class="field"><label>วันที่ / เวลาที่เกิดเหตุ</label><input class="input" type="datetime-local" name="at" value="${localInput()}"></div>
+          <div class="field"><label>วันที่ / เวลาที่เกิดเหตุ</label><input class="input" type="datetime-local" name="at" required value="${localInput()}"></div>
+          ${past.length ? `<div class="field full"><label>ภาคเรียน</label><select class="select" name="term">${optList([[Store.termKey(), Store.termKey() + ' (ปัจจุบัน)']].concat(past.map((k) => [k, k + ' (ย้อนหลัง)'])), Store.termKey())}</select><span class="help" data-term-info></span></div>` : ''}
           ${restoreOnly ? '' : `<label class="full inc-toggle"><input type="checkbox" name="multi"> <span><b>เหตุการณ์ที่มีนักเรียนหลายคน</b> (เช่น ทะเลาะวิวาท) — ลงผู้ก่อเหตุและผู้ร่วมกระทำพร้อมกัน</span></label>
           <div class="full inc-box" hidden>
             <div class="field"><label>บทบาทของนักเรียนคนแรก</label><select class="select" name="role0"><option>ผู้ก่อเหตุ</option><option>ผู้ร่วมกระทำ</option></select></div>
@@ -137,6 +149,9 @@
           const id = parseStudent(v.student);
           if (!id) { toast('ไม่พบรหัสนักเรียน กรุณาเลือกจากรายการ'); return false; }
           const rule = D().behavior.rules.find((r) => r.id === v.rule);
+          const term = v.term || Store.termKey(), isPast = term !== Store.termKey();
+          const bad = termDateError(term, v.at);
+          if (bad) { toast(bad, 'error'); return false; }
           if (v.multi) {
             const people = [{ studentId: id, involvement: v.role0, points: Number(v.points) }];
             for (const row of form.querySelectorAll('.inc-row')) {
@@ -149,20 +164,30 @@
             }
             if (people.length < 2) { toast('เพิ่มนักเรียนที่เกี่ยวข้องอย่างน้อย 1 คน หรือยกเลิกการเลือก "เหตุการณ์ที่มีนักเรียนหลายคน"'); return false; }
             const at = new Date(v.at || Date.now()).toISOString();
-            await Store.recordIncident({ at, place: (v.place || '').trim(), detail: v.note.trim(), rule, people });
+            await Store.recordIncident({ at, place: (v.place || '').trim(), detail: v.note.trim(), rule, people, term });
             toast(`บันทึกเหตุการณ์แล้ว · ${rule.name} · ${people.length} คน (${people.map((p) => p.involvement).filter((x, i, a) => a.indexOf(x) === i).join(' / ')})`);
             App.render();
             return;
           }
           const before = this.score(id);
-          await Store.add('records', { studentId: id, ruleId: rule.id, title: rule.name, points: Number(v.points), note: v.note.trim(), at: new Date(v.at || Date.now()).toISOString(), term: Store.termKey() });
+          await Store.add('records', { studentId: id, ruleId: rule.id, title: rule.name, points: Number(v.points), note: v.note.trim(), at: new Date(v.at || Date.now()).toISOString(), term });
           const after = this.score(id), p = Number(v.points);
-          toast(`บันทึกเรียบร้อยแล้ว · ${p < 0 ? 'ตัดคะแนน ' + Math.abs(p) : 'เพิ่มคะแนน ' + p} · ${fullName(Store.student(id))}${Store.student(id).mine ? ' · คงเหลือ ' + after : ''}`);
+          toast(`บันทึกเรียบร้อยแล้ว · ${p < 0 ? 'ตัดคะแนน ' + Math.abs(p) : 'เพิ่มคะแนน ' + p} · ${fullName(Store.student(id))}${isPast ? ` · ภาคเรียน ${term} (คะแนนภาคเรียนปัจจุบันเท่าเดิม)` : Store.student(id).mine ? ' · คงเหลือ ' + after : ''}`);
           if (Store.student(id).mine && before >= Store.s.alertBelow && after < Store.s.alertBelow) setTimeout(() => toast(`คะแนนต่ำกว่า ${Store.s.alertBelow} — ถึงเกณฑ์เชิญผู้ปกครองทำทัณฑ์บน (ข้อ 51.4)`), 400);
           App.render();
         },
       });
       const sel = d.form.rule, pts = d.form.points;
+      if (d.form.term) {
+        const now = d.form.at.value, info = d.form.querySelector('[data-term-info]');
+        d.form.term.addEventListener('change', () => {
+          const k = d.form.term.value, isPast = k !== Store.termKey(), t = Store.s.terms[k] || {};
+          d.form.at.min = t.start ? t.start + 'T00:00' : '';
+          d.form.at.max = isPast ? t.end + 'T23:59' : '';
+          d.form.at.value = isPast ? '' : now; // an earlier term needs its own date
+          info.textContent = isPast ? `เลือกวันที่ระหว่าง ${fmtDate(t.start)} – ${fmtDate(t.end)} · ไม่กระทบคะแนนภาคเรียนปัจจุบัน` : '';
+        });
+      }
       // same limits as the database: keep the rule's sign, may reduce but not exceed it (discretion rules up to 100)
       const limits = () => { const r = D().behavior.rules.find((x) => x.id === sel.value); if (!r) return [-100, 100]; const cap = r.level === 'ดุลยพินิจ' ? 100 : Math.abs(r.points); return r.points < 0 ? [-cap, -1] : [1, cap]; };
       const applyLimits = (inp) => { const [mn, mx] = limits(); inp.min = mn; inp.max = mx; inp.title = `คะแนน ${mn} ถึง ${mx}`; };

@@ -497,6 +497,17 @@
     UI.download(`รายงาน-${Store.s.term}-${Store.s.year}.csv`, out.map(csvRow).join('\n'));
   }
 
+  // ตั้งค่า → ภาคเรียน: วันเริ่ม/สิ้นสุดของแต่ละภาคเรียน (ใช้ตรวจวันที่ของบันทึกพฤติกรรม และเปิดให้บันทึกย้อนภาคเรียน)
+  function termDatesHtml(admin) {
+    const terms = Store.s.terms || {}, y = Store.s.year;
+    const keys = [...new Set(Object.keys(terms).concat('1/' + y, '2/' + y))].sort((a, b) => (a.slice(2) + a[0] < b.slice(2) + b[0] ? 1 : -1));
+    const inp = (k, f) => `<input class="input" type="date" name="${esc(k)}|${f}" value="${esc((terms[k] || {})[f] || '')}" ${admin ? '' : 'disabled'} aria-label="${f === 'start' ? 'วันเริ่ม' : 'วันสิ้นสุด'} ${esc(k)}">`;
+    return `<form class="card" data-form="term-dates" style="max-width:640px"><div class="card-head"><h3>วันเริ่ม – สิ้นสุดภาคเรียน</h3></div>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>ภาคเรียน</th><th>วันเริ่ม</th><th>วันสิ้นสุด</th></tr></thead><tbody>${keys.map((k) => `<tr><td><b>${esc(k)}</b>${k === Store.termKey() ? ' <span class="badge b-navy">ปัจจุบัน</span>' : ''}</td><td>${inp(k, 'start')}</td><td>${inp(k, 'end')}</td></tr>`).join('')}</tbody></table></div>
+      <div class="card-body"><div class="notice">${icon('info', 'i16')}<span>ผู้ดูแลระบบ หัวหน้าระดับ และสารวัตรนักเรียน บันทึกพฤติกรรมย้อนเข้าภาคเรียนก่อนหน้าที่กำหนดวันไว้ได้ · วันที่เกิดเหตุต้องอยู่ในภาคเรียนนั้น · เว้นว่างทั้งสองช่อง = ไม่เปิดให้ย้อน</span></div></div>
+      ${admin ? '<div class="dialog-foot"><button class="btn primary" type="submit">บันทึกวันของภาคเรียน</button></div>' : ''}</form>`;
+  }
+
   /* ---------------- ตั้งค่า ---------------- */
   const ROLES = { admin: 'ผู้ดูแลระบบ', counselor: 'ครูแนะแนว', grade_head: 'หัวหน้า / รองหัวหน้าระดับ', inspector: 'สารวัตรนักเรียน', teacher: 'ครูที่ปรึกษา / ครูทั่วไป', pending: 'รออนุมัติ (ไม่มีสิทธิ์)' };
   // ตั้งค่า → จัดการแอป: บทบาทใดดู/กู้คืน "ที่ลบไว้ (30 วัน)" ของแต่ละแอปได้ (แอปใหม่ขึ้นในตารางเอง)
@@ -748,7 +759,7 @@
         <div class="field"><label>ปีการศึกษา (พ.ศ.)</label><input class="input mono" type="number" name="year" value="${Store.s.year}" ${admin ? '' : 'disabled'}></div>
         <div class="field"><label>ภาคเรียน</label><select class="select" name="term" ${admin ? '' : 'disabled'}><option value="1" ${Store.s.term === 1 ? 'selected' : ''}>1</option><option value="2" ${Store.s.term === 2 ? 'selected' : ''}>2</option></select></div>
         <div class="full notice">${icon('info', 'i16')}<span>คะแนนพฤติกรรมนับแยกตามภาคเรียน เมื่อเปลี่ยนภาคเรียน คะแนนทุกคนเริ่มจากคะแนนตั้งต้นใหม่ (บันทึกเดิมยังเก็บไว้)</span></div></div></div>
-        ${admin ? '<div class="dialog-foot"><button class="btn primary" type="submit">บันทึก</button></div>' : ''}</form>`;
+        ${admin ? '<div class="dialog-foot"><button class="btn primary" type="submit">บันทึก</button></div>' : ''}</form>` + termDatesHtml(admin);
     } else if (tab === 'subjects' && admin) {
       return { title: 'ตั้งค่า', html: tabs + subjectsHtml(), after: bindSubjects };
     } else if (tab === 'feedback' && admin) {
