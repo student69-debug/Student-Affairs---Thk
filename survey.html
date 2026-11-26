@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>แบบประเมินตนเอง · ระบบกิจการนักเรียน</title>
+<link rel="icon" type="image/png" href="img/favicon.png?v=20261126g">
+<link rel="stylesheet" href="css/styles.css?v=20261126g">
+<style>
+  body{background:var(--ink-50)}
+  .sv{max-width:680px;margin:0 auto;padding:20px 14px 60px;display:flex;flex-direction:column;gap:14px}
+  .sv-head{display:flex;gap:12px;align-items:center}
+  .sv-head img{width:48px;height:48px}
+  .sv-q{padding:14px 16px}
+  .sv-q p{margin:0 0 10px;font-weight:500}
+  .sv-opts{display:flex;flex-wrap:wrap;gap:8px}
+  .sv-opts label{flex:1;min-width:110px;border:1px solid var(--ink-200);border-radius:var(--radius-md);padding:10px;text-align:center;cursor:pointer;background:var(--white)}
+  .sv-opts input{position:absolute;opacity:0;pointer-events:none}
+  .sv-opts input:checked+span{font-weight:600;color:var(--navy-800)}
+  .sv-opts label:has(input:checked){border-color:var(--navy-800);background:var(--navy-50)}
+  .sv-opts label:has(input:focus-visible){outline:2px solid var(--navy-800);outline-offset:2px}
+  .sv-help{border-left:4px solid var(--red-700)}
+</style>
+</head>
+<body>
+<main class="sv" id="sv"><div class="card card-body">กำลังโหลด…</div></main>
+<script src="js/config.js?v=20261126g"></script>
+<script>
+/* แบบประเมินตนเอง (นักเรียนกรอก) — ไม่ต้องเข้าระบบ: ใช้รหัสรอบจากครู + รหัสนักเรียน + เลขบัตรประชาชน 4 ตัวท้าย
+   คะแนนคิดในฐานข้อมูล (survey_submit) หน้านี้ไม่ได้รับชื่อหรือข้อมูลของใคร */
+(function () {
+  const C = window.SA_CONFIG, root = document.getElementById('sv');
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const rpc = (fn, body) => fetch(C.supabaseUrl + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error('การเชื่อมต่อขัดข้อง (' + r.status + ')'))));
+  // our own questions (not SDQ); 1-8 difficulties, 9-10 strengths, 11-12 yes / no
+  const SCALE = ['ไม่เลย', 'บางครั้ง', 'บ่อย', 'เกือบทุกวัน'];
+  const Q = ['รู้สึกเครียดหรือกังวลจนทำอะไรไม่ค่อยได้', 'รู้สึกเศร้า เบื่อ หรือไม่อยากทำอะไร', 'นอนไม่หลับ หรือนอนมากกว่าปกติ', 'โกรธหรือหงุดหงิดง่ายกว่าปกติ',
+    'รู้สึกโดดเดี่ยว ไม่มีใครเข้าใจ', 'ถูกเพื่อนล้อ แกล้ง หรือรังแก (ทั้งต่อหน้าและออนไลน์)', 'เรียนไม่ทัน หรือกังวลเรื่องการเรียนมาก', 'มีปัญหาหรือความขัดแย้งที่บ้าน',
+    'มีเพื่อนหรือคนที่ไว้ใจ คุยด้วยได้เมื่อมีเรื่องไม่สบายใจ', 'รู้สึกปลอดภัยเมื่ออยู่ที่โรงเรียน'];
+  const YN = ['ช่วงนี้เคยคิดอยากทำร้ายตัวเอง หรือคิดว่าไม่อยากมีชีวิตอยู่', 'อยากคุยกับครูที่ปรึกษาหรือครูแนะแนว'];
+  const HELP = '<div class="card card-body sv-help"><b>ถ้ารู้สึกไม่ไหว ไม่ต้องรอ</b><br>บอกครูที่ไว้ใจได้เลย หรือโทรสายด่วนสุขภาพจิต <a href="tel:1323"><b>1323</b></a> (ฟรี ตลอด 24 ชั่วโมง)</div>';
+  const code = (new URLSearchParams(location.search).get('c') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  history.replaceState(null, '', location.pathname + (code ? '?c=' + code : ''));
+  const head = (sub) => `<div class="sv-head"><img src="img/logo.png" alt=""><div><b>โรงเรียนธรรมศาสตร์คลองหลวงวิทยาคม</b><div class="muted small">${sub}</div></div></div>`;
+  const msg = (t, kind = '') => { root.innerHTML = head('แบบประเมินตนเอง') + `<div class="card card-body ${kind}">${t}</div>` + HELP; };
+
+  if (!code) { msg('ไม่พบรหัสแบบประเมิน — สแกน QR หรือเปิดลิงก์ที่ครูให้อีกครั้ง'); return; }
+  rpc('survey_round', { p_code: code }).then((r) => {
+    if (!r || !r.open) { msg('แบบประเมินรอบนี้ปิดแล้ว หรือรหัสไม่ถูกต้อง — ถามครูที่ปรึกษา'); return; }
+    const opt = (n, i, labels) => `<div class="sv-opts" role="radiogroup">${labels.map((l, v) => `<label><input type="radio" name="q${i}" value="${v}" required><span>${l}</span></label>`).join('')}</div>`;
+    root.innerHTML = head(`แบบประเมินตนเอง · ม.${esc(r.grade)}/${esc(r.room)} · เปิดถึง ${new Date(r.closes_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}`) + `
+      <div class="card card-body"><b>คำชี้แจง</b><br>ตอบตามความรู้สึกจริงใน <b>2 สัปดาห์ที่ผ่านมา</b> ไม่มีถูกหรือผิด คำตอบเห็นเฉพาะครูที่ดูแลนักเรียน ใช้เพื่อช่วยเหลือ ไม่มีผลต่อคะแนนเรียนหรือคะแนนความประพฤติ</div>
+      <form id="f" class="sv" style="padding:0" novalidate>
+        <div class="card card-body form-grid">
+          <div class="field"><label>รหัสนักเรียน</label><input class="input mono" name="sid" inputmode="numeric" autocomplete="off" required maxlength="10"></div>
+          <div class="field"><label>เลขบัตรประชาชน 4 ตัวท้าย</label><input class="input mono" name="cid4" inputmode="numeric" autocomplete="off" required maxlength="4" pattern="[0-9A-Za-z]{4}"></div></div>
+        ${Q.map((q, i) => `<div class="card sv-q"><p>${i + 1}. ${q}</p>${opt(4, i, SCALE)}</div>`).join('')}
+        ${YN.map((q, j) => `<div class="card sv-q"><p>${Q.length + j + 1}. ${q}</p>${opt(2, Q.length + j, ['ไม่ใช่', 'ใช่'])}</div>`).join('')}
+        <div class="card sv-q"><p>มีอะไรอยากบอกครูไหม (ไม่บังคับ)</p><textarea class="textarea" name="msg" maxlength="500"></textarea></div>
+        <button class="btn primary" type="submit" style="align-self:stretch;height:48px">ส่งคำตอบ</button>
+        <div id="err" class="muted" role="alert"></div></form>` + HELP;
+    const f = document.getElementById('f');
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const err = document.getElementById('err');
+      const ans = [...Array(Q.length + YN.length)].map((_, i) => { const x = f.querySelector(`[name=q${i}]:checked`); return x ? Number(x.value) : null; });
+      if (!/^\d{3,10}$/.test(f.sid.value.trim())) { err.textContent = 'ใส่รหัสนักเรียนเป็นตัวเลข'; f.sid.focus(); return; }
+      if (f.cid4.value.trim().length !== 4) { err.textContent = 'ใส่เลขบัตรประชาชน 4 ตัวท้าย'; f.cid4.focus(); return; }
+      const miss = ans.indexOf(null);
+      if (miss >= 0) { err.textContent = `ยังไม่ได้ตอบข้อ ${miss + 1}`; f.querySelector(`[name=q${miss}]`).closest('.card').scrollIntoView({ block: 'center' }); return; }
+      const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'กำลังส่ง…';
+      rpc('survey_submit', { p_code: code, p_student: f.sid.value.trim(), p_cid4: f.cid4.value.trim(), p_answers: ans, p_message: f.msg.value.trim() }).then((x) => {
+        const T = { ok: 'ส่งคำตอบแล้ว ขอบคุณที่ตอบตามจริง', done: 'รหัสนักเรียนนี้ส่งคำตอบรอบนี้ไปแล้ว', invalid: 'รหัสนักเรียนหรือเลขบัตร 4 ตัวท้ายไม่ตรงกับนักเรียนห้องนี้ ลองใหม่ (ผิด 5 ครั้งจะถูกล็อก)',
+          locked: 'ใส่ผิดเกิน 5 ครั้ง รหัสนักเรียนนี้ถูกล็อกในรอบนี้ ติดต่อครูที่ปรึกษา', closed: 'แบบประเมินรอบนี้ปิดแล้ว', bad: 'คำตอบไม่ครบหรือไม่ถูกต้อง ลองใหม่' };
+        if (x === 'ok' || x === 'done' || x === 'locked' || x === 'closed') { msg(`<b>${T[x]}</b>${x === 'ok' && (ans[10] === 1 || ans[11] === 1) ? '<br>ครูจะติดต่อกลับโดยเร็ว' : ''}`); return; }
+        err.textContent = T[x] || 'ส่งไม่สำเร็จ ลองใหม่'; btn.disabled = false; btn.textContent = 'ส่งคำตอบ';
+      }).catch((e2) => { err.textContent = 'ส่งไม่สำเร็จ: ' + e2.message; btn.disabled = false; btn.textContent = 'ส่งคำตอบ'; });
+    });
+  }).catch((e) => msg('โหลดแบบประเมินไม่สำเร็จ: ' + esc(e.message)));
+})();
+</script>
+</body>
+</html>

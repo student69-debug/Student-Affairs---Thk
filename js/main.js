@@ -99,6 +99,14 @@
     'drug-del': (el) => UI.deleteDialog({ title: 'ลบบันทึกบุหรี่ / สารเสพติด', text: `<p style="margin:0 0 10px">ต้องการลบบันทึกนี้ใช่หรือไม่?</p><div class="notice warn">${UI.icon('info', 'i16')}<span>· รายการจะหายทันที รวมถึงการตัดคะแนนที่มากับบันทึกนี้ (คะแนนจะถูกคำนวณใหม่)<br>· ระบบ<b>เก็บไว้ 30 วัน</b> กู้คืนได้ที่แท็บ "ที่ลบไว้ (30 วัน)" ของแอปนี้ (คืนทั้งบันทึกและคะแนน)<br>· ครบ 30 วันแล้วลบถาวร · การลบถูกบันทึกพร้อมชื่อคุณ</span></div>`, label: 'ลบรายการ',
       run: (pw) => Store.deleteItem('drug', el.dataset.id, pw),
       onDone: (r) => { UI.toast(r === 'ok' ? 'ลบแล้ว · เก็บไว้ 30 วัน ที่แท็บ "ที่ลบไว้" ของแอปบุหรี่ / สารเสพติด' : 'ไม่พบรายการนี้'); render(); } }),
+    'survey-open': async () => {
+      const [g, r] = document.getElementById('sv-room').value.split('/').map(Number);
+      const code = await Store.surveyOpen(g, r, Number(document.getElementById('sv-hours').value));
+      render(); const x = (Store.data.surveyRounds || []).find((y) => y.code === code); if (x) Apps.get('care').openQr(x.id);
+    },
+    'survey-qr': (el) => Apps.get('care').openQr(el.dataset.id),
+    'survey-close': (el) => UI.confirmDialog('ปิดรอบแบบประเมิน', 'นักเรียนจะส่งคำตอบรอบนี้ไม่ได้อีก', 'ปิดรอบ', async () => { await Store.surveyClose(el.dataset.id); UI.toast('ปิดรอบแล้ว'); render(); }),
+    'survey-refresh': async () => { await Store.refresh('surveyRounds', 'surveyResponses', 'screenings'); UI.toast('โหลดผลล่าสุดแล้ว'); render(); },
     'leave-new': (el) => Apps.get('leave').openNew(S(el)),
     'leave-act': (el) => Apps.get('leave').act(el.dataset.id, el.dataset.act),
     'leave-view': (el) => Apps.get('leave').view(el.dataset.id),
@@ -219,7 +227,9 @@
     const el = e.target.closest('[data-action]');
     if (!el || !ACTIONS[el.dataset.action]) return;
     e.preventDefault();
-    ACTIONS[el.dataset.action](el);
+    // an action that fails (refused by the database, network) tells the user instead of failing silently
+    const fail = (err) => UI.toast('ทำรายการไม่สำเร็จ: ' + (err && err.message ? err.message : err), 'error');
+    try { const r = ACTIONS[el.dataset.action](el); if (r && typeof r.catch === 'function') r.catch(fail); } catch (err) { fail(err); }
   });
 
   document.addEventListener('change', (e) => {

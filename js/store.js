@@ -38,6 +38,8 @@
     referrals: { table: 'care_referrals', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['type', 'type'], ['to', 'to'], ['note', 'note']] },
     discipline: { table: 'discipline_checks', order: 'at', desc: true, cols: [['id', 'id'], ['at', 'at'], ['term', 'term'], ['grade', 'grade'], ['room', 'room'], ['items', 'items'], ['checked', 'checked'], ['findings', 'findings'], ['note', 'note'], ['by', 'by_name'], ['byUser', 'by_user']] },
     leave: { table: 'leave_requests', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['term', 'term'], ['leaveDate', 'leave_date'], ['outPlan', 'out_plan'], ['backPlan', 'back_plan'], ['returns', 'returns'], ['reason', 'reason'], ['detail', 'detail'], ['pickup', 'pickup'], ['pickupName', 'pickup_name'], ['pickupRelation', 'pickup_relation'], ['pickupPhone', 'pickup_phone'], ['parentContacted', 'parent_contacted'], ['photos', 'photos'], ['status', 'status'], ['log', 'log'], ['advisorName', 'advisor_name'], ['approveName', 'approve_name'], ['outAt', 'out_at'], ['backAt', 'back_at'], ['by', 'by_name'], ['byUser', 'by_user']] },
+    surveyRounds: { table: 'survey_rounds', order: 'opens_at', desc: true, cols: [['id', 'id'], ['code', 'code'], ['grade', 'grade'], ['room', 'room'], ['opensAt', 'opens_at'], ['closesAt', 'closes_at'], ['closed', 'closed'], ['by', 'by_name'], ['byUser', 'by_user']] },
+    surveyResponses: { table: 'survey_responses', order: 'at', desc: true, cols: [['id', 'id'], ['roundId', 'round_id'], ['studentId', 'student_id'], ['at', 'at'], ['score', 'score'], ['result', 'result'], ['urgent', 'urgent'], ['wantsHelp', 'wants_help'], ['message', 'message']] },
     drugs: { table: 'drug_cases', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['term', 'term'], ['category', 'category'], ['substance', 'substance'], ['act', 'act'], ['foundBy', 'found_by'], ['place', 'place'], ['items', 'items'], ['level', 'level'], ['actions', 'actions'], ['points', 'points'], ['recordId', 'behavior_record_id'], ['status', 'status'], ['followUp', 'follow_up'], ['note', 'note'], ['photos', 'photos'], ['by', 'by_name'], ['byUser', 'by_user'], ['updatedAt', 'updated_at']] },
     nurse: { table: 'nurse_visits', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['outAt', 'out_at'], ['term', 'term'], ['period', 'period'], ['symptomGroup', 'symptom_group'], ['symptom', 'symptom'], ['temp', 'temp'], ['care', 'care'], ['medicine', 'medicine'], ['outcome', 'outcome'], ['parentNotified', 'parent_notified'], ['note', 'note'], ['by', 'by_name'], ['outBy', 'out_by_name'], ['byUser', 'by_user'], ['updatedAt', 'updated_at'], ['vitals', 'vitals'], ['followAt', 'follow_at'], ['followFor', 'follow_for'], ['followStatus', 'follow_status']] },
     nurseHealth: { table: 'nurse_health', order: 'student_id', cols: [['id', 'student_id'], ['allergyStatus', 'allergy_status'], ['allergies', 'allergies'], ['conditionStatus', 'condition_status'], ['conditions', 'conditions'], ['careNote', 'care_note'], ['source', 'source'], ['consentAt', 'consent_at'], ['by', 'by_name'], ['updatedAt', 'updated_at']] },
@@ -120,7 +122,7 @@
     students: ['students'], history: ['history'], users: ['users'], cases: ['cases'], apptLog: ['apptLog'], progress: ['progress'], counsellors: ['counsellors'], subjects: ['subjects'],
     health: ['care', 'health'], incidents: ['behavior', 'incidents'], incidentPeople: ['behavior', 'people'],
     teacherRooms: ['teacherRooms'], teacherGrades: ['teacherGrades'], gradeStaff: ['gradeStaff'], rules: ['behavior', 'rules'], records: ['behavior', 'records'],
-    screenings: ['care', 'screenings'], visits: ['care', 'visits'], needs: ['care', 'needs'], referrals: ['care', 'referrals'], drugs: ['drugs'], discipline: ['discipline'], leave: ['leave'], nurse: ['nurse'], nurseNow: ['nurseNow'], nurseFollow: ['nurseFollow'], nurseHealth: ['nurseHealth'],
+    screenings: ['care', 'screenings'], visits: ['care', 'visits'], needs: ['care', 'needs'], referrals: ['care', 'referrals'], drugs: ['drugs'], discipline: ['discipline'], leave: ['leave'], surveyRounds: ['surveyRounds'], surveyResponses: ['surveyResponses'], nurse: ['nurse'], nurseNow: ['nurseNow'], nurseFollow: ['nurseFollow'], nurseHealth: ['nurseHealth'],
   };
   function setSlot(kind, list) {
     const p = SLOT[kind];
@@ -299,7 +301,7 @@
         behavior: {}, care: {}, history: [] };
       this.data.gradeStaff = [];
       this.data.subjects = [];
-      const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'incidents', 'incidentPeople', 'cases', 'apptLog', 'progress', 'counsellors', 'screenings', 'visits', 'needs', 'referrals', 'health', 'drugs', 'discipline', 'leave', 'nurse', 'nurseNow', 'nurseHealth', 'nurseFollow'];
+      const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'incidents', 'incidentPeople', 'cases', 'apptLog', 'progress', 'counsellors', 'screenings', 'visits', 'needs', 'referrals', 'health', 'drugs', 'discipline', 'leave', 'surveyRounds', 'surveyResponses', 'nurse', 'nurseNow', 'nurseHealth', 'nurseFollow'];
       if (!this.isAdmin() && this.profile.role === 'grade_head') kinds.push('history'); // own grades only (row level security)
       if (this.isAdmin()) {
         kinds.push('history', 'gradeStaff', 'subjects');
@@ -389,6 +391,9 @@
       await this.loadAppTrash(app);
       return r;
     },
+    // แบบประเมินตนเองออนไลน์ (round code for a room; answers come in signed out through survey_submit)
+    async surveyOpen(grade, room, hours) { const code = check(await sb.rpc('survey_open', { p_grade: grade, p_room: room, p_hours: hours })); await this.refresh('surveyRounds'); return code; },
+    async surveyClose(id) { check(await sb.rpc('survey_close', { p_id: id })); await this.refresh('surveyRounds'); },
     // ขออนุญาตออกนอกโรงเรียน: every step goes through leave_save / leave_action (the database checks who may do what)
     async saveLeave(p) { const id = check(await sb.rpc('leave_save', { p })); await this.pull('leave', id); return id; },
     async leaveAction(id, action, note = '') { check(await sb.rpc('leave_action', { p_id: id, p_action: action, p_note: note })); await this.pull('leave', id); },
@@ -537,7 +542,7 @@
     async backup() {
       const tables = { students: 'id', profiles: 'id', app_settings: 'id', teacher_rooms: 'user_id,grade,room', teacher_grades: 'user_id,grade', grade_staff: 'grade,name', teacher_subjects: 'id', parent_links: 'user_id,student_id',
         registry_history: 'id', behavior_rules: 'id', behavior_incidents: 'id', behavior_records: 'id', care_screenings: 'id', care_visits: 'id', care_needs: 'id', care_referrals: 'id', health_logs: 'id',
-        counsel_cases: 'id', counsel_case_sessions: 'case_id,session_no', counsel_appt_log: 'id', drug_cases: 'id', discipline_checks: 'id', leave_requests: 'id', nurse_visits: 'id', nurse_health: 'student_id', feedback: 'id' };
+        counsel_cases: 'id', counsel_case_sessions: 'case_id,session_no', counsel_appt_log: 'id', drug_cases: 'id', discipline_checks: 'id', leave_requests: 'id', survey_rounds: 'id', survey_responses: 'id', nurse_visits: 'id', nurse_health: 'student_id', feedback: 'id' };
       const out = { at: new Date().toISOString(), tables: {} };
       for (const [t, key] of Object.entries(tables)) out.tables[t] = await paged((a, b) => key.split(',').reduce((q, k) => q.order(k), sb.from(t).select('*')).range(a, b));
       return out;

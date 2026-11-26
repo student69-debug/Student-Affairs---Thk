@@ -536,15 +536,63 @@
       const flt = { grade: q.grade || '', from: q.from || '', to: q.to || '', result: tab === 'screen' && RES[q.result] ? q.result : '' }, filtered = !!(flt.grade || flt.from || flt.to || flt.result);
       const t = this.tables(undefined, flt), n = this._n;
       const KINDS = [['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ']];
-      const add = { screen: ['care-screen', 'บันทึกผลคัดกรอง'], visit: ['care-visit', 'บันทึกเยี่ยมบ้าน'], health: ['care-health', 'บันทึกสุขภาพ'], needs: ['care-need', 'เพิ่มข้อมูล'], referral: ['care-referral', 'บันทึกการส่งต่อ'] }[tab === 'trash' || tab === 'overview' ? 'health' : tab];
+      const add = { screen: ['care-screen', 'บันทึกผลคัดกรอง'], visit: ['care-visit', 'บันทึกเยี่ยมบ้าน'], health: ['care-health', 'บันทึกสุขภาพ'], needs: ['care-need', 'เพิ่มข้อมูล'], referral: ['care-referral', 'บันทึกการส่งต่อ'] }[['trash', 'overview', 'survey'].includes(tab) ? 'health' : tab];
       const latest = Store.myStudents().map((s) => this.latestScreen(s.id)).filter(Boolean);
       const cnt = (r) => latest.filter((x) => x.result === r).length;
       const titles = { screen: 'ผลคัดกรองทั้งหมด', visit: 'บันทึกเยี่ยมบ้าน', health: 'บันทึกสุขภาพ', needs: 'ความต้องการพิเศษ / สุขภาพ', referral: 'การส่งต่อ' };
       return { title: this.name, actions: `<button class="btn primary" data-action="${add[0]}">${icon('plus')}${add[1]}</button>`,
         html: searchCard({ id: 'care', title: 'ค้นหาบันทึกดูแลช่วยเหลือ', hint: 'ความต้องการพิเศษไม่มีวันที่ — กรองได้เฉพาะระดับชั้น', typeLabel: 'ประเภทบันทึก', typeHtml: optList(KINDS, tab), q: flt }) + `<div class="grid g3">${[['smile', 'normal', 'green'], ['triangle-alert', 'risk', 'amber'], ['siren', 'problem', 'red']].map(([ic, r, tone]) => stat(ic, RES[r], cnt(r), 'คน', tone, 'ผลคัดกรองล่าสุด', '#/apps/care?tab=screen&result=' + r)).join('')}</div>` +
-          tabsBar([['overview', 'ภาพรวม'], ['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ']], tab, '#/apps/care') +
-          (tab === 'trash' ? trashView('care', 'บันทึกสุขภาพ') : (tab === 'overview' ? this.dashHtml() : `<div class="card"><div class="card-head"><h3>${flt.result ? 'ผลคัดกรองล่าสุด: ' + RES[flt.result] : titles[tab]}</h3>${filtered ? `<span class="muted small"><b>${(n[tab] || 0).toLocaleString()}</b> ${flt.result ? 'คน' : 'รายการ'}${[flt.grade && 'ม.' + esc(flt.grade), (flt.from || flt.to) && `${flt.from ? fmtDate(flt.from) : '…'} – ${flt.to ? fmtDate(flt.to) : '…'}`].filter(Boolean).map((x) => ' · ' + x).join('')} · <a href="#/apps/care?tab=${tab}">ล้างการค้นหา</a></span>` : ''}</div>${t[tab]}</div>`)),
+          tabsBar([['overview', 'ภาพรวม'], ['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ'], ['survey', 'แบบประเมินออนไลน์']], tab, '#/apps/care') +
+          (tab === 'survey' ? this.surveyHtml(q) : tab === 'trash' ? trashView('care', 'บันทึกสุขภาพ') : (tab === 'overview' ? this.dashHtml() : `<div class="card"><div class="card-head"><h3>${flt.result ? 'ผลคัดกรองล่าสุด: ' + RES[flt.result] : titles[tab]}</h3>${filtered ? `<span class="muted small"><b>${(n[tab] || 0).toLocaleString()}</b> ${flt.result ? 'คน' : 'รายการ'}${[flt.grade && 'ม.' + esc(flt.grade), (flt.from || flt.to) && `${flt.from ? fmtDate(flt.from) : '…'} – ${flt.to ? fmtDate(flt.to) : '…'}`].filter(Boolean).map((x) => ' · ' + x).join('')} · <a href="#/apps/care?tab=${tab}">ล้างการค้นหา</a></span>` : ''}</div>${t[tab]}</div>`)),
         after: () => bindSearch('care', (v) => hashOf('#/apps/care', { tab: v.type, grade: v.grade, from: v.from, to: v.to })) };
+    },
+    /* ---- แบบประเมินตนเองออนไลน์: ครูเปิดรอบให้ห้อง นักเรียนกรอกผ่าน survey.html (ไม่ต้องเข้าระบบ) ผลลงแท็บคัดกรองอัตโนมัติ ---- */
+    surveyRooms() {
+      const role = Store.user().role, all = new Map();
+      Store.activeStudents().forEach((s) => all.set(s.grade * 100 + s.room, [s.grade, s.room]));
+      const ok = ([g, r]) => Store.seesAll() || (role === 'grade_head' && Store.myGrades().includes(g)) || Store.myRooms().some((t) => Number(t.grade) === g && Number(t.room) === r);
+      return [...all.values()].filter(ok).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    },
+    surveyLink: (code) => location.origin + location.pathname.replace(/[^/]*$/, '') + 'survey.html?c=' + encodeURIComponent(code),
+    surveyHtml(q) {
+      const rooms = this.surveyRooms(), RES = { normal: 'ปกติ', risk: 'เสี่ยง', problem: 'มีปัญหา' };
+      const rounds = (D().surveyRounds || []).slice().sort((a, b) => (a.opensAt < b.opensAt ? 1 : -1));
+      const resp = D().surveyResponses || [];
+      const open = (x) => !x.closed && new Date(x.closesAt) > new Date();
+      const size = (x) => Store.activeStudents().filter((s) => s.grade === x.grade && s.room === x.room).length;
+      const cur = rounds.find((x) => x.id === q.round) || rounds[0];
+      const list = cur ? resp.filter((r) => r.roundId === cur.id).sort((a, b) => Number(b.urgent) - Number(a.urgent) || b.score - a.score) : [];
+      const badge = (r) => `<span class="badge ${r === 'problem' ? 'b-danger' : r === 'risk' ? 'b-warning' : 'b-success'}">${RES[r]}</span>`;
+      return `<div class="card"><div class="card-head"><h3>เปิดแบบประเมินให้ห้อง</h3><span class="muted small">แบบประเมินตนเองด้านสุขภาวะ 12 ข้อ (ของโรงเรียนเอง ไม่ใช่ SDQ) · นักเรียนใช้รหัสนักเรียน + เลขบัตร 4 ตัวท้าย</span></div>
+        ${rooms.length ? `<div class="card-body toolbar no-print"><select class="select" id="sv-room" aria-label="ห้อง">${rooms.map(([g, r]) => `<option value="${g}/${r}">ม.${g}/${r}</option>`).join('')}</select>
+          <select class="select" id="sv-hours" aria-label="เปิดนาน"><option value="1">เปิด 1 ชั่วโมง</option><option value="2" selected>เปิด 2 ชั่วโมง</option><option value="24">เปิด 1 วัน</option><option value="72">เปิด 3 วัน</option></select>
+          <button class="btn primary" data-action="survey-open">${icon('qr-code')}เปิดรอบใหม่</button></div>` : `<div class="card-body muted">เปิดได้เฉพาะครูที่ปรึกษา (ห้องตัวเอง) หัวหน้าระดับ (ระดับตัวเอง) ครูแนะแนว และผู้ดูแลระบบ</div>`}</div>
+        <div class="card"><div class="card-head"><h3>รอบที่เปิด</h3><button class="btn ghost sm" data-action="survey-refresh">${icon('refresh-cw', 'i16')}โหลดผลล่าสุด</button></div>
+        ${rounds.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ห้อง</th><th>รหัส</th><th>เปิดถึง</th><th class="num">ตอบแล้ว</th><th>ผู้เปิด</th><th></th></tr></thead><tbody>
+          ${rounds.slice(0, 50).map((x) => `<tr${cur && x.id === cur.id ? ' class="on"' : ''}><td>ม.${x.grade}/${x.room}</td><td class="mono">${esc(x.code)}</td><td>${fmtDate(x.closesAt, true)} ${open(x) ? '<span class="badge b-success">เปิดอยู่</span>' : '<span class="badge b-neutral">ปิดแล้ว</span>'}</td>
+            <td class="num">${resp.filter((r) => r.roundId === x.id).length} / ${size(x)}</td><td>${esc(x.by)}</td>
+            <td style="text-align:right;white-space:nowrap"><a class="btn ghost sm" href="#/apps/care?tab=survey&round=${esc(x.id)}">ดูผล</a>${open(x) ? `<button class="btn secondary sm" data-action="survey-qr" data-id="${esc(x.id)}">${icon('qr-code', 'i16')}QR / ลิงก์</button><button class="btn ghost sm" data-action="survey-close" data-id="${esc(x.id)}">ปิดรอบ</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีรอบแบบประเมิน', 'qr-code')}</div>
+        ${cur ? `<div class="card" id="sv-result"><div class="card-head"><h3>ผล ม.${cur.grade}/${cur.room} · ${fmtDate(cur.opensAt)}</h3><span class="muted small">ตอบ ${list.length} / ${size(cur)} คน · ด่วน ${list.filter((r) => r.urgent).length} · อยากคุยกับครู ${list.filter((r) => r.wantsHelp).length}</span></div>
+          ${list.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>นักเรียน</th><th class="num">คะแนน</th><th>ผล</th><th>ต้องดูแล</th><th>ข้อความถึงครู</th></tr></thead><tbody>
+          ${list.map((r) => `<tr><td>${sLink(r.studentId)}</td><td class="num">${r.score}/30</td><td>${badge(r.result)}</td><td>${r.urgent ? '<span class="badge b-danger">ด่วน: คิดทำร้ายตัวเอง</span> ' : ''}${r.wantsHelp ? '<span class="badge b-info">อยากคุยกับครู</span>' : r.urgent ? '' : '—'}</td><td class="small">${esc(r.message) || '—'}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีนักเรียนตอบ', 'inbox')}
+          <div class="card-body muted small" style="border-top:1px solid var(--ink-200)">ผลแต่ละคนลงแท็บ "คัดกรอง" อัตโนมัติ (เครื่องมือ "แบบประเมินตนเอง") · เกณฑ์: 0–8 ปกติ, 9–15 เสี่ยง, 16 ขึ้นไป หรือตอบว่าเคยคิดทำร้ายตัวเอง = มีปัญหา · เป็นแบบคัดกรองเบื้องต้น ไม่ใช่การวินิจฉัย นักเรียนที่ขึ้น "ด่วน" ให้ครูแนะแนวพูดคุยโดยเร็ว</div></div>` : ''}`;
+    },
+    async openQr(id) {
+      const x = (D().surveyRounds || []).find((r) => r.id === id);
+      if (!x) return;
+      const link = this.surveyLink(x.code);
+      const d = dialog({ title: `แบบประเมิน ม.${x.grade}/${x.room}`, footer: '<button type="button" class="btn ghost" data-close>ปิด</button>',
+        body: `<div style="text-align:center"><div id="sv-qr" style="display:inline-block;background:#fff;padding:8px">กำลังสร้าง QR…</div>
+          <div style="font:700 28px var(--font-display);letter-spacing:4px;margin:8px 0" class="mono">${esc(x.code)}</div>
+          <div class="small" style="word-break:break-all">${esc(link)}</div>
+          <button type="button" class="btn secondary sm" id="sv-copy" style="margin-top:8px">${icon('copy', 'i16')}คัดลอกลิงก์</button>
+          <p class="muted small">เปิดถึง ${fmtDate(x.closesAt, true)} · นักเรียนใช้รหัสนักเรียน + เลขบัตรประชาชน 4 ตัวท้าย · ตอบได้คนละครั้ง</p></div>` });
+      d.form.querySelector('#sv-copy').addEventListener('click', () => navigator.clipboard.writeText(link).then(() => toast('คัดลอกลิงก์แล้ว')));
+      try {
+        if (!window.qrcode) await new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js'; s.onload = ok; s.onerror = () => no(new Error('โหลดตัวสร้าง QR ไม่ได้')); document.head.appendChild(s); });
+        const qr = window.qrcode(0, 'M'); qr.addData(link); qr.make();
+        d.form.querySelector('#sv-qr').innerHTML = qr.createSvgTag({ cellSize: 6, margin: 2, scalable: false });
+      } catch (e) { d.form.querySelector('#sv-qr').textContent = e.message + ' — ใช้ลิงก์ด้านล่างแทน'; }
     },
   };
 
