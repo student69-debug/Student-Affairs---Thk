@@ -642,7 +642,9 @@
       onSubmit: () => {
         let el = document.getElementById('print-sheet');
         if (!el) { el = document.createElement('div'); el.id = 'print-sheet'; document.body.appendChild(el); }
-        el.innerHTML = html;
+        // print what the preview shows (signature pictures filled in after opening), at paper size
+        el.innerHTML = d.form.querySelector('.rp-preview').innerHTML;
+        el.querySelectorAll('[style*="zoom"]').forEach((z) => { z.style.zoom = ''; });
         document.body.classList.add('printing-sheet');
         const done = () => { document.body.classList.remove('printing-sheet'); el.innerHTML = ''; removeEventListener('afterprint', done); };
         addEventListener('afterprint', done);
@@ -650,6 +652,7 @@
         return false;
       } });
     fitSheet(d.form);
+    if (r.after) r.after(d.form);
   }
   // a wide sheet (A4 landscape) is shrunk to the dialog's width so a phone shows the whole page without sideways scrolling
   function fitSheet(root) {

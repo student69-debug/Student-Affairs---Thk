@@ -35,6 +35,26 @@
     return false;
   }
   const OPEN = ['pending', 'advisor_ok', 'approved', 'out'];
+  // user, 26 Nov 2026: homeroom / subject teachers only approve (students / parents file from the parent page); nurse-room teachers still file
+  const canFile = () => role() !== 'teacher' || Store.nurseStaff();
+  /* signature pad (finger, stylus or mouse): white JPEG so it prints and fits the photo bucket */
+  function signPad(root) {
+    const c = root.querySelector('canvas.sign-pad'), g = c.getContext('2d');
+    let drawn = false, last = null;
+    const fit = () => { const r = c.getBoundingClientRect(), k = window.devicePixelRatio || 1; c.width = Math.round(r.width * k); c.height = Math.round(r.height * k);
+      g.setTransform(k, 0, 0, k, 0, 0); g.fillStyle = '#fff'; g.fillRect(0, 0, r.width, r.height); g.lineWidth = 2.4; g.lineCap = g.lineJoin = 'round'; g.strokeStyle = '#0b1d6b'; drawn = false; };
+    const pt = (e) => { const r = c.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    c.addEventListener('pointerdown', (e) => { e.preventDefault(); if (!drawn) fit(); c.setPointerCapture(e.pointerId); last = pt(e); g.beginPath(); g.arc(last[0], last[1], 1.1, 0, 7); g.fillStyle = '#0b1d6b'; g.fill(); drawn = true; });
+    c.addEventListener('pointermove', (e) => { if (!last) return; const p = pt(e); g.beginPath(); g.moveTo(last[0], last[1]); g.lineTo(p[0], p[1]); g.stroke(); last = p; });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => c.addEventListener(t, () => { last = null; }));
+    root.querySelector('[data-sign-clear]').addEventListener('click', fit);
+    // size the drawing to the box once the dialog is laid out (and again on rotation while still blank)
+    new ResizeObserver(() => { if (!drawn) fit(); }).observe(c);
+    return { empty: () => !drawn, blob: () => new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.9)) };
+  }
+  const signField = (who) => `<div class="field full sign-box"><label>ลายมือชื่อ${esc(who)} <span class="req">*</span></label><canvas class="sign-pad" aria-label="ช่องลงลายมือชื่อ"></canvas>
+    <div class="actions" style="justify-content:space-between"><span class="help">เซ็นด้วยนิ้ว ปากกา หรือเมาส์ในกรอบด้านบน</span><button type="button" class="btn ghost sm" data-sign-clear>ล้าง เซ็นใหม่</button></div></div>`;
+  async function upSign(x, pad, step) { return Store.leavePhotoUpload(x.id, await pad.blob(), 'sign' + step); }
   function actions(x) {
     const b = (a, l, cls = 'secondary', ic = 'check') => `<button class="btn ${cls} sm" data-action="leave-act" data-act="${a}" data-id="${esc(x.id)}">${icon(ic, 'i16')}${l}</button>`;
     const out = [];
@@ -69,7 +89,7 @@
         title: `ออกนอกโรงเรียน · ${esc(REASONS[x.reason] || x.reason)} ${badge(x.status)}`, note: [x.detail, x.backAt && 'กลับ ' + time(x.backAt)].filter(Boolean).join(' · ') }));
     },
     studentTab(sid) {
-      return `<div class="card-body no-print" style="border-bottom:1px solid var(--ink-200)"><div class="actions"><button class="btn accent sm" data-action="leave-new" data-student="${esc(sid)}">${icon('plus', 'i16')}ยื่นขออนุญาตออก</button></div></div>${this.table(this.list(sid), false)}`;
+      return `${canFile() ? `<div class="card-body no-print" style="border-bottom:1px solid var(--ink-200)"><div class="actions"><button class="btn accent sm" data-action="leave-new" data-student="${esc(sid)}">${icon('plus', 'i16')}ยื่นขออนุญาตออก</button></div></div>` : ''}${this.table(this.list(sid), false)}`;
     },
     table(list, withStudent = true) {
       if (!list.length) return empty('ยังไม่มีคำขอ', 'door-open');
@@ -91,6 +111,7 @@
       const rej = (step) => (x.log || []).find((l) => l.action === 'reject' && Number(l.step) === step);
       const box = (on) => `<b>${on ? '☑' : '☐'}</b>`;
       const ok1 = !!(x.advisorName && !rej(1)), no1 = rej(1), ok2 = ['approved', 'out', 'returned'].includes(x.status) || (x.approveName && !rej(2)), no2 = rej(2);
+      const sig = (path, name) => (path ? `<span class="u w"><img class="pk-sign" alt="ลายมือชื่อ" data-lv="${esc(path)}"></span>` : u(name, 'w'));
       const sys = (name, at) => (name ? `<div class="st">อนุญาตในระบบ ${esc(fmtDate(at, true))}</div>` : '');
       const half = (label) => `<div>
         <div class="pk-top"><span>${label}</span><span>ปค. 22</span></div>
@@ -108,18 +129,20 @@
         <p><b>ความเห็นของครูที่ปรึกษา</b></p>
         <p class="ck">${box(ok1)} เห็นควรอนุญาต</p>
         <p class="ck">${box(no1)} ไม่ควรอนุญาต เนื่องจาก ${u(no1 ? no1.note : '', 'w')}</p>
-        <div class="sg">ลงชื่อ ${u(ok1 || no1 ? x.advisorName : '', 'w')} ครูที่ปรึกษา<br>( ${u(x.advisorName, 'w')} )${sys(x.advisorName, x.advisorAt)}</div>
+        <div class="sg">ลงชื่อ ${sig(ok1 && x.advisorSign, ok1 || no1 ? x.advisorName : '')} ครูที่ปรึกษา<br>( ${u(x.advisorName, 'w')} )${sys(x.advisorName, x.advisorAt)}</div>
         <p><b>ความเห็นของหัวหน้าระดับ/รองหัวหน้าระดับ/หัวหน้ากลุ่มบริหารกิจการนักเรียน</b></p>
         <p class="ck">${box(ok2)} อนุญาต</p>
         <p class="ck">${box(no2)} ไม่อนุญาต เนื่องจาก ${u(no2 ? no2.note : '', 'w')}</p>
-        <div class="sg">ลงชื่อ ${u(ok2 || no2 ? x.approveName : '', 'w')}<br>( ${u(x.approveName, 'w')} )${sys(x.approveName, x.approveAt)}</div>
+        <div class="sg">ลงชื่อ ${sig(ok2 && x.approveSign, ok2 || no2 ? x.approveName : '')}<br>( ${u(x.approveName, 'w')} )${sys(x.approveName, x.approveAt)}</div>
         ${x.outAt ? `<div class="st">ออกจากโรงเรียน ${esc(fmtDate(x.outAt, true))}${x.backAt ? ' · กลับ ' + esc(fmtDate(x.backAt, true)) : ''}</div>` : ''}</div>`;
       return `<div class="pk22">${half('ส่วนที่ 1 สำหรับส่งให้เจ้าหน้าที่รักษาความปลอดภัย')}${half('ส่วนที่ 2 สำหรับผู้ปกครองเก็บไว้เป็นหลักฐาน')}</div>`;
     },
     report(kind, id) {
       const x = all().find((y) => y.id === id);
       if (!x) return null;
-      if (kind === 'pass') return { title: `แบบขออนุญาตออกนอกบริเวณโรงเรียน (ปค.22)${x.docNo ? ' ที่ ' + x.docNo + '/' + x.docYear : ''}`, studentId: x.studentId, html: this.pk22(x) };
+      if (kind === 'pass') return { title: `แบบขออนุญาตออกนอกบริเวณโรงเรียน (ปค.22)${x.docNo ? ' ที่ ' + x.docNo + '/' + x.docYear : ''}`, studentId: x.studentId, html: this.pk22(x),
+        after: async (root) => { const p = [x.advisorSign, x.approveSign].filter(Boolean); if (!p.length) return; const m = await Store.leaveUrls(p);
+          root.querySelectorAll('img[data-lv]').forEach((img) => { const v = m.get(img.dataset.lv); if (v) img.src = v; }); } };
       const log = (x.log || []).map((l) => `<tr><td>${fmtDate(l.at, true)}</td><td>${esc(ACT[l.action] || l.action)}${l.note ? ' · ' + esc(l.note) : ''}</td><td>${esc(l.by)}</td></tr>`).join('');
       return { title: 'ใบขออนุญาตออกนอกโรงเรียน', studentId: x.studentId, by: x.by,
         rows: [['ที่', x.docNo ? `${x.docNo}/${x.docYear}` : ''], ['วันที่', fmtDate(x.leaveDate)], ['เวลาที่ขอออก', hhmm(x.outPlan)], ['หลังออกจากโรงเรียน', x.returns ? 'กลับมาเรียนต่อ' + (x.backPlan ? ' ประมาณ ' + hhmm(x.backPlan) : '') : 'กลับบ้าน ไม่กลับมาเรียนต่อ'],
@@ -157,8 +180,7 @@
             try { await Store.leavePhotos(newId, await Promise.all(files.map((f) => UI.shrinkImage(f, 1280, 0.82)))); }
             catch (e) { toast('ยื่นคำขอแล้ว แต่แนบรูปไม่สำเร็จ: ' + e.message, 'error'); }
           }
-          const x = all().find((y) => y.id === newId);
-          toast(x && x.status === 'advisor_ok' ? 'ยื่นคำขอแล้ว · ความเห็นครูที่ปรึกษาผ่านแล้ว (คุณเป็นผู้ให้ความเห็น) · รอหัวหน้าระดับ' : 'ยื่นคำขอแล้ว · รอครูที่ปรึกษาให้ความเห็น');
+              toast('ยื่นคำขอแล้ว · รอครูที่ปรึกษาให้ความเห็น');
           App.render();
         } });
       return d;
@@ -169,6 +191,7 @@
       const go = async (note) => { await Store.leaveAction(id, a, note); toast(ACT[a] + ' แล้ว'); App.render(); };
       // step 2 (user, 26 Nov 2026): a photo of who picks the student up comes first, then the approval
       if (a === 'approve2') { this.approveWithPhoto(x); return; }
+      if (a === 'approve1') { this.approveWithSign(x); return; }
       if (a === 'reject' || a === 'cancel') {
         dialog({ title: a === 'reject' ? 'ไม่อนุญาตให้ออก' : 'ยกเลิกคำขอ', size: 'sm', submitLabel: a === 'reject' ? 'ไม่อนุญาต' : 'ยกเลิกคำขอ', submitClass: 'accent',
           body: `<div>${Apps.sLink(x.studentId)}</div><div class="field"><label>เหตุผล ${a === 'reject' ? '<span class="req">*</span>' : ''}</label><textarea class="textarea" name="note" maxlength="500" ${a === 'reject' ? 'required' : ''}></textarea></div>`,
@@ -178,21 +201,35 @@
       const s = Store.student(x.studentId);
       UI.confirmDialog(ACT[a], `${esc(s ? fullName(s) + ' ' + klass(s) : x.studentId)} · ${esc(REASONS[x.reason] || '')}<br>${a === 'out' ? 'บันทึกเวลาออกจากโรงเรียนเป็นตอนนี้' : a === 'back' ? 'บันทึกเวลากลับเข้าโรงเรียนเป็นตอนนี้' : 'ยืนยันการอนุมัติ'}`, ACT[a], () => go(''));
     },
+    approveWithSign(x) {
+      const s = Store.student(x.studentId);
+      let pad;
+      const d = dialog({ title: 'ความเห็นครูที่ปรึกษา · เห็นควรอนุญาต', submitLabel: 'เห็นควรอนุญาต', submitClass: 'primary',
+        body: `<div>${esc(s ? fullName(s) + ' ' + klass(s) : x.studentId)} · ${esc(REASONS[x.reason] || '')}${x.detail ? ' · ' + esc(x.detail) : ''}</div>
+          ${x.pickupName ? `<div class="muted small">ผู้มารับ ${esc(x.pickupName)}${x.pickupRelation ? ' (' + esc(x.pickupRelation) + ')' : ''}</div>` : ''}${signField('ครูที่ปรึกษา')}`,
+        onSubmit: async () => {
+          if (pad.empty()) { toast('ลงลายมือชื่อก่อน'); return false; }
+          await Store.leaveAction(x.id, 'approve1', '', null, await upSign(x, pad, 1));
+          toast('เห็นควรอนุญาตแล้ว · ส่งต่อหัวหน้าระดับ'); App.render();
+        } });
+      pad = signPad(d.form);
+    },
     approveWithPhoto(x) {
       const s = Store.student(x.studentId);
       const d = dialog({ title: 'อนุญาต (หัวหน้าระดับ) · ถ่ายรูปผู้มารับ', submitLabel: 'อนุญาต', submitClass: 'primary',
         body: `<div>${esc(s ? fullName(s) + ' ' + klass(s) : x.studentId)} · ${esc(REASONS[x.reason] || '')}${x.pickupName ? ` · ผู้มารับ ${esc(x.pickupName)}${x.pickupRelation ? ' (' + esc(x.pickupRelation) + ')' : ''}` : ''}</div>
           <div class="notice warn">${icon('camera', 'i16')}<span>ถ่ายรูปผู้ปกครองที่มารับคู่กับนักเรียน เพื่อเป็นหลักฐาน แล้วจึงกดอนุญาต · รูปเก็บในระบบและ Google Drive</span></div>
           <div class="field"><label>รูปผู้มารับ <span class="req">*</span></label><input class="input" type="file" name="photo" accept="image/*" capture="environment" required style="padding-top:6px"></div>
-          <img class="photo-preview" alt="ตัวอย่างรูปผู้มารับ" hidden style="max-width:100%;max-height:320px;object-fit:contain;border-radius:8px">`,
+          <img class="photo-preview" alt="ตัวอย่างรูปผู้มารับ" hidden style="max-width:100%;max-height:320px;object-fit:contain;border-radius:8px">${signField('หัวหน้าระดับ / ผู้อนุญาต')}`,
         onSubmit: async (v, form) => {
           const f = form.photo.files[0];
           if (!f) { toast('ถ่ายรูปผู้มารับก่อน'); return false; }
+          if (pad.empty()) { toast('ลงลายมือชื่อก่อน'); return false; }
           const path = await Store.leavePhotoUpload(x.id, await UI.shrinkImage(f, 1280, 0.82));
-          await Store.leaveAction(x.id, 'approve2', '', [path]);
+          await Store.leaveAction(x.id, 'approve2', '', [path], await upSign(x, pad, 2));
           toast('อนุญาตแล้ว · บันทึกรูปผู้มารับแล้ว'); App.render();
         } });
-      const inp = d.form.photo, img = d.form.querySelector('.photo-preview');
+      const pad = signPad(d.form), inp = d.form.photo, img = d.form.querySelector('.photo-preview');
       inp.addEventListener('change', () => { const f = inp.files[0]; if (f) { img.src = URL.createObjectURL(f); img.hidden = false; } });
     },
     async view(id) {
@@ -225,13 +262,13 @@
       const search = Apps.searchCard({ id: 'leave', title: 'ค้นหาคำขอออกนอกโรงเรียน', typeLabel: 'เหตุผล', typeHtml: '<option value="">ทุกเหตุผล</option>' + Apps.optList(Object.entries(REASONS), q.type), q });
       const bindS = () => Apps.bindSearch('leave', (v) => Apps.hashOf(base, { tab: 'list', grade: v.grade, type: v.type, from: v.from, to: v.to }));
       const tabs = Apps.tabsBar([['overview', 'ภาพรวม'], ['list', 'รายการคำขอ'], ['guide', 'ขั้นตอน']], tab, base);
-      const actionsBar = `<button class="btn accent" data-action="leave-new">${icon('plus')}ยื่นขออนุญาตออก</button>`;
+      const actionsBar = canFile() ? `<button class="btn accent" data-action="leave-new">${icon('plus')}ยื่นขออนุญาตออก</button>` : '';
       const out = (html) => ({ title: this.name, actions: actionsBar, html: search + cards + tabs + html, after: bindS });
       if (tab === 'trash') return out(Apps.trashView('leave', 'คำขอออกนอกโรงเรียน'));
       if (tab === 'guide') return out(`<div class="card"><div class="card-body"><ol style="margin:0;padding-left:20px;line-height:2">
-        <li><b>ยื่นคำขอ</b> — ครูคนใดก็ได้ยื่นแทนนักเรียนที่ตนดูแล (ครูห้องพยาบาลยื่นได้ทุกคน) ระบุเหตุผล ผู้มารับ แนบรูปได้ไม่เกิน 5 รูป</li>
-        <li><b>ความเห็นของครูที่ปรึกษา</b> — ครูที่ปรึกษาเข้าระบบแล้วกด "เห็นควรอนุญาต" หรือ "ไม่อนุญาต" · ห้องที่มีครูที่ปรึกษาคนเดียว (หรือครูที่ปรึกษายังไม่มีบัญชี) หัวหน้าระดับ / รองหัวหน้าระดับให้ความเห็นแทนได้ · ถ้าครูที่ปรึกษาเป็นผู้ยื่นเอง ขั้นนี้ผ่านอัตโนมัติ</li>
-        <li><b>ความเห็นของหัวหน้าระดับ / รองหัวหน้าระดับ / หัวหน้ากลุ่มบริหารกิจการนักเรียน</b> — ต้องเป็นคนละคนกับขั้นที่ 1</li>
+        <li><b>ยื่นคำขอ</b> — นักเรียน / ผู้ปกครองยื่นจากหน้าผู้ปกครอง (ครูห้องพยาบาล หัวหน้าระดับ ฝ่ายปกครอง ยื่นแทนได้) · ครูที่ปรึกษาไม่ต้องยื่น รอแจ้งเตือนเพื่ออนุมัติ</li>
+        <li><b>ความเห็นของครูที่ปรึกษา</b> — ครูที่ปรึกษาเข้าระบบแล้วกด "เห็นควรอนุญาต" หรือ "ไม่อนุญาต" · ห้องที่มีครูที่ปรึกษาคนเดียว (หรือครูที่ปรึกษายังไม่มีบัญชี) หัวหน้าระดับ / รองหัวหน้าระดับให้ความเห็นแทนได้ · ต้องลงลายมือชื่อบนจอก่อนอนุญาต</li>
+        <li><b>ความเห็นของหัวหน้าระดับ / รองหัวหน้าระดับ / หัวหน้ากลุ่มบริหารกิจการนักเรียน</b> — ต้องเป็นคนละคนกับขั้นที่ 1 · ถ่ายรูปผู้มารับและลงลายมือชื่อบนจอก่อนอนุญาต</li>
         <li><b>ประตู (ฝ่ายปกครอง): บันทึกออก</b> แล้ว <b>บันทึกกลับ</b> ถ้านักเรียนกลับมาเรียนต่อ</li>
         <li>พิมพ์ใบตามแบบ <b>ปค.22</b> (A4 แนวนอน 2 ส่วน: ให้เจ้าหน้าที่รักษาความปลอดภัย / ให้ผู้ปกครอง) จากปุ่มเครื่องพิมพ์</li></ol>
         <p class="muted small" style="margin:12px 0 0">ไม่อนุญาตต้องใส่เหตุผล · ทุกขั้นตอนเก็บชื่อผู้ทำและเวลา · พิมพ์ใบขออนุญาตได้จากปุ่มเครื่องพิมพ์ · รูปถ่ายเก็บสำเนาใน Google Drive โฟลเดอร์ "ขออนุญาตออกนอกโรงเรียน" แยกปีการศึกษาและห้อง</p></div></div>`);
