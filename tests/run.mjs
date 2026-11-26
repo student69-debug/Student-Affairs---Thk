@@ -120,6 +120,14 @@ const tests = {
     try { await Store.purgePhotos(); } finally { sb.storage.from = keep; }
     assert.deepEqual(removed, { 'drug-evidence': ['a/x.jpg'], 'leave-photos': ['b/y.jpg'], 'student-photos': ['1.jpg'] });
   },
+  'leave pass ปค.22: two halves, number, ticks from the approvals, escaped': () => {
+    const h = ctx.LeaveApp.pk22({ studentId: '30001', leaveDate: '2026-11-26', docNo: 7, docYear: 2569, outPlan: '10:30:00', returns: false, reason: 'sick', detail: '<b>ไข้</b>', pickupName: 'นาง ก', pickupPhone: '081', pickupRelation: 'มารดา',
+      status: 'advisor_ok', advisorName: 'ครู ข', advisorAt: '2026-11-26T03:00:00Z', log: [{ action: 'request' }, { action: 'approve1' }] });
+    assert.equal((h.match(/ปค\. 22/g) || []).length, 2); assert.match(h, /7\/2569/); assert.match(h, /☑<\/b> เห็นควรอนุญาต/); assert.match(h, /☐<\/b> อนุญาต/);
+    assert.ok(!h.includes('<b>ไข้')); assert.match(h, /10:30/);
+    const r = ctx.LeaveApp.pk22({ studentId: '30001', leaveDate: '2026-11-26', reason: 'sick', status: 'rejected', advisorName: 'ครู ข', log: [{ action: 'reject', step: 1, note: 'ไม่ได้ติดต่อผู้ปกครอง' }] });
+    assert.match(r, /☑<\/b> ไม่ควรอนุญาต เนื่องจาก <span class="u w">ไม่ได้ติดต่อผู้ปกครอง/);
+  },
   'settings: only the changed value is sent': async () => {
     await Store.saveSettings({ apps: { care: false } });
     assert.deepEqual(Object.keys(op(calls[0], 'update')[1]), ['apps']);

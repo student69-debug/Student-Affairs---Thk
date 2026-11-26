@@ -616,6 +616,7 @@
   const reportBtn = (app, kind, id) => `<button type="button" class="icon-btn no-print" title="รายงาน / พิมพ์" aria-label="รายงาน / พิมพ์" data-action="report" data-app="${esc(app)}" data-kind="${esc(kind)}" data-id="${esc(id)}">${icon('printer', 'i16')}</button>`;
   // values in rows are HTML the app already escaped; empty values are left out
   function reportSheet(r) {
+    if (r.html) return r.html; // an app with its own official form (e.g. ปค.22)
     const s = Store.student(r.studentId) || { id: r.studentId, first: '', last: '', prefix: '' };
     const kv = (rows) => `<table class="rp-kv">${rows.filter(([, v]) => v !== '' && v !== null && v !== undefined).map(([k, v]) => `<tr><th>${esc(k)}</th><td>${v}</td></tr>`).join('')}</table>`;
     const signs = r.signs || [[r.by, 'ผู้รายงาน'], [s.advisor, 'ครูที่ปรึกษา'], ['', 'ผู้รับรายงาน']];

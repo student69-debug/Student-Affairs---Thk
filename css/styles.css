@@ -571,6 +571,24 @@ details.card>summary::-webkit-details-marker{display:none}
 .update-bar>span{flex:1;line-height:1.45}
 .update-bar .btn{flex:none}
 @media print{.update-bar{display:none}}
+/* แบบ ปค.22 ขออนุญาตออกนอกบริเวณโรงเรียน: A4 landscape, two identical halves */
+@page pk22{size:A4 landscape;margin:0}
+.pk22{page:pk22;display:grid;grid-template-columns:1fr 1fr;gap:14mm;width:297mm;min-height:200mm;padding:10mm 12mm;box-sizing:border-box;font:13.5px/1.75 'Sarabun',var(--font-body),sans-serif;color:#000;background:#fff}
+.pk22 .pk-top{display:flex;justify-content:space-between;font-size:12.5px}
+.pk22 .pk-head{display:flex;gap:10px;align-items:center;border-bottom:1.5px solid #000;padding-bottom:4px;margin:4px 0 8px}
+.pk22 .pk-head img{width:40px;height:40px}
+.pk22 p{margin:0}
+.pk22 .r{text-align:right}
+.pk22 .i{text-indent:3em}
+.pk22 .u{display:inline-block;border-bottom:1px dotted #000;min-width:3em;padding:0 6px;text-indent:0;line-height:1.35}
+.pk22 .w{min-width:14em}
+.pk22 .sg{margin:6px 0 4px 34%;line-height:1.6;white-space:nowrap}
+.pk22 .sg .w{min-width:11em}
+.pk22 .ck{margin-left:3em}
+.pk22 .ck b{font-size:15px}
+.pk22 .st{font-size:11px;color:#444}
+body.printing-sheet #print-sheet:has(.pk22){padding:0}
+.rp-preview:has(.pk22){padding:0;overflow:auto}
 /* discipline check grid */
 .dc-grid td,.dc-grid th{padding:6px 8px;text-align:center}
 .dc-grid td:nth-child(2),.dc-grid th:nth-child(2){text-align:left;min-width:160px}
