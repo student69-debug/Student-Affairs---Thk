@@ -20,7 +20,7 @@ const storage = { getItem: () => null, setItem() {}, removeItem() {} };
 const ctx = vm.createContext({ console, setTimeout, clearTimeout, setInterval: () => 0, localStorage: storage, sessionStorage: storage, location: { hash: '', pathname: '/', origin: '' }, URLSearchParams, Date, Math, JSON, Map, Set, crypto,
   document: { addEventListener() {}, getElementById: () => null, querySelector: () => null }, addEventListener() {}, MutationObserver: class { observe() {} } });
 ctx.window = ctx; ctx.supabase = { createClient: () => sb };
-for (const f of ['config.js', 'store.js', 'ui.js', 'charts.js', 'counsel.js', 'apps.js', 'drugs.js', 'nurse.js', 'discipline.js', 'pages.js']) vm.runInContext(read(f), ctx, { filename: f });
+for (const f of ['config.js', 'store.js', 'ui.js', 'charts.js', 'counsel.js', 'apps.js', 'drugs.js', 'nurse.js', 'discipline.js', 'leave.js', 'pages.js']) vm.runInContext(read(f), ctx, { filename: f });
 const { Store, Pages } = ctx;
 
 const fresh = () => {
@@ -98,7 +98,7 @@ const tests = {
     const h = ctx.Apps.reportSheet({ title: 'รายงาน', secret: true, studentId: '30001', by: '<b>x</b>', rows: [['รายการ', ctx.UI.esc('<img src=x>')], ['ว่าง', '']] });
     assert.ok(!/<img src=x>|<b>x<\/b>|<i>/.test(h)); assert.ok(!h.includes('ว่าง')); assert.match(h, /เอกสารลับ/); assert.match(h, /ครูที่ปรึกษา/);
     for (const a of ctx.Apps.all) assert.equal(typeof a.report, 'function', a.id);
-    assert.ok(ctx.Apps.get('discipline'));
+    assert.ok(ctx.Apps.get('discipline') && ctx.Apps.get('leave'));
   },
   'student picker card: numbers only for own students, every value escaped': () => {
     const c = ctx.UI.studentCard;
@@ -112,6 +112,13 @@ const tests = {
     Store.data.teacherGrades = [{ userId: 'g', grade: 4 }]; Store.data.teacherRooms = [{ userId: 'g', grade: 2, room: 3 }];
     assert.equal(Store.readsAll(), true); assert.equal(Store.seesAll(), false);
     assert.deepEqual([{ grade: 4, room: 1, mine: true }, { grade: 2, room: 3, mine: true }, { grade: 5, room: 1, mine: true }].map((s) => Store.canWrite(s)), [true, true, false]);
+  },
+  'photo purge: each bucket gets only its own files': async () => {
+    const removed = {}; const keep = sb.storage.from;
+    sb.storage.from = (b) => ({ remove: async (l) => { removed[b] = l; return { data: null, error: null }; } });
+    answer = (c) => ({ data: c.table.startsWith('rpc:admin_photo_purge_queue') ? ['1.jpg', 'drug-evidence/a/x.jpg', 'leave-photos/b/y.jpg'] : null, error: null });
+    try { await Store.purgePhotos(); } finally { sb.storage.from = keep; }
+    assert.deepEqual(removed, { 'drug-evidence': ['a/x.jpg'], 'leave-photos': ['b/y.jpg'], 'student-photos': ['1.jpg'] });
   },
   'settings: only the changed value is sent': async () => {
     await Store.saveSettings({ apps: { care: false } });
