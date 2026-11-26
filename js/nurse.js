@@ -154,6 +154,16 @@
   }
 
   const app = {
+    report(kind, id) {
+      const x = (D().nurse || []).find((y) => y.id === id);
+      if (!x) return null;
+      return { title: 'รายงานการพักห้องพยาบาล', secret: true, studentId: x.studentId, by: x.by, rows: [
+        ['วันที่', fmtDate(x.at)], ['เวลา', `${timeOf(x.at)} – ${x.outAt ? timeOf(x.outAt) : 'ยังพักอยู่'} (${dur(mins(x.at, x.outAt))})`], ['คาบ', esc(x.period)], ['อาการ', what(x)],
+        ['สัญญาณชีพ', vitalLines(x, false)], ['การดูแล', esc(x.care)], ['ยาที่ให้', esc(x.medicine)], ['ผลการดูแล', esc((OUTCOMES[x.outcome] || OUTCOMES.other)[0])],
+        ['แจ้งผู้ปกครอง', x.parentNotified ? 'แจ้งแล้ว' : 'ยังไม่ได้แจ้ง'], ['นัดติดตาม', x.followStatus ? `${esc(FOLLOW[x.followStatus][0])} ${fmtDate(x.followAt)} ${esc(x.followFor || '')}` : ''],
+        ['หมายเหตุ', esc(x.note)], ['ผู้รับเข้าพัก', esc(x.by)], ['ผู้ให้ออก', x.outBy && x.outBy !== x.by ? esc(x.outBy) : '']],
+        signs: [[x.by, 'ครูผู้ดูแลห้องพยาบาล'], [(Store.student(x.studentId) || {}).advisor, 'ครูที่ปรึกษา'], ['', 'ผู้ปกครอง']] };
+    },
     id: 'nurse', name: 'ห้องพยาบาล', short: 'ห้องพยาบาล', icon: 'bed', rule: 'rule',
     list(sid) { return (sid ? all().filter((x) => x.studentId === sid) : all()).slice().sort(byDate); },
     summary(sid) {
@@ -172,7 +182,7 @@
         ${list.slice(0, 300).map((x) => `<tr><td>${fmtDate(x.at)}<div class="muted small">${timeOf(x.at)}–${x.outAt ? timeOf(x.outAt) : 'ยังพักอยู่'} · ${dur(mins(x.at, x.outAt))}${x.period ? ' · ' + esc(x.period) : ''}</div></td>${withStudent ? `<td>${sLink(x.studentId)}</td>` : ''}
           <td>${what(x)}<div>${vitalsHtml(x)}</div></td><td class="small">${esc(x.care) || '—'}${x.medicine ? `<div class="muted">ยา: ${esc(x.medicine)}</div>` : ''}${x.note ? `<div class="muted">${esc(x.note)}</div>` : ''}</td>
           <td>${outBadge(x.outcome)}${x.parentNotified ? '<div class="muted small">แจ้งผู้ปกครองแล้ว</div>' : ''}${x.followStatus ? `<div class="small" style="margin-top:4px">${badge(FOLLOW[x.followStatus])} <span class="muted">${fmtDate(x.followAt)} ${esc(x.followFor || '')}</span></div>` : ''}</td><td>${esc(x.by)}${x.outBy && x.outBy !== x.by ? `<div class="muted small">ออก: ${esc(x.outBy)}</div>` : ''}</td>
-          <td style="text-align:right;min-width:100px">${x.outcome === 'resting' ? `<button class="btn secondary sm" data-action="nurse-out" data-id="${esc(x.id)}">${icon('log-out', 'i16')}ให้ออก</button>` : ''}<button class="icon-btn" title="วัดสัญญาณชีพ" aria-label="วัดสัญญาณชีพ" data-action="nurse-vital" data-id="${esc(x.id)}">${icon('activity', 'i16')}</button><button class="icon-btn" title="นัดติดตาม" aria-label="นัดติดตาม" data-action="nurse-follow" data-id="${esc(x.id)}">${icon('calendar-plus', 'i16')}</button><button class="icon-btn" title="แก้ไข" data-action="nurse-edit" data-id="${esc(x.id)}">${icon('pencil', 'i16')}</button>${canDel(x) ? `<button class="icon-btn" title="ลบ (เก็บไว้ 30 วัน)" data-action="nurse-del" data-id="${esc(x.id)}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}
+          <td style="text-align:right;min-width:100px">${Apps.reportBtn('nurse', 'visit', x.id)}${x.outcome === 'resting' ? `<button class="btn secondary sm" data-action="nurse-out" data-id="${esc(x.id)}">${icon('log-out', 'i16')}ให้ออก</button>` : ''}<button class="icon-btn" title="วัดสัญญาณชีพ" aria-label="วัดสัญญาณชีพ" data-action="nurse-vital" data-id="${esc(x.id)}">${icon('activity', 'i16')}</button><button class="icon-btn" title="นัดติดตาม" aria-label="นัดติดตาม" data-action="nurse-follow" data-id="${esc(x.id)}">${icon('calendar-plus', 'i16')}</button><button class="icon-btn" title="แก้ไข" data-action="nurse-edit" data-id="${esc(x.id)}">${icon('pencil', 'i16')}</button>${canDel(x) ? `<button class="icon-btn" title="ลบ (เก็บไว้ 30 วัน)" data-action="nurse-del" data-id="${esc(x.id)}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}
         </tbody></table></div>${list.length > 300 ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง 300 จาก ${list.length.toLocaleString()} รายการ — ใช้ตัวกรองเพื่อดูเพิ่ม</div>` : ''}`;
     },
     studentTab(sid) {

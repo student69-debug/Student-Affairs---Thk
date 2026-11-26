@@ -82,6 +82,7 @@
   const ACTIONS = {
     go: (el) => { location.hash = el.dataset.href; },
     print: () => window.print(),
+    report: (el) => Apps.openReport(el.dataset.app, el.dataset.kind, el.dataset.id),
     'behavior-record': (el) => Apps.get('behavior').openRecord(S(el)),
     'behavior-restore': (el) => Apps.get('behavior').openRecord(S(el), true),
     'behavior-rule': (el) => Apps.get('behavior').ruleDialog(el.dataset.id),

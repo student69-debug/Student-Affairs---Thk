@@ -90,10 +90,10 @@
 
   function caseTable(list, showStudent = true) {
     if (!list.length) return empty('ยังไม่มีเคส', 'folder-open');
-    return `<div class="tbl-wrap"><table class="tbl"><thead><tr>${showStudent ? '<th>นักเรียน</th>' : ''}<th>เปิดเคส</th><th>ประเภทปัญหา</th><th>ความรุนแรง</th><th>แผน</th><th class="num">ครั้ง</th><th>นัดถัดไป</th><th>ผู้รับผิดชอบ</th></tr></thead><tbody>
+    return `<div class="tbl-wrap"><table class="tbl"><thead><tr>${showStudent ? '<th>นักเรียน</th>' : ''}<th>เปิดเคส</th><th>ประเภทปัญหา</th><th class="no-print"></th>
       ${list.map((c) => {
         return `<tr class="clickable" data-action="go" data-href="#/apps/counsel?case=${esc(c.id)}">${showStudent ? `<td>${sLink(c.studentId)}</td>` : ''}<td>${fmtDate(c.openDate)}</td><td>${kBadges(c.types) || '—'}</td><td>${sevBadge(c.severity)}</td><td>${planBadge(c.plan)}</td><td class="num">${sessionDates(c).length}</td>
-        <td>${apptBadge(c)}</td><td>${esc(ownerName(c.owner))}</td></tr>`; }).join('')}
+        <td>${apptBadge(c)}</td><td>${esc(ownerName(c.owner))}</td><td class="no-print">${Apps.reportBtn('counsel', 'case', c.id)}</td></tr>`; }).join('')}
       </tbody></table></div>`;
   }
 
@@ -281,6 +281,7 @@
         </div>
         <div class="actions">
           ${existing && (Store.isAdmin() || Store.appOk('counsel')) ? `<button type="button" class="btn danger" data-case="delete" title="ลบเคสที่บันทึกซ้ำ/ผิด (เก็บไว้ 30 วัน)">${icon('trash-2', 'i16')}ลบเคส</button>` : ''}
+          ${existing ? `<button type="button" class="btn secondary" data-action="report" data-app="counsel" data-kind="case" data-id="${esc(c.id)}" title="พิมพ์ตามที่บันทึกไว้ล่าสุด">${icon('printer', 'i16')}รายงาน / พิมพ์</button>` : ''}
           <button type="button" class="btn ghost" data-case="cancel">ยกเลิก</button>
           <button type="submit" class="btn primary">${icon('save', 'i16')}บันทึกเคส</button>
         </div></div>
@@ -512,6 +513,18 @@
     sample, csvObjects,
     id: 'counsel', name: 'ให้คำปรึกษา', short: 'ให้คำปรึกษา', icon: 'messages-square', rule: 'rule',
     summary, events, studentTab, openRecord, page, cases, progress, KTYPES,
+    // whole case with every session, as saved (counsellors and admins only get the full content from the database)
+    report(kind, id) {
+      const c = (D().cases || []).find((x) => x.id === id);
+      if (!c) return null;
+      const para = (t) => `<div style="white-space:pre-wrap">${esc(t)}</div>`;
+      const extra = c.sessions.map((ss, i) => { const tpl = tplFor(i);
+        return `<h3>${esc(tpl.t.replace(' เป็นต้นไป', ''))}${i >= 3 ? ` (ครั้งที่ ${i + 1})` : ''}${ss.date ? ' · ' + fmtDate(ss.date) : ''}</h3><table class="rp-kv">${tpl.f.map(([lab], j) => ss.notes[j] ? `<tr><th>${esc(lab)}</th><td>${para(ss.notes[j])}</td></tr>` : '').join('') || '<tr><td class="muted">ไม่มีบันทึก</td></tr>'}</table>`; }).join('');
+      return { title: 'รายงานการให้คำปรึกษา', secret: true, studentId: c.studentId, by: c.owner ? ownerName(c.owner) : '', extra,
+        rows: [['วันที่เปิดเคส', fmtDate(c.openDate)], ['ประเภทปัญหา', (c.types || []).map((k) => esc(k + ' ' + (KMAP[k] || ''))).join('<br>')], ['ระดับความรุนแรง', esc(c.severity)],
+          ['แผนการดำเนินงาน', esc(c.plan)], ['จำนวนครั้งที่พบ', String(sessionDates(c).length)], ['นัดถัดไป', c.nextAppt ? fmtDate(c.nextAppt) + (c.nextTime ? ' ' + esc(c.nextTime) + ' น.' : '') : ''], ['ผู้รับผิดชอบ', c.owner ? esc(ownerName(c.owner)) : '']],
+        signs: [[c.owner ? ownerName(c.owner) : '', 'ครูผู้ให้คำปรึกษา'], ['', 'หัวหน้างานแนะแนว'], ['', 'ผู้รับรายงาน']] };
+    },
     resetDraft() { draft = null; },
     // quick appointment outcomes from the overview list (counsellors and admins; checked again in the database)
     apptMeet(id) { draft = null; location.hash = '#/apps/counsel?case=' + id + '&meet=1'; },

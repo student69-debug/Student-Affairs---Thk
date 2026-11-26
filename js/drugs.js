@@ -111,6 +111,15 @@
   }
 
   const app = {
+    report(kind, id) {
+      const x = (D().drugs || []).find((y) => y.id === id);
+      if (!x) return null;
+      return { title: 'รายงานเหตุการณ์บุหรี่ / สารเสพติด', secret: true, studentId: x.studentId, by: x.by, rows: [
+        ['วันที่ / เวลา', fmtDate(x.at, true)], ['ภาคเรียน', esc(x.term)], ['ประเภท', esc((CATS[x.category] || {}).label || x.category)], ['สาร / พฤติกรรม', what(x)],
+        ['ผู้พบ', esc(x.foundBy)], ['สถานที่', esc(x.place)], ['ของกลาง', esc(Array.isArray(x.items) ? x.items.join(', ') : x.items)], ['กลุ่ม', esc((LEVELS[x.level] || LEVELS.none)[0])],
+        ['ตัดคะแนน', x.points ? signed(x.points) : ''], ['การดำเนินการ', (x.actions || []).map(esc).join(', ')], ['สถานะ', esc((STATUS[x.status] || STATUS.open)[0])],
+        ['การติดตาม', esc(x.followUp)], ['หมายเหตุ', esc(x.note)], ['รูปถ่าย', (x.photos || []).length ? x.photos.length + ' รูป (ดูในระบบ)' : ''], ['ผู้บันทึก', esc(x.by)]] };
+    },
     id: 'drugs', name: 'บุหรี่ / สารเสพติด', short: 'สารเสพติด', icon: 'cigarette-off', rule: 'rule-red',
     list(sid) { return (sid ? all().filter((x) => x.studentId === sid) : all()).slice().sort(byDate); },
     summary(sid) {
@@ -129,7 +138,7 @@
         ${list.slice(0, 300).map((x) => `<tr><td>${fmtDate(x.at, true)}</td>${withStudent ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${what(x)}${x.place || x.foundBy ? `<div class="muted small">${esc([x.foundBy, x.place].filter(Boolean).join(' · '))}</div>` : ''}</td>
           <td>${lvBadge(x.level)}${(x.photos || []).length ? `<div><button class="btn ghost sm" style="padding:0 6px;height:26px" data-action="drug-photos" data-id="${esc(x.id)}" title="ดูรูปถ่าย">${icon('camera', 'i16')}${x.photos.length}</button></div>` : ''}</td><td class="num ${x.points ? 'pts-neg' : ''}">${x.points ? signed(x.points) : '—'}</td>
           <td class="small">${x.actions.map(esc).join(', ') || '—'}${x.followUp ? `<div class="muted">ติดตาม: ${esc(x.followUp)}</div>` : ''}</td><td>${stBadge(x.status)}</td><td>${esc(x.by)}</td>
-          <td style="text-align:right;white-space:nowrap">${canEdit(x) ? `<button class="icon-btn" title="ติดตาม / แก้ไข" data-action="drug-edit" data-id="${esc(x.id)}">${icon('pencil', 'i16')}</button>` : ''}${canDel(x) ? `<button class="icon-btn" title="ลบ (เก็บไว้ 30 วัน)" data-action="drug-del" data-id="${esc(x.id)}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}
+          <td style="text-align:right;white-space:nowrap">${Apps.reportBtn('drugs', 'case', x.id)}${canEdit(x) ? `<button class="icon-btn" title="ติดตาม / แก้ไข" data-action="drug-edit" data-id="${esc(x.id)}">${icon('pencil', 'i16')}</button>` : ''}${canDel(x) ? `<button class="icon-btn" title="ลบ (เก็บไว้ 30 วัน)" data-action="drug-del" data-id="${esc(x.id)}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}
         </tbody></table></div>${list.length > 300 ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง 300 จาก ${list.length.toLocaleString()} รายการ — ใช้ตัวกรองเพื่อดูเพิ่ม</div>` : ''}`;
     },
     studentTab(sid) {

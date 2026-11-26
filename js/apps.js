@@ -90,6 +90,15 @@
   const behavior = {
     id: 'behavior', name: 'พฤติกรรม / ตัดคะแนน', short: 'พฤติกรรม', icon: 'clipboard-pen', rule: 'rule-red',
     // "เหตุการณ์ 14 พ.ย. 2569 · 12:20 น. · โรงอาหาร · ผู้ก่อเหตุ · ร่วมกับ ..." for records that belong to a multi-student incident
+    report(kind, id) {
+      const r = (D().behavior.records || []).find((x) => x.id === id);
+      if (!r) return null;
+      const rule = (D().behavior.rules || []).find((x) => x.id === r.ruleId);
+      return { title: 'รายงานพฤติกรรมนักเรียน', studentId: r.studentId, by: r.by, rows: [
+        ['วันที่ / เวลา', fmtDate(r.at, true)], ['ภาคเรียน', esc(r.term)], ['รายการ', esc(r.title) + (rule && rule.code ? ` <span class="muted">(ระเบียบข้อ ${esc(rule.code)})</span>` : '')],
+        ['คะแนน', signed(r.points)], ['เหตุการณ์', this.incidentLine(r)], ['หมายเหตุ', esc(r.note)], ['ผู้บันทึก', esc(r.by)],
+        ['คะแนนความประพฤติภาคเรียนนี้', String(this.score(r.studentId))]] };
+    },
     incidentLine(r, html = true) {
       if (!r.incidentId) return '';
       const inc = (D().behavior.incidents || []).find((x) => x.id === r.incidentId);
@@ -119,8 +128,8 @@
       return `<div class="card-body" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--ink-200)">
           <div style="flex:1;min-width:220px">${meter(this.score(sid))}</div>
           <button class="btn accent sm no-print" data-action="behavior-record" data-student="${sid}">${icon('clipboard-pen', 'i16')}บันทึกพฤติกรรม</button></div>
-        ${rec.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>วันที่</th><th>รายการ</th><th class="num">คะแนน</th><th>หมายเหตุ</th><th>ผู้บันทึก</th></tr></thead><tbody>
-        ${rec.map((r) => `<tr><td>${fmtDate(r.at, true)}</td><td>${esc(r.title)}${this.incidentLine(r)}</td><td class="num ${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${signed(r.points)}</td><td class="muted">${esc(r.note) || '—'}</td><td>${esc(r.by)}</td></tr>`).join('')}
+        ${rec.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>วันที่</th><th>รายการ</th><th class="num">คะแนน</th><th>หมายเหตุ</th><th>ผู้บันทึก</th><th class="no-print"></th></tr></thead><tbody>
+        ${rec.map((r) => `<tr><td>${fmtDate(r.at, true)}</td><td>${esc(r.title)}${this.incidentLine(r)}</td><td class="num ${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${signed(r.points)}</td><td class="muted">${esc(r.note) || '—'}</td><td>${esc(r.by)}</td><td class="no-print">${reportBtn('behavior', 'record', r.id)}</td></tr>`).join('')}
         </tbody></table></div>` : empty('ยังไม่มีบันทึกพฤติกรรมในภาคเรียนนี้')}`;
     },
     openRecord(sid, restoreOnly = false) {
@@ -356,7 +365,7 @@
         } else {
           body = `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>วันที่</th><th>นักเรียน</th><th>รายการ</th><th class="num">คะแนน</th><th>ผู้บันทึก</th><th></th></tr></thead><tbody>
             ${rec.slice(0, LIMIT).map((r) => `<tr><td>${fmtDate(r.at, true)}</td><td>${sLink(r.studentId)}</td><td>${esc(r.title)}${r.note ? `<div class="muted small">${esc(r.note)}</div>` : ''}${this.incidentLine(r)}</td><td class="num ${r.points >= 0 ? 'pts-pos' : 'pts-neg'}">${signed(r.points)}</td><td>${esc(r.by)}</td>
-            <td>${Store.isAdmin() || r.byUser === Store.user().id ? `<button class="icon-btn" title="ลบรายการ" data-action="behavior-del" data-id="${esc(r.id)}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}
+            <td style="white-space:nowrap">${reportBtn('behavior', 'record', r.id)}${Store.isAdmin() || r.byUser === Store.user().id ? `<button class="icon-btn" title="ลบรายการ" data-action="behavior-del" data-id="${esc(r.id)}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}
             </tbody></table></div>${more(rec.length, 'รายการล่าสุด')}`;
         }
         $('bf-out').innerHTML = head + body;
@@ -411,6 +420,19 @@
       (this.c().health || []).filter(f).forEach((x) => ev.push({ app: 'care', at: x.date + 'T10:00:00', studentId: x.studentId, by: x.by, dot: 'care', ic: 'thermometer', title: `บันทึกสุขภาพ · ${esc(x.symptom)}${x.referred ? ' <span class="badge b-warning">ส่งต่อ</span>' : ''}`, note: [x.detail, x.action && 'การดูแล: ' + x.action].filter(Boolean).join(' · ') }));
       return ev;
     },
+    report(kind, id) {
+      const c = this.c(), RES = { normal: 'ปกติ', risk: 'เสี่ยง', problem: 'มีปัญหา' };
+      if (kind === 'health') { const x = (c.health || []).find((y) => y.id === id); return x && { title: 'รายงานบันทึกสุขภาพนักเรียน', secret: true, studentId: x.studentId, by: x.by,
+        rows: [['วันที่', fmtDate(x.date)], ['อาการ', esc(x.symptom)], ['รายละเอียด', esc(x.detail)], ['การดูแล', esc(x.action)], ['ส่งต่อ', x.referred ? 'ส่งต่อ' : 'ไม่ได้ส่งต่อ'], ['ผู้บันทึก', esc(x.by)]] }; }
+      if (kind === 'screen') { const x = c.screenings.find((y) => y.id === id); return x && { title: 'รายงานผลการคัดกรองนักเรียน', secret: true, studentId: x.studentId, by: x.by,
+        rows: [['วันที่', fmtDate(x.at)], ['เครื่องมือ', esc(x.tool)], ['ผลการคัดกรอง', esc(RES[x.result] || x.result)], ['หมายเหตุ', esc(x.note)], ['ผู้ประเมิน', esc(x.by)]] }; }
+      if (kind === 'visit') { const x = c.visits.find((y) => y.id === id); return x && { title: 'รายงานการเยี่ยมบ้านนักเรียน', secret: true, studentId: x.studentId, by: x.by,
+        rows: [['วันที่', fmtDate(x.at)], ['ผู้เยี่ยม', esc(x.by)], ['บันทึก', esc(x.note)], ['รูปถ่าย', /^(data:image\/|https:)/.test(x.photo || '') ? `<img src="${esc(x.photo)}" alt="รูปเยี่ยมบ้าน" style="max-width:260px;max-height:200px">` : '']] }; }
+      if (kind === 'referral') { const x = c.referrals.find((y) => y.id === id); return x && { title: 'แบบส่งต่อนักเรียน', secret: true, studentId: x.studentId,
+        rows: [['วันที่', fmtDate(x.at)], ['ประเภท', x.type === 'internal' ? 'ส่งต่อภายใน' : 'ส่งต่อภายนอก'], ['ส่งต่อไปยัง', esc(x.to)], ['เหตุผล / ข้อมูลที่ส่งต่อ', esc(x.note)]],
+        signs: [['', 'ผู้ส่งต่อ'], [(Store.student(x.studentId) || {}).advisor, 'ครูที่ปรึกษา'], ['', 'ผู้รับการส่งต่อ']] }; }
+      return null;
+    },
     tables(sid, flt = {}) {
       const inGrade = (x) => !flt.grade || String((Store.student(x.studentId) || {}).grade) === String(flt.grade);
       const inDate = (d) => { d = String(d || '').slice(0, 10); return (!flt.from || d >= flt.from) && (!flt.to || d <= flt.to); };
@@ -422,11 +444,11 @@
       const canDel = (x) => Store.isAdmin() || x.byUser === Store.user().id;
       this._n = { health: hl.length, screen: sc.length, visit: vi.length, needs: ne.length, referral: rf.length };
       return {
-        health: hl.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>อาการ</th><th>รายละเอียด</th><th>การดูแล</th><th>ส่งต่อ</th><th>ผู้บันทึก</th><th></th></tr></thead><tbody>${hl.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.date)}</td><td>${esc(x.symptom)}</td><td class="muted">${esc(x.detail) || '—'}</td><td>${esc(x.action) || '—'}</td><td>${x.referred ? '<span class="badge b-warning">ส่งต่อ</span>' : '—'}</td><td>${esc(x.by)}</td><td>${canDel(x) ? `<button class="icon-btn" title="ลบ" data-action="care-health-del" data-id="${esc(x.id)}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>${more(hl.length, 'รายการ')}` : empty('ยังไม่มีบันทึกสุขภาพ', 'thermometer'),
-        screen: sc.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>เครื่องมือ</th><th>ผล</th><th>ผู้ประเมิน</th><th>หมายเหตุ</th></tr></thead><tbody>${sc.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${esc(x.tool)}</td><td>${screenBadge(x.result)}</td><td>${esc(x.by)}</td><td class="muted">${esc(x.note) || '—'}</td></tr>`).join('')}</tbody></table></div>${more(sc.length, 'รายการ')}` : empty('ยังไม่มีผลคัดกรอง', 'clipboard-check'),
-        visit: vi.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>ผู้เยี่ยม</th><th>บันทึก</th><th>รูป</th></tr></thead><tbody>${vi.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${esc(x.by)}</td><td>${esc(x.note)}</td><td>${x.photo ? `<img src="${x.photo}" alt="รูปเยี่ยมบ้าน" style="width:56px;height:42px;object-fit:cover;border-radius:4px">` : '<span class="muted">—</span>'}</td></tr>`).join('')}</tbody></table></div>${more(vi.length, 'รายการ')}` : empty('ยังไม่มีบันทึกเยี่ยมบ้าน', 'house'),
+        health: hl.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>อาการ</th><th>รายละเอียด</th><th>การดูแล</th><th>ส่งต่อ</th><th>ผู้บันทึก</th><th></th></tr></thead><tbody>${hl.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.date)}</td><td>${esc(x.symptom)}</td><td class="muted">${esc(x.detail) || '—'}</td><td>${esc(x.action) || '—'}</td><td>${x.referred ? '<span class="badge b-warning">ส่งต่อ</span>' : '—'}</td><td>${esc(x.by)}</td><td style="white-space:nowrap">${reportBtn('care', 'health', x.id)}${canDel(x) ? `<button class="icon-btn" title="ลบ" data-action="care-health-del" data-id="${esc(x.id)}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>${more(hl.length, 'รายการ')}` : empty('ยังไม่มีบันทึกสุขภาพ', 'thermometer'),
+        screen: sc.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>เครื่องมือ</th><th>ผล</th><th>ผู้ประเมิน</th><th>หมายเหตุ</th><th class="no-print"></th></tr></thead><tbody>${sc.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${esc(x.tool)}</td><td>${screenBadge(x.result)}</td><td>${esc(x.by)}</td><td class="muted">${esc(x.note) || '—'}</td><td class="no-print">${reportBtn('care', 'screen', x.id)}</td></tr>`).join('')}</tbody></table></div>${more(sc.length, 'รายการ')}` : empty('ยังไม่มีผลคัดกรอง', 'clipboard-check'),
+        visit: vi.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>ผู้เยี่ยม</th><th>บันทึก</th><th>รูป</th><th class="no-print"></th></tr></thead><tbody>${vi.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${esc(x.by)}</td><td>${esc(x.note)}</td><td>${x.photo ? `<img src="${x.photo}" alt="รูปเยี่ยมบ้าน" style="width:56px;height:42px;object-fit:cover;border-radius:4px">` : '<span class="muted">—</span>'}</td><td class="no-print">${reportBtn('care', 'visit', x.id)}</td></tr>`).join('')}</tbody></table></div>${more(vi.length, 'รายการ')}` : empty('ยังไม่มีบันทึกเยี่ยมบ้าน', 'house'),
         needs: ne.length ? `<div class="list">${ne.map((x) => `<div class="list-row"><span class="badge ${x.kind === 'สุขภาพ' ? 'b-info' : 'b-warning'}">${esc(x.kind)}</span><div class="grow">${st ? `<div class="t">${sLink(x.studentId)}</div>` : ''}<div>${esc(x.text)}</div></div></div>`).join('')}</div>` : empty('ไม่มีข้อมูลความต้องการพิเศษ / สุขภาพ', 'heart-pulse'),
-        referral: rf.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>ประเภท</th><th>ส่งต่อไปยัง</th><th>เหตุผล</th></tr></thead><tbody>${rf.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${x.type === 'internal' ? '<span class="badge b-info">ภายใน</span>' : '<span class="badge b-warning">ภายนอก</span>'}</td><td>${esc(x.to)}</td><td>${esc(x.note)}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีการส่งต่อ', 'share-2'),
+        referral: rf.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>ประเภท</th><th>ส่งต่อไปยัง</th><th>เหตุผล</th><th class="no-print"></th></tr></thead><tbody>${rf.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${x.type === 'internal' ? '<span class="badge b-info">ภายใน</span>' : '<span class="badge b-warning">ภายนอก</span>'}</td><td>${esc(x.to)}</td><td>${esc(x.note)}</td><td class="no-print">${reportBtn('care', 'referral', x.id)}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีการส่งต่อ', 'share-2'),
       };
     },
     dashHtml() {
@@ -542,8 +564,42 @@
   }
 
   const ALL = [care, window.CounselApp, behavior];
+  /* ---- one case / record on paper: every app gives app.report(kind, id) → { title, secret, studentId, rows: [[label, html]], extra, by } ---- */
+  const reportBtn = (app, kind, id) => `<button type="button" class="icon-btn no-print" title="รายงาน / พิมพ์" aria-label="รายงาน / พิมพ์" data-action="report" data-app="${esc(app)}" data-kind="${esc(kind)}" data-id="${esc(id)}">${icon('printer', 'i16')}</button>`;
+  // values in rows are HTML the app already escaped; empty values are left out
+  function reportSheet(r) {
+    const s = Store.student(r.studentId) || { id: r.studentId, first: '', last: '', prefix: '' };
+    const kv = (rows) => `<table class="rp-kv">${rows.filter(([, v]) => v !== '' && v !== null && v !== undefined).map(([k, v]) => `<tr><th>${esc(k)}</th><td>${v}</td></tr>`).join('')}</table>`;
+    const signs = r.signs || [[r.by, 'ผู้รายงาน'], [s.advisor, 'ครูที่ปรึกษา'], ['', 'ผู้รับรายงาน']];
+    return `<div class="rp">
+      <div class="rp-head"><img src="img/logo.png" alt=""><div><b>โรงเรียนธรรมศาสตร์คลองหลวงวิทยาคม</b><div>กลุ่มบริหารกิจการนักเรียน</div></div>${r.secret ? '<span class="rp-secret">เอกสารลับ</span>' : ''}</div>
+      <h2>${esc(r.title)}</h2>
+      <h3>ข้อมูลนักเรียน</h3>${kv([['ชื่อ – นามสกุล', esc(fullName(s)) || esc(s.id)], ['รหัสนักเรียน', esc(s.id)], ['ชั้น', s.grade ? `${klass(s)} เลขที่ ${esc(s.no)}` : ''], ['ครูที่ปรึกษา', esc(s.advisor)]])}
+      <h3>รายละเอียด</h3>${kv(r.rows)}
+      ${r.extra || ''}
+      <div class="rp-sign">${signs.map(([n, role]) => `<div>ลงชื่อ ..........................................<br>( ${n ? esc(n) : '..........................................'} )<br>${esc(role)}</div>`).join('')}</div>
+      <p class="rp-foot">พิมพ์เมื่อ ${fmtDate(new Date().toISOString(), true)} โดย ${esc(Store.user().name)}${r.secret ? ' · ข้อมูลส่วนบุคคล ใช้เฉพาะผู้เกี่ยวข้อง ห้ามเผยแพร่' : ''}</p></div>`;
+  }
+  function openReport(appId, kind, id) {
+    const a = ALL.find((x) => x.id === appId), r = a && a.report ? a.report(kind, id) : null;
+    if (!r) { toast('ไม่พบรายการ หรือคุณไม่มีสิทธิ์ดู'); return; }
+    const html = reportSheet(r);
+    dialog({ title: 'รายงาน · ' + r.title, size: 'lg', submitLabel: 'พิมพ์ / บันทึกเป็น PDF', cancelLabel: 'ปิด',
+      body: `<p class="muted small" style="margin:0">ตรวจข้อมูลก่อนพิมพ์ · ส่งต่อเป็นไฟล์: ในหน้าต่างพิมพ์เลือก "บันทึกเป็น PDF"</p><div class="rp-preview">${html}</div>`,
+      onSubmit: () => {
+        let el = document.getElementById('print-sheet');
+        if (!el) { el = document.createElement('div'); el.id = 'print-sheet'; document.body.appendChild(el); }
+        el.innerHTML = html;
+        document.body.classList.add('printing-sheet');
+        const done = () => { document.body.classList.remove('printing-sheet'); el.innerHTML = ''; removeEventListener('afterprint', done); };
+        addEventListener('afterprint', done);
+        window.print();
+        return false;
+      } });
+  }
+
   window.Apps = {
-    all: ALL,
+    all: ALL, reportBtn, reportSheet, openReport,
     get: (id) => ALL.find((a) => a.id === id),
     enabled: () => ALL.filter((a) => Store.s.apps[a.id] !== false && Store.appOk(a.id)),
     events: (sid) => window.Apps.enabled().flatMap((a) => a.events(sid)).sort(byDate),

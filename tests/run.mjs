@@ -93,6 +93,12 @@ const tests = {
     const h = ctx.NurseApp._test.guardianHtml({ name: '', phone: '', others: [{ who: 'บิดา', name: '<b>', phone: '0812345678' }, { who: 'มารดา', name: '', phone: '' }] });
     assert.match(h, /โทรบิดา 0812345678/); assert.match(h, /title="&lt;b&gt;"/); assert.ok(!/ยังไม่มีเบอร์/.test(h));
   },
+  'report: one record on paper, every value escaped, empty rows left out': () => {
+    Store.data.students[0].advisor = 'ครู <i>';
+    const h = ctx.Apps.reportSheet({ title: 'รายงาน', secret: true, studentId: '30001', by: '<b>x</b>', rows: [['รายการ', ctx.UI.esc('<img src=x>')], ['ว่าง', '']] });
+    assert.ok(!/<img src=x>|<b>x<\/b>|<i>/.test(h)); assert.ok(!h.includes('ว่าง')); assert.match(h, /เอกสารลับ/); assert.match(h, /ครูที่ปรึกษา/);
+    for (const a of ctx.Apps.all.concat([ctx.Apps.get('drugs'), ctx.Apps.get('nurse')])) assert.equal(typeof a.report, 'function', a.id);
+  },
   'settings: only the changed value is sent': async () => {
     await Store.saveSettings({ apps: { care: false } });
     assert.deepEqual(Object.keys(op(calls[0], 'update')[1]), ['apps']);
