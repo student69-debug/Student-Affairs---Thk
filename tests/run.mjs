@@ -20,7 +20,7 @@ const storage = { getItem: () => null, setItem() {}, removeItem() {} };
 const ctx = vm.createContext({ console, setTimeout, clearTimeout, setInterval: () => 0, localStorage: storage, sessionStorage: storage, location: { hash: '', pathname: '/', origin: '' }, URLSearchParams, Date, Math, JSON, Map, Set, crypto,
   document: { addEventListener() {}, getElementById: () => null, querySelector: () => null }, addEventListener() {}, MutationObserver: class { observe() {} } });
 ctx.window = ctx; ctx.supabase = { createClient: () => sb };
-for (const f of ['config.js', 'store.js', 'ui.js', 'charts.js', 'counsel.js', 'apps.js', 'drugs.js', 'nurse.js', 'discipline.js', 'leave.js', 'pages.js']) vm.runInContext(read(f), ctx, { filename: f });
+for (const f of ['config.js', 'store.js', 'ui.js', 'charts.js', 'counsel.js', 'apps.js', 'drugs.js', 'nurse.js', 'discipline.js', 'leave.js', 'pages.js', 'parent.js']) vm.runInContext(read(f), ctx, { filename: f });
 const { Store, Pages } = ctx;
 
 const fresh = () => {

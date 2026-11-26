@@ -102,7 +102,54 @@
         ${c.advisor ? `<div class="pv-adv">${icon('user-round', 'i16')}ครูที่ปรึกษา: ${esc(c.advisor)}</div>` : ''}</div></div>`);
     if ('score' in c) parts.push(scoreCard(c), behaviorCard(c));
     parts.push(careCard(c));
+    parts.push(leaveCard(c));
     return `<section class="pv-child">${parts.join('')}</section>`;
+  }
+
+  /* ---- ขออนุญาตออกนอกโรงเรียน: the student / parent files it, the homeroom teacher then the grade head decide ---- */
+  let leaves = [];
+  const L = () => window.LeaveApp;
+  const STEP = { pending: 'รอครูที่ปรึกษาให้ความเห็น', advisor_ok: 'รอหัวหน้าระดับอนุญาต', approved: 'อนุญาตแล้ว · แสดงที่ป้อมยามเมื่อออก', out: 'ออกจากโรงเรียนแล้ว', returned: 'กลับเข้าโรงเรียนแล้ว', rejected: 'ไม่อนุญาต', cancelled: 'ยกเลิกแล้ว' };
+  function leaveCard(c) {
+    if (!L()) return ''; // parents do not load the settings; the database refuses when the app is switched off
+    const mine = leaves.filter((x) => x.student_id === c.id);
+    const tone = (st) => (st === 'rejected' ? 'b-danger' : st === 'approved' || st === 'out' || st === 'returned' ? 'b-success' : st === 'cancelled' ? 'b-neutral' : 'b-warning');
+    return `<div class="card pv-leave"><div class="card-head"><h3>${icon('door-open', 'i16')} ขออนุญาตออกนอกโรงเรียน</h3>
+      <button class="btn primary sm" data-pv-leave="${esc(c.id)}">${icon('plus', 'i16')}ยื่นขออนุญาตออก</button></div>
+      <div class="card-body muted small">ยื่นแล้ว ครูที่ปรึกษาให้ความเห็นก่อน แล้วหัวหน้าระดับ / รองหัวหน้าระดับอนุญาต · เมื่ออนุญาตแล้วผู้ปกครองมารับและแจ้งที่ป้อมยาม</div>
+      ${mine.length ? `<div class="list">${mine.map((x) => `<div class="list-row"><div class="grow">
+          <div><b>${fmtDate(x.leave_date)}</b>${x.out_plan ? ' · ออก ' + esc(String(x.out_plan).slice(0, 5)) + ' น.' : ''} · ${esc(L().REASONS[x.reason] || x.reason)}${x.doc ? ` <span class="muted small">ที่ ${esc(x.doc)}</span>` : ''}</div>
+          <div class="small"><span class="badge ${tone(x.status)}">${esc(STEP[x.status] || x.status)}</span>
+            ${x.advisor_name ? ` ครูที่ปรึกษา: ${esc(x.advisor_name)}` : ''}${x.approve_name ? ` · หัวหน้าระดับ: ${esc(x.approve_name)}` : ''}</div>
+          ${x.reject_note ? `<div class="small" style="color:var(--red-700)">เหตุผล: ${esc(x.reject_note)}</div>` : ''}</div>
+          ${x.mine && ['pending', 'advisor_ok', 'approved'].includes(x.status) ? `<button class="btn ghost sm" data-pv-cancel="${esc(x.id)}">ยกเลิก</button>` : ''}</div>`).join('')}</div>` : ''}</div>`;
+  }
+  function openLeave(sid, gate) {
+    const today = new Date(Date.now() + 7 * 36e5).toISOString().slice(0, 10);
+    UI.dialog({ title: 'ยื่นขออนุญาตออกนอกโรงเรียน', submitLabel: 'ยื่นคำขอ',
+      body: `<div class="form-grid">
+        <div class="field"><label>วันที่ <span class="req">*</span></label><input class="input" type="date" name="leaveDate" value="${today}" min="${today}" required></div>
+        <div class="field"><label>เวลาที่ขอออก</label><input class="input" type="time" name="outPlan"></div>
+        <div class="field"><label>เหตุผล <span class="req">*</span></label><select class="select" name="reason">${Object.entries(L().REASONS).filter(([k]) => k !== 'activity').map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select></div>
+        <div class="field"><label>หลังออกจากโรงเรียน</label><select class="select" name="returns">${L().RETURNS_OPTS}</select></div>
+        <div class="field"><label>เวลาที่จะกลับ (ถ้ากลับมาเรียนต่อ)</label><input class="input" type="time" name="backPlan"></div>
+        <div class="field full"><label>กิจธุระ / รายละเอียด <span class="req">*</span></label><textarea class="textarea" name="detail" maxlength="1000" required placeholder="เช่น ไปพบแพทย์ตามนัด" style="min-height:56px"></textarea></div>
+        <div class="field"><label>ชื่อผู้ปกครองที่มารับ <span class="req">*</span></label><input class="input" name="pickupName" maxlength="200" required></div>
+        <div class="field"><label>เกี่ยวข้องเป็น</label><input class="input" name="pickupRelation" maxlength="100" placeholder="บิดา มารดา ญาติ"></div>
+        <div class="field"><label>เบอร์โทรผู้ปกครอง <span class="req">*</span></label><input class="input" name="pickupPhone" maxlength="60" inputmode="tel" required></div></div>
+        <div class="notice">${icon('info', 'i16')}<span>คำขอจะส่งให้ครูที่ปรึกษาก่อน แล้วจึงถึงหัวหน้าระดับ ติดตามสถานะได้ที่หน้านี้</span></div>`,
+      onSubmit: async (v) => {
+        await Store.parentLeaveSave({ student_id: sid, leave_date: v.leaveDate, out_plan: v.outPlan, back_plan: v.backPlan, returns: v.returns === 'true', reason: v.reason,
+          detail: v.detail.trim(), pickup_name: v.pickupName.trim(), pickup_relation: v.pickupRelation.trim(), pickup_phone: v.pickupPhone.trim() });
+        UI.toast('ยื่นคำขอแล้ว · รอครูที่ปรึกษาให้ความเห็น');
+        render(gate);
+      } });
+  }
+  function bindLeave(root, gate) {
+    root.querySelectorAll('[data-pv-leave]').forEach((b) => b.addEventListener('click', () => openLeave(b.dataset.pvLeave, gate)));
+    root.querySelectorAll('[data-pv-cancel]').forEach((b) => b.addEventListener('click', () => UI.confirmDialog('ยกเลิกคำขอ', 'ต้องการยกเลิกคำขอออกนอกโรงเรียนนี้?', 'ยกเลิกคำขอ', async () => {
+      await Store.parentLeaveCancel(b.dataset.pvCancel); UI.toast('ยกเลิกคำขอแล้ว'); render(gate);
+    }, true)));
   }
 
   // filter chips above the behaviour list (all / good deeds / deductions)
@@ -120,6 +167,7 @@
     gate(`<div class="login" style="align-items:center">${icon('loader', 'i28')}<div class="muted">กำลังโหลดข้อมูล…</div></div>`);
     let v;
     try { v = await Store.parentView(); } catch (e) { v = { error: e.message }; }
+    try { leaves = await Store.parentLeaves(); } catch (e) { leaves = []; }
     const head = `<header class="pv-top"><div class="brand-row" style="border:0;padding:0"><div class="brand-mark"><img src="img/logo.png?v=20261117e" alt=""></div><div><b>STUDENT AFFAIRS</b><span>สำหรับผู้ปกครอง · ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม</span></div></div>
       <button class="btn ghost sm" id="pv-out">${icon('log-out', 'i16')}ออกจากระบบ</button></header>`;
     let body;
@@ -132,6 +180,7 @@
     document.getElementById('pv-out').addEventListener('click', () => Store.signOut());
     UI.hydratePhotos(document.getElementById('gate'));
     bindFilters(document.getElementById('gate'));
+    bindLeave(document.getElementById('gate'), gate);
   }
 
   window.Parent = { render };

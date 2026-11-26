@@ -37,7 +37,9 @@
     return out.join('');
   }
 
+  const RETURNS_OPTS = '<option value="false">กลับบ้าน (ไม่กลับมาเรียนต่อ)</option><option value="true">กลับมาเรียนต่อในวันนี้</option>';
   const app = {
+    REASONS, STATUS, RETURNS_OPTS,
     id: 'leave', name: 'ขออนุญาตออกนอกโรงเรียน', short: 'ขอออกนอกโรงเรียน', icon: 'door-open', rule: 'rule',
     list(sid) { return all().filter((x) => !sid || x.studentId === sid).sort(byDate); },
     summary(sid) {
@@ -59,7 +61,7 @@
           <td>${esc(REASONS[x.reason] || x.reason)}${x.detail ? `<div class="muted small">${esc(x.detail)}</div>` : ''}</td>
           <td class="small">${esc(PICKUP[x.pickup] || '')}${x.pickupName ? `<div class="muted">${esc(x.pickupName)}${x.pickupRelation ? ' (' + esc(x.pickupRelation) + ')' : ''}</div>` : ''}</td>
           <td>${badge(x.status)}${(x.photos || []).length ? ` <span class="muted small">${icon('camera', 'i16')}${x.photos.length}</span>` : ''}</td>
-          <td class="small">${x.outAt ? 'ออก ' + time(x.outAt) : '—'}${x.backAt ? '<br>กลับ ' + time(x.backAt) : x.status === 'out' && !x.returns ? '<br><span class="muted">ไม่กลับมา</span>' : ''}</td>
+          <td class="small">${x.outAt ? 'ออก ' + time(x.outAt) : '—'}${x.backAt ? '<br>กลับ ' + time(x.backAt) : x.status === 'out' && !x.returns ? '<br><span class="muted">กลับบ้าน</span>' : ''}</td>
           <td class="no-print" style="text-align:right;white-space:nowrap"><div class="actions" style="justify-content:flex-end">${actions(x)}<button class="icon-btn" title="ดูรายละเอียด / รูปถ่าย" data-action="leave-view" data-id="${esc(x.id)}">${icon('eye', 'i16')}</button>${Apps.reportBtn('leave', 'pass', x.id)}${(Store.isAdmin() || x.byUser === Store.user().id) ? `<button class="icon-btn" title="ลบ (เก็บไว้ 30 วัน)" data-action="leave-del" data-id="${esc(x.id)}">${icon('trash-2', 'i16')}</button>` : ''}</div></td></tr>`).join('')}
         </tbody></table></div>`;
     },
@@ -78,7 +80,7 @@
         <div class="pk-head"><img src="img/logo.png" alt=""><div><b>แบบขออนุญาตออกนอกบริเวณโรงเรียน</b><div>กลุ่มบริหารกิจการนักเรียน โรงเรียนธรรมศาสตร์คลองหลวงวิทยาคม</div></div></div>
         <p class="r">ที่ ${u(x.docNo ? `${x.docNo}/${x.docYear}` : '')} วันที่ ${u(part({ day: 'numeric' }))} เดือน ${u(part({ month: 'long' }))} พ.ศ. ${u(part({ year: 'numeric' }).replace(/\D/g, ''))}</p>
         <p class="i">ด้วยข้าพเจ้า ${u(fullName(s), 'w')} ชั้น ม. ${u(s.grade)} / ${u(s.room)}</p>
-        <p>มีเหตุจำเป็นต้องขออนุญาตออกนอกบริเวณโรงเรียน ช่วงเวลา ${u(x.outPlan ? String(x.outPlan).slice(0, 5) : '')} น. ถึง ${u(x.backPlan ? String(x.backPlan).slice(0, 5) : x.returns ? '' : 'ไม่กลับ')} น.</p>
+        <p>มีเหตุจำเป็นต้องขออนุญาตออกนอกบริเวณโรงเรียน ช่วงเวลา ${u(x.outPlan ? String(x.outPlan).slice(0, 5) : '')} น. ถึง ${u(x.backPlan ? String(x.backPlan).slice(0, 5) : '')} น.</p>
         <p>โดยมีกิจธุระสำคัญ คือ ${u((REASONS[x.reason] || '') + (x.detail ? ' · ' + x.detail : ''), 'w')}</p>
         <p class="i">โดยมีผู้ปกครองชื่อ ${u(x.pickupName, 'w')}</p>
         <p>เบอร์โทรศัพท์ผู้ปกครอง ${u(x.pickupPhone)} เกี่ยวข้องเป็น ${u(x.pickupRelation)}</p>
@@ -103,7 +105,7 @@
       if (kind === 'pass') return { title: `แบบขออนุญาตออกนอกบริเวณโรงเรียน (ปค.22)${x.docNo ? ' ที่ ' + x.docNo + '/' + x.docYear : ''}`, studentId: x.studentId, html: this.pk22(x) };
       const log = (x.log || []).map((l) => `<tr><td>${fmtDate(l.at, true)}</td><td>${esc(ACT[l.action] || l.action)}${l.note ? ' · ' + esc(l.note) : ''}</td><td>${esc(l.by)}</td></tr>`).join('');
       return { title: 'ใบขออนุญาตออกนอกโรงเรียน', studentId: x.studentId, by: x.by,
-        rows: [['ที่', x.docNo ? `${x.docNo}/${x.docYear}` : ''], ['วันที่', fmtDate(x.leaveDate)], ['เวลาที่ขอออก', hhmm(x.outPlan)], ['กลับมาเรียนต่อ', x.returns ? 'กลับ' + (x.backPlan ? ' ประมาณ ' + hhmm(x.backPlan) : '') : 'ไม่กลับ'],
+        rows: [['ที่', x.docNo ? `${x.docNo}/${x.docYear}` : ''], ['วันที่', fmtDate(x.leaveDate)], ['เวลาที่ขอออก', hhmm(x.outPlan)], ['หลังออกจากโรงเรียน', x.returns ? 'กลับมาเรียนต่อ' + (x.backPlan ? ' ประมาณ ' + hhmm(x.backPlan) : '') : 'กลับบ้าน ไม่กลับมาเรียนต่อ'],
           ['เหตุผล', esc(REASONS[x.reason] || x.reason) + (x.detail ? ' · ' + esc(x.detail) : '')], ['การรับกลับ', esc(PICKUP[x.pickup] || '')],
           ['ผู้มารับ', [x.pickupName, x.pickupRelation && '(' + x.pickupRelation + ')', x.pickupPhone].filter(Boolean).map(esc).join(' ')], ['ติดต่อผู้ปกครองแล้ว', x.parentContacted ? 'ติดต่อแล้ว' : 'ยังไม่ได้ติดต่อ'],
           ['สถานะ', esc((STATUS[x.status] || STATUS.pending)[0])], ['เวลาออกจริง', x.outAt ? fmtDate(x.outAt, true) : ''], ['เวลากลับจริง', x.backAt ? fmtDate(x.backAt, true) : ''],
@@ -119,7 +121,7 @@
           <div class="field"><label>วันที่ <span class="req">*</span></label><input class="input" type="date" name="leaveDate" value="${today()}" required></div>
           <div class="field"><label>เวลาที่ขอออก</label><input class="input" type="time" name="outPlan"></div>
           <div class="field"><label>เหตุผล <span class="req">*</span></label><select class="select" name="reason">${Object.entries(REASONS).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select></div>
-          <div class="field"><label>กลับมาเรียนต่อหรือไม่</label><select class="select" name="returns"><option value="false">ไม่กลับ (กลับบ้าน)</option><option value="true">กลับมาเรียนต่อ</option></select></div>
+          <div class="field"><label>หลังออกจากโรงเรียน</label><select class="select" name="returns">${RETURNS_OPTS}</select></div>
           <div class="field"><label>เวลาที่จะกลับ (ถ้ากลับ)</label><input class="input" type="time" name="backPlan"></div>
           <div class="field full"><label>รายละเอียด</label><textarea class="textarea" name="detail" maxlength="1000" placeholder="เช่น มีไข้ 38.5 ห้องพยาบาลแนะนำให้กลับบ้าน" style="min-height:56px"></textarea></div>
           <div class="field"><label>การรับกลับ</label><select class="select" name="pickup">${Object.entries(PICKUP).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select></div>

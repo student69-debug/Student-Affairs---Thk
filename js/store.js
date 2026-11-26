@@ -216,6 +216,10 @@
       check(await sb.auth.verifyOtp({ token_hash: body.token, type: 'email' }));
     },
     async parentView() { return check(await sb.rpc('parent_view')); },
+    // leave requests filed by the student / parent (own linked child only, checked in the database)
+    async parentLeaves() { return check(await sb.rpc('parent_leave_list')) || []; },
+    async parentLeaveSave(p) { return check(await sb.rpc('parent_leave_save', { p })); },
+    async parentLeaveCancel(id) { return check(await sb.rpc('parent_leave_cancel', { p_id: id })); },
 
     /* ---- API keys for other school systems (admin only, enforced in the database) ---- */
     async apiKeys() { return check(await sb.rpc('admin_list_app_keys')); },

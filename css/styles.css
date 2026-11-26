@@ -673,6 +673,8 @@ body.printing-sheet #print-sheet:has(.pk22){padding:0}
 .fb-msg-cell{white-space:pre-wrap;max-width:420px}
 @media (max-width:640px){.fb{right:12px;bottom:12px}.fb-fab{width:52px;height:52px}.fb-fab svg{width:46px;height:46px}.fb-panel{max-height:calc(100vh - 96px)}}
 @media print{.fb{display:none}}
+/* the feedback mascot never covers a dialog's buttons */
+body.modal-open .fb{display:none}
 .fb-home-row .ic-kind{width:32px;height:32px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--navy-50,#eef0fb);color:var(--navy-800)}
 .fb-home-msg{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 #fb-home .chip .badge{height:18px;padding:0 7px}
