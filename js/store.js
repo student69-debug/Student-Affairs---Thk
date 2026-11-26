@@ -36,6 +36,7 @@
     visits: { table: 'care_visits', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['by', 'by_name'], ['note', 'note'], ['photo', 'photo']] },
     needs: { table: 'care_needs', order: 'id', cols: [['id', 'id'], ['studentId', 'student_id'], ['kind', 'kind'], ['text', 'text']] },
     referrals: { table: 'care_referrals', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['type', 'type'], ['to', 'to'], ['note', 'note']] },
+    discipline: { table: 'discipline_checks', order: 'at', desc: true, cols: [['id', 'id'], ['at', 'at'], ['term', 'term'], ['grade', 'grade'], ['room', 'room'], ['items', 'items'], ['checked', 'checked'], ['findings', 'findings'], ['note', 'note'], ['by', 'by_name'], ['byUser', 'by_user']] },
     drugs: { table: 'drug_cases', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['term', 'term'], ['category', 'category'], ['substance', 'substance'], ['act', 'act'], ['foundBy', 'found_by'], ['place', 'place'], ['items', 'items'], ['level', 'level'], ['actions', 'actions'], ['points', 'points'], ['recordId', 'behavior_record_id'], ['status', 'status'], ['followUp', 'follow_up'], ['note', 'note'], ['photos', 'photos'], ['by', 'by_name'], ['byUser', 'by_user'], ['updatedAt', 'updated_at']] },
     nurse: { table: 'nurse_visits', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['outAt', 'out_at'], ['term', 'term'], ['period', 'period'], ['symptomGroup', 'symptom_group'], ['symptom', 'symptom'], ['temp', 'temp'], ['care', 'care'], ['medicine', 'medicine'], ['outcome', 'outcome'], ['parentNotified', 'parent_notified'], ['note', 'note'], ['by', 'by_name'], ['outBy', 'out_by_name'], ['byUser', 'by_user'], ['updatedAt', 'updated_at'], ['vitals', 'vitals'], ['followAt', 'follow_at'], ['followFor', 'follow_for'], ['followStatus', 'follow_status']] },
     nurseHealth: { table: 'nurse_health', order: 'student_id', cols: [['id', 'student_id'], ['allergyStatus', 'allergy_status'], ['allergies', 'allergies'], ['conditionStatus', 'condition_status'], ['conditions', 'conditions'], ['careNote', 'care_note'], ['source', 'source'], ['consentAt', 'consent_at'], ['by', 'by_name'], ['updatedAt', 'updated_at']] },
@@ -118,7 +119,7 @@
     students: ['students'], history: ['history'], users: ['users'], cases: ['cases'], apptLog: ['apptLog'], progress: ['progress'], counsellors: ['counsellors'], subjects: ['subjects'],
     health: ['care', 'health'], incidents: ['behavior', 'incidents'], incidentPeople: ['behavior', 'people'],
     teacherRooms: ['teacherRooms'], teacherGrades: ['teacherGrades'], gradeStaff: ['gradeStaff'], rules: ['behavior', 'rules'], records: ['behavior', 'records'],
-    screenings: ['care', 'screenings'], visits: ['care', 'visits'], needs: ['care', 'needs'], referrals: ['care', 'referrals'], drugs: ['drugs'], nurse: ['nurse'], nurseNow: ['nurseNow'], nurseFollow: ['nurseFollow'], nurseHealth: ['nurseHealth'],
+    screenings: ['care', 'screenings'], visits: ['care', 'visits'], needs: ['care', 'needs'], referrals: ['care', 'referrals'], drugs: ['drugs'], discipline: ['discipline'], nurse: ['nurse'], nurseNow: ['nurseNow'], nurseFollow: ['nurseFollow'], nurseHealth: ['nurseHealth'],
   };
   function setSlot(kind, list) {
     const p = SLOT[kind];
@@ -292,11 +293,11 @@
 
     async load() {
       const s = check(await sb.from('app_settings').select('*').eq('id', 1).single());
-      this.data = { settings: { year: s.year, term: s.term, baseScore: s.base_score, warnBelow: s.warn_below, alertBelow: s.alert_below, apps: s.apps || {}, parentView: s.parent_view || {}, restoreRoles: s.restore_roles || {}, drugPoints: s.drug_points || {}, terms: s.terms || {} },
+      this.data = { settings: { year: s.year, term: s.term, baseScore: s.base_score, warnBelow: s.warn_below, alertBelow: s.alert_below, apps: s.apps || {}, parentView: s.parent_view || {}, restoreRoles: s.restore_roles || {}, drugPoints: s.drug_points || {}, terms: s.terms || {}, disciplineItems: s.discipline_items || [] },
         behavior: {}, care: {}, history: [] };
       this.data.gradeStaff = [];
       this.data.subjects = [];
-      const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'incidents', 'incidentPeople', 'cases', 'apptLog', 'progress', 'counsellors', 'screenings', 'visits', 'needs', 'referrals', 'health', 'drugs', 'nurse', 'nurseNow', 'nurseHealth', 'nurseFollow'];
+      const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'incidents', 'incidentPeople', 'cases', 'apptLog', 'progress', 'counsellors', 'screenings', 'visits', 'needs', 'referrals', 'health', 'drugs', 'discipline', 'nurse', 'nurseNow', 'nurseHealth', 'nurseFollow'];
       if (!this.isAdmin() && this.profile.role === 'grade_head') kinds.push('history'); // own grades only (row level security)
       if (this.isAdmin()) {
         kinds.push('history', 'gradeStaff', 'subjects');
@@ -357,8 +358,8 @@
     },
     async deleteItem(kind, id, password) {
       const r = check(await sb.rpc('delete_item', { p_kind: kind, p_id: String(id), p_password: password }));
-      const slots = { nurse: ['nurseNow', 'nurseFollow'], case: ['cases', 'progress'], subjects: ['subjects'] }[kind];
-      const list = { record: 'records', health: 'health', drug: 'drugs', nurse: 'nurse' }[kind];
+      const slots = { nurse: ['nurseNow', 'nurseFollow'], case: ['cases', 'progress'], subjects: ['subjects'], discipline: ['records'] }[kind];
+      const list = { record: 'records', health: 'health', drug: 'drugs', nurse: 'nurse', discipline: 'discipline' }[kind];
       if (r === 'ok') {
         const d = kind === 'drug' && this.data.drugs.find((x) => x.id === id);
         if (d && d.recordId) this.drop('records', d.recordId);
@@ -366,7 +367,7 @@
         await this.refresh(...(slots || []), ...(this.isAdmin() ? ['history'] : []));
       }
       if (r === 'ok' && kind === 'case') await this.loadCaseTrash();
-      if (r === 'ok' && (kind === 'record' || kind === 'health' || kind === 'drug' || kind === 'nurse')) await this.loadAppTrash({ record: 'behavior', health: 'care', drug: 'drugs', nurse: 'nurse' }[kind]);
+      if (r === 'ok' && (kind === 'record' || kind === 'health' || kind === 'drug' || kind === 'nurse' || kind === 'discipline')) await this.loadAppTrash({ record: 'behavior', health: 'care', drug: 'drugs', nurse: 'nurse', discipline: 'discipline' }[kind]);
       return r;
     },
     // deleted counselling cases, kept 30 days (counsellors and admins)
@@ -382,10 +383,12 @@
     },
     async restoreItem(id, app) {
       const r = check(await sb.rpc('restore_item', { p_id: id }));
-      if (r === 'ok') await this.refresh(...({ behavior: ['records'], care: ['health'], drugs: ['drugs', 'records'], nurse: ['nurse', 'nurseNow', 'nurseFollow'] }[app] || []), ...(this.isAdmin() ? ['history'] : []));
+      if (r === 'ok') await this.refresh(...({ behavior: ['records'], care: ['health'], drugs: ['drugs', 'records'], discipline: ['discipline', 'records'], nurse: ['nurse', 'nurseNow', 'nurseFollow'] }[app] || []), ...(this.isAdmin() ? ['history'] : []));
       await this.loadAppTrash(app);
       return r;
     },
+    // ตรวจระเบียบวินัย: one call saves the check and makes the deductions (the database takes the points from the rule table)
+    async saveDiscipline(p) { const id = check(await sb.rpc('discipline_save', { p })); await this.refresh('discipline', 'records'); return id; },
     /* ---- บุหรี่ / สารเสพติด: writes go through functions (a deduction also lands in behaviour records) ---- */
     async saveDrug(p) {
       const id = check(await sb.rpc('drug_save', { p }));
@@ -516,7 +519,7 @@
     async backup() {
       const tables = { students: 'id', profiles: 'id', app_settings: 'id', teacher_rooms: 'user_id,grade,room', teacher_grades: 'user_id,grade', grade_staff: 'grade,name', teacher_subjects: 'id', parent_links: 'user_id,student_id',
         registry_history: 'id', behavior_rules: 'id', behavior_incidents: 'id', behavior_records: 'id', care_screenings: 'id', care_visits: 'id', care_needs: 'id', care_referrals: 'id', health_logs: 'id',
-        counsel_cases: 'id', counsel_case_sessions: 'case_id,session_no', counsel_appt_log: 'id', drug_cases: 'id', nurse_visits: 'id', nurse_health: 'student_id', feedback: 'id' };
+        counsel_cases: 'id', counsel_case_sessions: 'case_id,session_no', counsel_appt_log: 'id', drug_cases: 'id', discipline_checks: 'id', nurse_visits: 'id', nurse_health: 'student_id', feedback: 'id' };
       const out = { at: new Date().toISOString(), tables: {} };
       for (const [t, key] of Object.entries(tables)) out.tables[t] = await paged((a, b) => key.split(',').reduce((q, k) => q.order(k), sb.from(t).select('*')).range(a, b));
       return out;

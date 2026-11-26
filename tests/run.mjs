@@ -20,7 +20,7 @@ const storage = { getItem: () => null, setItem() {}, removeItem() {} };
 const ctx = vm.createContext({ console, setTimeout, clearTimeout, setInterval: () => 0, localStorage: storage, sessionStorage: storage, location: { hash: '', pathname: '/', origin: '' }, URLSearchParams, Date, Math, JSON, Map, Set, crypto,
   document: { addEventListener() {}, getElementById: () => null, querySelector: () => null }, addEventListener() {}, MutationObserver: class { observe() {} } });
 ctx.window = ctx; ctx.supabase = { createClient: () => sb };
-for (const f of ['config.js', 'store.js', 'ui.js', 'charts.js', 'counsel.js', 'apps.js', 'drugs.js', 'nurse.js', 'pages.js']) vm.runInContext(read(f), ctx, { filename: f });
+for (const f of ['config.js', 'store.js', 'ui.js', 'charts.js', 'counsel.js', 'apps.js', 'drugs.js', 'nurse.js', 'discipline.js', 'pages.js']) vm.runInContext(read(f), ctx, { filename: f });
 const { Store, Pages } = ctx;
 
 const fresh = () => {
@@ -97,7 +97,8 @@ const tests = {
     Store.data.students[0].advisor = 'ครู <i>';
     const h = ctx.Apps.reportSheet({ title: 'รายงาน', secret: true, studentId: '30001', by: '<b>x</b>', rows: [['รายการ', ctx.UI.esc('<img src=x>')], ['ว่าง', '']] });
     assert.ok(!/<img src=x>|<b>x<\/b>|<i>/.test(h)); assert.ok(!h.includes('ว่าง')); assert.match(h, /เอกสารลับ/); assert.match(h, /ครูที่ปรึกษา/);
-    for (const a of ctx.Apps.all.concat([ctx.Apps.get('drugs'), ctx.Apps.get('nurse')])) assert.equal(typeof a.report, 'function', a.id);
+    for (const a of ctx.Apps.all) assert.equal(typeof a.report, 'function', a.id);
+    assert.ok(ctx.Apps.get('discipline'));
   },
   'student picker card: numbers only for own students, every value escaped': () => {
     const c = ctx.UI.studentCard;

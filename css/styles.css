@@ -571,6 +571,12 @@ details.card>summary::-webkit-details-marker{display:none}
 .update-bar>span{flex:1;line-height:1.45}
 .update-bar .btn{flex:none}
 @media print{.update-bar{display:none}}
+/* discipline check grid */
+.dc-grid td,.dc-grid th{padding:6px 8px;text-align:center}
+.dc-grid td:nth-child(2),.dc-grid th:nth-child(2){text-align:left;min-width:160px}
+.dc-cell{min-width:72px;height:32px;border:1px solid var(--ink-200);border-radius:var(--radius-md);background:var(--white);font:500 13px var(--font-body);color:var(--ink-500);cursor:pointer}
+.dc-cell.deduct{background:var(--red-50,#fdecec);border-color:var(--red-700);color:var(--red-700)}
+.dc-cell.warn{background:var(--amber-50,#fff6e0);border-color:var(--amber-500);color:#8a5a00}
 /* student picker: who was chosen (UI.studentCard) */
 .st-card{display:flex;gap:12px;align-items:flex-start;margin-top:8px;padding:10px 12px;border:1px solid var(--ink-200);border-radius:var(--radius-md);background:var(--ink-50)}
 .st-tel{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
