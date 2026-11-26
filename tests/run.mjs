@@ -151,6 +151,17 @@ const tests = {
       assert.doesNotMatch(JSON.stringify(L.page({ tab: 'list' })), /leave-new|ยื่นขออนุญาตออก</);
     }
   },
+  'home visit summary: counts each student once (latest visit of the year), totals from the registry': () => {
+    const care = ctx.Apps.get('care');
+    Store.data.students = [{ id: '40001', prefix: 'ด.ช.', first: 'ก', last: 'ข', grade: 1, room: 9, status: 'studying' }, { id: '40002', prefix: 'ด.ญ.', first: 'ค', last: 'ง', grade: 1, room: 9, status: 'studying' },
+      { id: '40003', prefix: 'ด.ญ.', first: 'จ', last: 'ฉ', grade: 1, room: 9, status: 'studying' }];
+    Store.data.settings.terms = { '1/2569': { start: '2026-05-16', end: '2026-10-31' }, '2/2569': { start: '2026-11-01', end: '2027-05-15' } };
+    Store.data.care.visits = [{ id: 'a', studentId: '40001', at: '2026-06-10T08:00:00Z', family: 'warm', flags: ['game'] }, { id: 'b', studentId: '40001', at: '2026-11-20T08:00:00Z', family: 'broken', flags: ['divorced', 'urgent'] },
+      { id: 'c', studentId: '40002', at: '2025-12-01T08:00:00Z', family: 'warm', flags: ['study'] }];
+    const n = care.roomCounts(1, 9, 2569);
+    assert.deepEqual([n.total, n.m, n.f, n.visited], [3, 1, 2, 1]);
+    assert.deepEqual(Object.fromEntries(Object.entries(n.who).map(([k, v]) => [k, v.length])), { broken: 1, divorced: 1, urgent: 1 });
+  },
   'settings: only the changed value is sent': async () => {
     await Store.saveSettings({ apps: { care: false } });
     assert.deepEqual(Object.keys(op(calls[0], 'update')[1]), ['apps']);

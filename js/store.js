@@ -33,7 +33,8 @@
     health: { table: 'health_logs', order: 'log_date', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['date', 'log_date'], ['symptom', 'symptom'], ['referred', 'referred'], ['detail', 'detail'], ['action', 'action_taken'], ['by', 'by_name'], ['byUser', 'by_user'], ['at', 'at']] },
     subjects: { table: 'teacher_subjects', order: 'id', cols: [['id', 'id'], ['year', 'year'], ['term', 'term'], ['grade', 'grade'], ['room', 'room'], ['code', 'subject_code'], ['subject', 'subject_name'], ['email', 'staff_email'], ['staffName', 'staff_name']] },
     screenings: { table: 'care_screenings', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['tool', 'tool'], ['result', 'result'], ['by', 'by_name'], ['note', 'note']] },
-    visits: { table: 'care_visits', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['by', 'by_name'], ['note', 'note'], ['photo', 'photo']] },
+    visits: { table: 'care_visits', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['by', 'by_name'], ['note', 'note'], ['photo', 'photo'], ['family', 'family'], ['flags', 'flags'], ['otherRisk', 'other_risk'], ['otherProblem', 'other_problem']] },
+    visitRooms: { table: 'care_visit_rooms', order: 'updated_at', desc: true, cols: [['id', 'id'], ['year', 'year'], ['grade', 'grade'], ['room', 'room'], ['uses', 'uses'], ['parentCare', 'parent_care'], ['obstacles', 'obstacles'], ['suggestions', 'suggestions'], ['by', 'by_name'], ['updatedAt', 'updated_at']] },
     needs: { table: 'care_needs', order: 'id', cols: [['id', 'id'], ['studentId', 'student_id'], ['kind', 'kind'], ['text', 'text']] },
     referrals: { table: 'care_referrals', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['type', 'type'], ['to', 'to'], ['note', 'note']] },
     discipline: { table: 'discipline_checks', order: 'at', desc: true, cols: [['id', 'id'], ['at', 'at'], ['term', 'term'], ['grade', 'grade'], ['room', 'room'], ['items', 'items'], ['checked', 'checked'], ['findings', 'findings'], ['note', 'note'], ['by', 'by_name'], ['byUser', 'by_user']] },
@@ -122,7 +123,7 @@
     students: ['students'], history: ['history'], users: ['users'], cases: ['cases'], apptLog: ['apptLog'], progress: ['progress'], counsellors: ['counsellors'], subjects: ['subjects'],
     health: ['care', 'health'], incidents: ['behavior', 'incidents'], incidentPeople: ['behavior', 'people'],
     teacherRooms: ['teacherRooms'], teacherGrades: ['teacherGrades'], gradeStaff: ['gradeStaff'], rules: ['behavior', 'rules'], records: ['behavior', 'records'],
-    screenings: ['care', 'screenings'], visits: ['care', 'visits'], needs: ['care', 'needs'], referrals: ['care', 'referrals'], drugs: ['drugs'], discipline: ['discipline'], leave: ['leave'], surveyRounds: ['surveyRounds'], surveyResponses: ['surveyResponses'], nurse: ['nurse'], nurseNow: ['nurseNow'], nurseFollow: ['nurseFollow'], nurseHealth: ['nurseHealth'],
+    screenings: ['care', 'screenings'], visits: ['care', 'visits'], visitRooms: ['care', 'visitRooms'], needs: ['care', 'needs'], referrals: ['care', 'referrals'], drugs: ['drugs'], discipline: ['discipline'], leave: ['leave'], surveyRounds: ['surveyRounds'], surveyResponses: ['surveyResponses'], nurse: ['nurse'], nurseNow: ['nurseNow'], nurseFollow: ['nurseFollow'], nurseHealth: ['nurseHealth'],
   };
   function setSlot(kind, list) {
     const p = SLOT[kind];
@@ -305,7 +306,7 @@
         behavior: {}, care: {}, history: [] };
       this.data.gradeStaff = [];
       this.data.subjects = [];
-      const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'incidents', 'incidentPeople', 'cases', 'apptLog', 'progress', 'counsellors', 'screenings', 'visits', 'needs', 'referrals', 'health', 'drugs', 'discipline', 'leave', 'surveyRounds', 'surveyResponses', 'nurse', 'nurseNow', 'nurseHealth', 'nurseFollow'];
+      const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'incidents', 'incidentPeople', 'cases', 'apptLog', 'progress', 'counsellors', 'screenings', 'visits', 'visitRooms', 'needs', 'referrals', 'health', 'drugs', 'discipline', 'leave', 'surveyRounds', 'surveyResponses', 'nurse', 'nurseNow', 'nurseHealth', 'nurseFollow'];
       if (!this.isAdmin() && this.profile.role === 'grade_head') kinds.push('history'); // own grades only (row level security)
       if (this.isAdmin()) {
         kinds.push('history', 'gradeStaff', 'subjects');
@@ -402,6 +403,8 @@
     async saveLeave(p) { const id = check(await sb.rpc('leave_save', { p })); await this.pull('leave', id); return id; },
     async leaveAction(id, action, note = '', photos = null, sign = null) { check(await sb.rpc('leave_action', { p_id: id, p_action: action, p_note: note, p_photos: photos, p_sign: sign })); await this.pull('leave', id); },
     // one photo into the request's folder (e.g. who picks the student up), copied to Google Drive in the background
+    // สรุปการเยี่ยมบ้านประจำห้อง: written answers 19–22 (the counts come from the visits themselves)
+    async saveVisitRoom(p) { check(await sb.rpc('care_room_save', { p })); await this.refresh('visitRooms'); },
     async leavePhotoUpload(id, blob, kind = 'pickup') {
       const path = `${id}/${kind}-${Date.now().toString(36)}.jpg`;
       check(await sb.storage.from('leave-photos').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '3600' }));
@@ -552,7 +555,7 @@
     // every table the admin may read, as rows (no photos, passwords or bins); paging needs a fixed order
     async backup() {
       const tables = { students: 'id', profiles: 'id', app_settings: 'id', teacher_rooms: 'user_id,grade,room', teacher_grades: 'user_id,grade', grade_staff: 'grade,name', teacher_subjects: 'id', parent_links: 'user_id,student_id',
-        registry_history: 'id', behavior_rules: 'id', behavior_incidents: 'id', behavior_records: 'id', care_screenings: 'id', care_visits: 'id', care_needs: 'id', care_referrals: 'id', health_logs: 'id',
+        registry_history: 'id', behavior_rules: 'id', behavior_incidents: 'id', behavior_records: 'id', care_screenings: 'id', care_visits: 'id', care_visit_rooms: 'id', care_needs: 'id', care_referrals: 'id', health_logs: 'id',
         counsel_cases: 'id', counsel_case_sessions: 'case_id,session_no', counsel_appt_log: 'id', drug_cases: 'id', discipline_checks: 'id', leave_requests: 'id', survey_rounds: 'id', survey_responses: 'id', nurse_visits: 'id', nurse_health: 'student_id', feedback: 'id' };
       const out = { at: new Date().toISOString(), tables: {} };
       for (const [t, key] of Object.entries(tables)) out.tables[t] = await paged((a, b) => key.split(',').reduce((q, k) => q.order(k), sb.from(t).select('*')).range(a, b));

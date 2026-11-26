@@ -400,6 +400,16 @@
   /* ให้คำปรึกษา: ระบบเคสอยู่ใน counsel.js (window.CounselApp) */
 
   /* ================= ดูแลช่วยเหลือนักเรียน ================= */
+  /* แบบสรุปการเยี่ยมบ้าน (school form, user 26 Nov 2026): items 2–18 ticked per student, counted per room */
+  const FAMILY = { warm: 'ครอบครัวอบอุ่น', broken: 'ครอบครัวแตกแยก' };
+  const VFLAGS = [['parents_dead', 4, 'บิดาและมารดาเสียชีวิต'], ['parent_dead', 5, 'บิดาหรือมารดาเสียชีวิต'], ['divorced', 6, 'บิดาและมารดาเลิกร้างกัน'], ['not_with_parents', 7, 'ไม่ได้อาศัยอยู่กับบิดาและมารดาของตนเอง'],
+    ['study', 8, 'เสี่ยงหรือมีปัญหาเรื่องการเรียน'], ['health', 9, 'มีปัญหาด้านสุขภาพ'], ['drug', 10, 'เสี่ยงด้านการใช้สารเสพติด'], ['violence', 11, 'เสี่ยงด้านการใช้ความรุนแรง'], ['travel', 12, 'เสี่ยงด้านการเดินทางมาเรียน'],
+    ['sex', 13, 'เสี่ยงด้านเพศ'], ['game', 14, 'เสี่ยงด้านการติดเกม'], ['risk_other', 15, 'เสี่ยงด้านอื่น ๆ'], ['economy', 16, 'มีปัญหาด้านเศรษฐกิจ'], ['problem_other', 17, 'มีปัญหาด้านอื่น ๆ'], ['urgent', 18, 'ต้องได้รับความช่วยเหลือเร่งด่วน']];
+  const VFLAG = Object.fromEntries(VFLAGS.map(([k, , l]) => [k, l]));
+  const VGROUPS = [['บิดา มารดา และที่อยู่อาศัย', ['parents_dead', 'parent_dead', 'divorced', 'not_with_parents']], ['ความเสี่ยง / ปัญหา', ['study', 'health', 'drug', 'violence', 'travel', 'sex', 'game', 'risk_other', 'economy', 'problem_other']], ['การช่วยเหลือ', ['urgent']]];
+  const ROOM_Q = [['uses', '19. ท่านนำข้อมูลการเยี่ยมบ้านนี้ไปใช้ประโยชน์อย่างไรบ้าง'], ['parentCare', '20. ผู้ปกครองได้แสดงความห่วงใยที่มีต่อนักเรียนอย่างไรบ้าง'], ['obstacles', '21. ปัญหา / อุปสรรค ในการเยี่ยมบ้านนักเรียน'], ['suggestions', '22. ความคิดเห็นและข้อเสนอแนะในการเยี่ยมบ้านนักเรียน']];
+  const visitTags = (x) => [x.family && `<span class="badge ${x.family === 'broken' ? 'b-warning' : 'b-success'}">${FAMILY[x.family]}</span>`,
+    ...(x.flags || []).map((k) => `<span class="badge ${k === 'urgent' ? 'b-danger' : 'b-neutral'}">${esc(VFLAG[k] || k)}${k === 'risk_other' && x.otherRisk ? ': ' + esc(x.otherRisk) : k === 'problem_other' && x.otherProblem ? ': ' + esc(x.otherProblem) : ''}</span>`)].filter(Boolean).join(' ');
   const HSYMS = ['ปวดศีรษะ', 'ไข้', 'ปวดท้อง', 'ปวดประจำเดือน', 'เป็นลม/หน้ามืด', 'บาดแผล/อุบัติเหตุ', 'ผื่นแพ้', 'หอบหืด', 'คลื่นไส้/อาเจียน'];
   const care = {
     id: 'care', name: 'ดูแลช่วยเหลือนักเรียน', short: 'ดูแลช่วยเหลือ', icon: 'hand-heart', rule: 'rule',
@@ -427,7 +437,7 @@
       if (kind === 'screen') { const x = c.screenings.find((y) => y.id === id); return x && { title: 'รายงานผลการคัดกรองนักเรียน', secret: true, studentId: x.studentId, by: x.by,
         rows: [['วันที่', fmtDate(x.at)], ['เครื่องมือ', esc(x.tool)], ['ผลการคัดกรอง', esc(RES[x.result] || x.result)], ['หมายเหตุ', esc(x.note)], ['ผู้ประเมิน', esc(x.by)]] }; }
       if (kind === 'visit') { const x = c.visits.find((y) => y.id === id); return x && { title: 'รายงานการเยี่ยมบ้านนักเรียน', secret: true, studentId: x.studentId, by: x.by,
-        rows: [['วันที่', fmtDate(x.at)], ['ผู้เยี่ยม', esc(x.by)], ['บันทึก', esc(x.note)], ['รูปถ่าย', /^(data:image\/|https:)/.test(x.photo || '') ? `<img src="${esc(x.photo)}" alt="รูปเยี่ยมบ้าน" style="max-width:260px;max-height:200px">` : '']] }; }
+        rows: [['วันที่', fmtDate(x.at)], ['ผู้เยี่ยม', esc(x.by)], ['สภาพครอบครัว', esc(FAMILY[x.family] || '')], ['สภาพ / ความเสี่ยงที่พบ', (x.flags || []).map((k) => esc(VFLAG[k] || k) + (k === 'risk_other' && x.otherRisk ? ': ' + esc(x.otherRisk) : k === 'problem_other' && x.otherProblem ? ': ' + esc(x.otherProblem) : '')).join('<br>')], ['บันทึก', esc(x.note)], ['รูปถ่าย', /^(data:image\/|https:)/.test(x.photo || '') ? `<img src="${esc(x.photo)}" alt="รูปเยี่ยมบ้าน" style="max-width:260px;max-height:200px">` : '']] }; }
       if (kind === 'referral') { const x = c.referrals.find((y) => y.id === id); return x && { title: 'แบบส่งต่อนักเรียน', secret: true, studentId: x.studentId,
         rows: [['วันที่', fmtDate(x.at)], ['ประเภท', x.type === 'internal' ? 'ส่งต่อภายใน' : 'ส่งต่อภายนอก'], ['ส่งต่อไปยัง', esc(x.to)], ['เหตุผล / ข้อมูลที่ส่งต่อ', esc(x.note)]],
         signs: [['', 'ผู้ส่งต่อ'], [(Store.student(x.studentId) || {}).advisor, 'ครูที่ปรึกษา'], ['', 'ผู้รับการส่งต่อ']] }; }
@@ -446,7 +456,7 @@
       return {
         health: hl.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>อาการ</th><th>รายละเอียด</th><th>การดูแล</th><th>ส่งต่อ</th><th>ผู้บันทึก</th><th></th></tr></thead><tbody>${hl.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.date)}</td><td>${esc(x.symptom)}</td><td class="muted">${esc(x.detail) || '—'}</td><td>${esc(x.action) || '—'}</td><td>${x.referred ? '<span class="badge b-warning">ส่งต่อ</span>' : '—'}</td><td>${esc(x.by)}</td><td style="white-space:nowrap">${reportBtn('care', 'health', x.id)}${canDel(x) ? `<button class="icon-btn" title="ลบ" data-action="care-health-del" data-id="${esc(x.id)}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>${more(hl.length, 'รายการ')}` : empty('ยังไม่มีบันทึกสุขภาพ', 'thermometer'),
         screen: sc.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>เครื่องมือ</th><th>ผล</th><th>ผู้ประเมิน</th><th>หมายเหตุ</th><th class="no-print"></th></tr></thead><tbody>${sc.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${esc(x.tool)}</td><td>${screenBadge(x.result)}</td><td>${esc(x.by)}</td><td class="muted">${esc(x.note) || '—'}</td><td class="no-print">${reportBtn('care', 'screen', x.id)}</td></tr>`).join('')}</tbody></table></div>${more(sc.length, 'รายการ')}` : empty('ยังไม่มีผลคัดกรอง', 'clipboard-check'),
-        visit: vi.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>ผู้เยี่ยม</th><th>บันทึก</th><th>รูป</th><th class="no-print"></th></tr></thead><tbody>${vi.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${esc(x.by)}</td><td>${esc(x.note)}</td><td>${x.photo ? `<img src="${x.photo}" alt="รูปเยี่ยมบ้าน" style="width:56px;height:42px;object-fit:cover;border-radius:4px">` : '<span class="muted">—</span>'}</td><td class="no-print">${reportBtn('care', 'visit', x.id)}</td></tr>`).join('')}</tbody></table></div>${more(vi.length, 'รายการ')}` : empty('ยังไม่มีบันทึกเยี่ยมบ้าน', 'house'),
+        visit: vi.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>ผู้เยี่ยม</th><th>สภาพครอบครัว / ความเสี่ยง</th><th>บันทึก</th><th>รูป</th><th class="no-print"></th></tr></thead><tbody>${vi.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${esc(x.by)}</td><td><div class="chips">${visitTags(x) || '<span class="muted">—</span>'}</div></td><td>${esc(x.note)}</td><td>${x.photo ? `<img src="${x.photo}" alt="รูปเยี่ยมบ้าน" style="width:56px;height:42px;object-fit:cover;border-radius:4px">` : '<span class="muted">—</span>'}</td><td class="no-print">${reportBtn('care', 'visit', x.id)}</td></tr>`).join('')}</tbody></table></div>${more(vi.length, 'รายการ')}` : empty('ยังไม่มีบันทึกเยี่ยมบ้าน', 'house'),
         needs: ne.length ? `<div class="list">${ne.map((x) => `<div class="list-row"><span class="badge ${x.kind === 'สุขภาพ' ? 'b-info' : 'b-warning'}">${esc(x.kind)}</span><div class="grow">${st ? `<div class="t">${sLink(x.studentId)}</div>` : ''}<div>${esc(x.text)}</div></div></div>`).join('')}</div>` : empty('ไม่มีข้อมูลความต้องการพิเศษ / สุขภาพ', 'heart-pulse'),
         referral: rf.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>ประเภท</th><th>ส่งต่อไปยัง</th><th>เหตุผล</th><th class="no-print"></th></tr></thead><tbody>${rf.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${x.type === 'internal' ? '<span class="badge b-info">ภายใน</span>' : '<span class="badge b-warning">ภายนอก</span>'}</td><td>${esc(x.to)}</td><td>${esc(x.note)}</td><td class="no-print">${reportBtn('care', 'referral', x.id)}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีการส่งต่อ', 'share-2'),
       };
@@ -494,10 +504,18 @@
       const d = dialog({ title: 'บันทึกเยี่ยมบ้าน', body: `<div class="form-grid">${studentField('student', sid, true)}
         <div class="field"><label>วันที่เยี่ยม</label><input class="input" type="date" name="at" value="${localInput().slice(0, 10)}"></div>
         <div class="field"><label>รูปถ่าย</label><input class="input" type="file" name="photoFile" accept="image/*" style="padding-top:6px"></div>
+        <div class="field full"><label>สภาพครอบครัว <span class="req">*</span></label><div class="radio-row">${Object.entries(FAMILY).map(([k, l]) => `<label><input type="radio" name="family" value="${k}" required> ${l}</label>`).join('')}</div></div>
+        ${VGROUPS.map(([g, keys]) => `<div class="field full"><label>${g} <span class="muted small">(ติ๊กทุกข้อที่พบ)</span></label><div class="vf-grid">${keys.map((k) => `<label class="check"><input type="checkbox" name="vf" value="${k}"> ${esc(VFLAG[k])}</label>`).join('')}</div></div>`).join('')}
+        <div class="field"><label>เสี่ยงด้านอื่น ๆ (ระบุ)</label><input class="input" name="otherRisk" maxlength="300"></div>
+        <div class="field"><label>ปัญหาด้านอื่น ๆ (ระบุ)</label><input class="input" name="otherProblem" maxlength="300"></div>
         <div class="field full"><label>บันทึกการเยี่ยม <span class="req">*</span></label><textarea class="textarea" name="note" required placeholder="สภาพบ้าน ความเป็นอยู่ ผู้ปกครองที่พบ"></textarea></div></div>`,
         onSubmit: (v, form) => {
           const file = form.photoFile.files[0];
-          const finish = (photo) => this.save('visits', v.student, { at: new Date(v.at + 'T15:00').toISOString(), by: Store.user().name, note: v.note.trim(), photo }, 'บันทึกเยี่ยมบ้านแล้ว');
+          const flags = [...form.querySelectorAll('input[name=vf]:checked')].map((i) => i.value);
+          if (v.otherRisk.trim() && !flags.includes('risk_other')) flags.push('risk_other');
+          if (v.otherProblem.trim() && !flags.includes('problem_other')) flags.push('problem_other');
+          const finish = (photo) => this.save('visits', v.student, { at: new Date(v.at + 'T15:00').toISOString(), by: Store.user().name, note: v.note.trim(), photo,
+            family: v.family, flags, otherRisk: v.otherRisk.trim(), otherProblem: v.otherProblem.trim() }, 'บันทึกเยี่ยมบ้านแล้ว');
           if (!file) return finish('');
           if (!parseMyStudent(v.student)) { toast('ไม่พบรหัสนักเรียน หรือไม่ได้อยู่ในห้อง/ระดับชั้นที่คุณดูแล'); return false; }
           // ย่อรูปก่อนเก็บ
@@ -543,8 +561,81 @@
       return { title: this.name, actions: `<button class="btn primary" data-action="${add[0]}">${icon('plus')}${add[1]}</button>`,
         html: searchCard({ id: 'care', title: 'ค้นหาบันทึกดูแลช่วยเหลือ', hint: 'ความต้องการพิเศษไม่มีวันที่ — กรองได้เฉพาะระดับชั้น', typeLabel: 'ประเภทบันทึก', typeHtml: optList(KINDS, tab), q: flt }) + `<div class="grid g3">${[['smile', 'normal', 'green'], ['triangle-alert', 'risk', 'amber'], ['siren', 'problem', 'red']].map(([ic, r, tone]) => stat(ic, RES[r], cnt(r), 'คน', tone, 'ผลคัดกรองล่าสุด', '#/apps/care?tab=screen&result=' + r)).join('')}</div>` +
           tabsBar([['overview', 'ภาพรวม'], ['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ'], ['survey', 'แบบประเมินออนไลน์']], tab, '#/apps/care') +
-          (tab === 'survey' ? this.surveyHtml(q) : tab === 'trash' ? trashView('care', 'บันทึกสุขภาพ') : (tab === 'overview' ? this.dashHtml() : `<div class="card"><div class="card-head"><h3>${flt.result ? 'ผลคัดกรองล่าสุด: ' + RES[flt.result] : titles[tab]}</h3>${filtered ? `<span class="muted small"><b>${(n[tab] || 0).toLocaleString()}</b> ${flt.result ? 'คน' : 'รายการ'}${[flt.grade && 'ม.' + esc(flt.grade), (flt.from || flt.to) && `${flt.from ? fmtDate(flt.from) : '…'} – ${flt.to ? fmtDate(flt.to) : '…'}`].filter(Boolean).map((x) => ' · ' + x).join('')} · <a href="#/apps/care?tab=${tab}">ล้างการค้นหา</a></span>` : ''}</div>${t[tab]}</div>`)),
-        after: () => bindSearch('care', (v) => hashOf('#/apps/care', { tab: v.type, grade: v.grade, from: v.from, to: v.to })) };
+          (tab === 'survey' ? this.surveyHtml(q) : tab === 'visit' && !filtered ? this.roomSummaryHtml(q) + `<div class="card"><div class="card-head"><h3>${titles.visit}</h3></div>${t.visit}</div>` : tab === 'trash' ? trashView('care', 'บันทึกสุขภาพ') : (tab === 'overview' ? this.dashHtml() : `<div class="card"><div class="card-head"><h3>${flt.result ? 'ผลคัดกรองล่าสุด: ' + RES[flt.result] : titles[tab]}</h3>${filtered ? `<span class="muted small"><b>${(n[tab] || 0).toLocaleString()}</b> ${flt.result ? 'คน' : 'รายการ'}${[flt.grade && 'ม.' + esc(flt.grade), (flt.from || flt.to) && `${flt.from ? fmtDate(flt.from) : '…'} – ${flt.to ? fmtDate(flt.to) : '…'}`].filter(Boolean).map((x) => ' · ' + x).join('')} · <a href="#/apps/care?tab=${tab}">ล้างการค้นหา</a></span>` : ''}</div>${t[tab]}</div>`)),
+        after: () => {
+          bindSearch('care', (v) => hashOf('#/apps/care', { tab: v.type, grade: v.grade, from: v.from, to: v.to }));
+          const sel = document.getElementById('vr-room');
+          if (sel) sel.addEventListener('change', () => { location.hash = hashOf('#/apps/care', { tab: 'visit', room: sel.value }); });
+        } };
+    },
+    /* ---- สรุปการเยี่ยมบ้านประจำห้อง (แบบฟอร์มของโรงเรียน): items 1–18 counted from the registry and each student's latest visit this year ---- */
+    visitYear() { return Number(Store.s.year); },
+    yearRange(year) {
+      const t = Store.s.terms || {}, a = t['1/' + year], b = t['2/' + year];
+      return [(a && a.start) || `${year - 544}-05-01`, (b && b.end) || `${year - 543}-04-30`];
+    },
+    summaryRooms() {
+      // who sees which rooms: everyone who reads all grades sees every room; otherwise the rooms they may also answer for
+      const all = new Map(); Store.activeStudents().forEach((s) => all.set(s.grade * 100 + s.room, [s.grade, s.room]));
+      const own = new Set(this.surveyRooms().map(([g, r]) => g * 100 + r));
+      return [...all.entries()].filter(([k]) => Store.readsAll() || own.has(k)).sort((a, b) => a[0] - b[0]).map(([k, v]) => ({ grade: v[0], room: v[1], edit: own.has(k) }));
+    },
+    roomCounts(grade, room, year) {
+      const [from, to] = this.yearRange(year);
+      const st = Store.activeStudents().filter((s) => Number(s.grade) === Number(grade) && Number(s.room) === Number(room));
+      const latest = (sid) => of(this.c().visits, sid).filter((v) => { const d = String(v.at).slice(0, 10); return d >= from && d <= to; }).sort(byDate)[0];
+      const rows = st.map((s) => ({ s, v: latest(s.id) }));
+      const sex = (s) => (window.Pages && Pages.sexOf ? Pages.sexOf(s) : '');
+      const n = { total: st.length, m: st.filter((s) => sex(s) === 'm').length, f: st.filter((s) => sex(s) === 'f').length, visited: rows.filter((x) => x.v).length, who: {} };
+      const add = (k, s) => (n.who[k] = n.who[k] || []).push(s);
+      rows.forEach(({ s, v }) => { if (!v) return; if (v.family) add(v.family, s); (v.flags || []).forEach((k) => add(k, s)); });
+      return n;
+    },
+    roomSummaryHtml(q) {
+      const rooms = this.summaryRooms(), year = Number(q.year) || this.visitYear();
+      if (!rooms.length) return '';
+      const pick = rooms.find((r) => `${r.grade}/${r.room}` === q.room) || rooms.find((r) => r.edit) || rooms[0];
+      const n = this.roomCounts(pick.grade, pick.room, year), cnt = (k) => (n.who[k] || []).length;
+      const names = (k) => (n.who[k] || []).length ? `<details><summary class="muted small">รายชื่อ</summary><div class="small">${n.who[k].map((s) => sLink(s.id)).join('<br>')}</div></details>` : '';
+      const ans = (D().care.visitRooms || []).find((x) => x.year === year && x.grade === pick.grade && x.room === pick.room) || {};
+      const row = (no, label, v, extra = '') => `<tr><td class="mono">${no}</td><td>${label}${extra}</td><td style="text-align:right"><b>${v}</b></td></tr>`;
+      const roomOpts = rooms.map((r) => `<option value="${r.grade}/${r.room}" ${r === pick ? 'selected' : ''}>ม.${r.grade}/${r.room}</option>`).join('');
+      return `<div class="card" id="vr-card"><div class="card-head"><h3>สรุปการเยี่ยมบ้านนักเรียน ปีการศึกษา ${year}</h3>
+          <div class="actions"><select class="select" id="vr-room" aria-label="เลือกห้อง" style="width:auto">${roomOpts}</select>
+          <button class="btn ghost sm" data-action="care-room-print" data-room="${pick.grade}/${pick.room}" data-year="${year}">${icon('printer', 'i16')}พิมพ์</button>
+          ${Store.readsAll() ? `<button class="btn ghost sm" data-action="care-room-csv" data-year="${year}">${icon('download', 'i16')}ทุกห้อง (CSV)</button>` : ''}</div></div>
+        <div class="card-body"><div class="notice">${icon('info', 'i16')}<span>ข้อ 1 นับจากทะเบียน ข้อ 2–18 นับจากการเยี่ยมบ้านครั้งล่าสุดของนักเรียนแต่ละคนในปีการศึกษานี้ (ติ๊กในปุ่ม "เยี่ยมบ้าน") · เยี่ยมแล้ว <b>${n.visited}</b> จาก ${n.total} คน</span></div></div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>ข้อ</th><th>รายการ</th><th style="text-align:right">จำนวน (คน)</th></tr></thead><tbody>
+          ${row('1', 'จำนวนนักเรียนทั้งหมด', n.total)}${row('1.1', 'นักเรียนชาย', n.m)}${row('1.2', 'นักเรียนหญิง', n.f)}
+          ${row('2', 'สภาพครอบครัวมีความอบอุ่น', cnt('warm'), names('warm'))}${row('3', 'สภาพครอบครัวมีความแตกแยก', cnt('broken'), names('broken'))}
+          ${VFLAGS.map(([k, no, l]) => row(no, l, cnt(k), names(k))).join('')}</tbody></table></div>
+        <div class="card-body"><div class="actions" style="justify-content:space-between"><h4 style="font-size:15px;margin:0">ข้อ 19–22 (ครูที่ปรึกษาตอบห้องละครั้ง)</h4>
+          ${pick.edit ? `<button class="btn secondary sm" data-action="care-room-edit" data-room="${pick.grade}/${pick.room}" data-year="${year}">${icon('pencil', 'i16')}${ans.id ? 'แก้ไขคำตอบ' : 'ตอบข้อ 19–22'}</button>` : ''}</div>
+          ${ROOM_Q.map(([k, l]) => `<div style="margin-top:10px"><div class="small"><b>${l}</b></div><div style="white-space:pre-wrap">${esc(ans[k]) || '<span class="muted">ยังไม่ได้ตอบ</span>'}</div></div>`).join('')}
+          ${ans.by ? `<div class="muted small" style="margin-top:8px">บันทึกโดย ${esc(ans.by)} · ${fmtDate(ans.updatedAt, true)}</div>` : ''}</div></div>`;
+    },
+    roomEdit(room, year) {
+      const [g, r] = room.split('/').map(Number), y = Number(year);
+      const ans = (D().care.visitRooms || []).find((x) => x.year === y && x.grade === g && x.room === r) || {};
+      dialog({ title: `สรุปการเยี่ยมบ้าน ม.${g}/${r} · ข้อ 19–22`, body: `<div class="form-grid">${ROOM_Q.map(([k, l]) => `<div class="field full"><label>${l} <span class="req">*</span></label><textarea class="textarea" name="${k}" maxlength="3000" required placeholder="ตอบเป็นข้อ ๆ">${esc(ans[k] || '')}</textarea></div>`).join('')}</div>`,
+        onSubmit: async (v) => { await Store.saveVisitRoom({ year: y, grade: g, room: r, uses: v.uses.trim(), parent_care: v.parentCare.trim(), obstacles: v.obstacles.trim(), suggestions: v.suggestions.trim() }); toast('บันทึกแล้ว'); App.render(); } });
+    },
+    roomReport(room, year) {
+      const [g, r] = room.split('/').map(Number), y = Number(year), n = this.roomCounts(g, r, y), cnt = (k) => String((n.who[k] || []).length);
+      const ans = (D().care.visitRooms || []).find((x) => x.year === y && x.grade === g && x.room === r) || {};
+      Apps.showReport({ title: `สรุปการเยี่ยมบ้านนักเรียน ปีการศึกษา ${y} · ม.${g}/${r}`,
+        rows: [['ระดับชั้น / ห้อง', `ม.${g}/${r}`], ['เยี่ยมแล้ว', `${n.visited} จาก ${n.total} คน`], ['1. จำนวนนักเรียนทั้งหมด', String(n.total)], ['1.1 นักเรียนชาย', String(n.m)], ['1.2 นักเรียนหญิง', String(n.f)],
+          ['2. สภาพครอบครัวมีความอบอุ่น', cnt('warm')], ['3. สภาพครอบครัวมีความแตกแยก', cnt('broken')], ...VFLAGS.map(([k, no, l]) => [`${no}. ${l}`, cnt(k)]),
+          ...ROOM_Q.map(([k, l]) => [l, esc(ans[k] || '')])],
+        signs: [['', 'ครูที่ปรึกษา'], ['', 'หัวหน้าระดับ'], ['', 'ผู้รับรายงาน']] });
+    },
+    roomCSV(year) {
+      const y = Number(year), head = ['ระดับชั้น', 'ห้อง', 'เยี่ยมแล้ว', '1 ทั้งหมด', '1.1 ชาย', '1.2 หญิง', '2 อบอุ่น', '3 แตกแยก', ...VFLAGS.map(([, no, l]) => `${no} ${l}`), ...ROOM_Q.map(([, l]) => l)];
+      const out = this.summaryRooms().map(({ grade, room }) => { const n = this.roomCounts(grade, room, y), c = (k) => (n.who[k] || []).length;
+        const ans = (D().care.visitRooms || []).find((x) => x.year === y && x.grade === grade && x.room === room) || {};
+        return [grade, room, n.visited, n.total, n.m, n.f, c('warm'), c('broken'), ...VFLAGS.map(([k]) => c(k)), ...ROOM_Q.map(([k]) => ans[k] || '')]; });
+      const cell = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+      UI.download(`สรุปการเยี่ยมบ้าน ${y}.csv`, [head, ...out].map((r) => r.map(cell).join(',')).join('\n'));
     },
     /* ---- แบบประเมินตนเองออนไลน์: ครูเปิดรอบให้ห้อง นักเรียนกรอกผ่าน survey.html (ไม่ต้องเข้าระบบ) ผลลงแท็บคัดกรองอัตโนมัติ ---- */
     surveyRooms() {
