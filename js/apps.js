@@ -633,7 +633,7 @@
     const a = ALL.find((x) => x.id === appId), r = a && a.report ? a.report(kind, id) : null;
     if (!r) { toast('ไม่พบรายการ หรือคุณไม่มีสิทธิ์ดู'); return; }
     const html = reportSheet(r);
-    dialog({ title: 'รายงาน · ' + r.title, size: 'lg', submitLabel: 'พิมพ์ / บันทึกเป็น PDF', cancelLabel: 'ปิด',
+    const d = dialog({ title: 'รายงาน · ' + r.title, size: 'lg', submitLabel: 'พิมพ์ / บันทึกเป็น PDF', cancelLabel: 'ปิด',
       body: `<p class="muted small" style="margin:0">ตรวจข้อมูลก่อนพิมพ์ · ส่งต่อเป็นไฟล์: ในหน้าต่างพิมพ์เลือก "บันทึกเป็น PDF"</p><div class="rp-preview">${html}</div>`,
       onSubmit: () => {
         let el = document.getElementById('print-sheet');
@@ -645,10 +645,19 @@
         window.print();
         return false;
       } });
+    fitSheet(d.form);
+  }
+  // a wide sheet (A4 landscape) is shrunk to the dialog's width so a phone shows the whole page without sideways scrolling
+  function fitSheet(root) {
+    root.querySelectorAll('.rp-preview > .pk22, .fit-sheet').forEach((el) => {
+      const box = el.parentElement, w = el.scrollWidth;
+      el.style.zoom = '';
+      if (w > box.clientWidth) el.style.zoom = Math.max(0.3, (box.clientWidth - 2) / w).toFixed(3);
+    });
   }
 
   window.Apps = {
-    all: ALL, reportBtn, reportSheet, openReport,
+    all: ALL, reportBtn, reportSheet, openReport, fitSheet,
     get: (id) => ALL.find((a) => a.id === id),
     enabled: () => ALL.filter((a) => Store.s.apps[a.id] !== false && Store.appOk(a.id)),
     events: (sid) => window.Apps.enabled().flatMap((a) => a.events(sid)).sort(byDate),

@@ -248,13 +248,28 @@ a.app-card:hover{box-shadow:var(--shadow-2);border-color:var(--navy-300);color:i
 
 /* Dialog */
 .scrim{position:fixed;inset:0;background:rgba(8,33,51,.45);display:grid;place-items:center;padding:20px;z-index:100;animation:fade .18s var(--ease-out)}
-.dialog{background:var(--white);border-radius:var(--radius-lg);border-top:4px solid var(--navy-800);box-shadow:var(--shadow-3);width:min(640px,100%);max-height:calc(100vh - 40px);display:flex;flex-direction:column;animation:rise .26s var(--ease-out)}
+.dialog{background:var(--white);border-radius:var(--radius-lg);border-top:4px solid var(--navy-800);box-shadow:var(--shadow-3);width:min(640px,100%);min-width:0;max-width:100%;max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);display:flex;flex-direction:column;animation:rise .26s var(--ease-out)}
 .dialog.accent{border-top-color:var(--red-700)}
 .dialog.sm{width:min(440px,100%)}
-.dialog-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--ink-200)}
+.dialog.lg{width:min(1100px,100%)}
+.dialog-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:16px 20px;border-bottom:1px solid var(--ink-200);flex:none}
+.dialog-head h2{min-width:0;overflow-wrap:anywhere}
+.dialog-head .icon-btn{flex:none}
 .dialog-head h2,.dialog-head h3{font-size:19px;font-weight:500}
-.dialog-body{padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
-.dialog-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--ink-200);background:var(--ink-50);border-radius:0 0 var(--radius-lg) var(--radius-lg)}
+/* min-height/min-width 0: a flex child only scrolls when allowed to be smaller than its content (iPhone could not scroll the forms) */
+.dialog-body{padding:20px;overflow:auto;flex:1 1 auto;min-height:0;min-width:0;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:14px}
+.dialog-foot{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;padding:14px 20px;border-top:1px solid var(--ink-200);background:var(--ink-50);border-radius:0 0 var(--radius-lg) var(--radius-lg);flex:none}
+body.modal-open{overflow:hidden}
+/* phones: every dialog is a full-screen sheet; title + close button stay on top, buttons stay at the bottom, only the middle scrolls */
+@media (max-width:640px){
+  .scrim{padding:0;place-items:stretch}
+  /* explicit screen height: a grid row would grow with the content and nothing could scroll */
+  .dialog,.dialog.sm{width:100%;height:100vh;height:100dvh;max-height:none;border-radius:0}
+  .dialog-head{padding:10px 12px 10px 16px}
+  .dialog-head .icon-btn{width:44px;height:44px}
+  .dialog-body{padding:16px}
+  .dialog-foot{border-radius:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+}
 @keyframes fade{from{opacity:0}}
 @keyframes rise{from{transform:translateY(8px);opacity:0}}
 
@@ -589,6 +604,13 @@ details.card>summary::-webkit-details-marker{display:none}
 .pk22 .st{font-size:11px;color:#444}
 body.printing-sheet #print-sheet:has(.pk22){padding:0}
 .rp-preview:has(.pk22){padding:0;overflow:auto}
+/* on a phone / small window the preview of ปค.22 reflows to one column so it can be read; the printout stays A4 landscape */
+@media screen and (max-width:900px){
+  .rp-preview .pk22{grid-template-columns:1fr;width:auto;min-height:0;padding:12px;gap:24px;font-size:13px}
+  .rp-preview .pk22>div+div{border-top:2px dashed var(--ink-300);padding-top:16px}
+  .rp-preview .pk22 .sg{margin-left:0;white-space:normal}
+  .rp-preview .pk22 .w,.rp-preview .pk22 .sg .w{min-width:8em}
+}
 /* discipline check grid */
 .dc-grid td,.dc-grid th{padding:6px 8px;text-align:center}
 .dc-grid td:nth-child(2),.dc-grid th:nth-child(2){text-align:left;min-width:160px}
@@ -602,7 +624,7 @@ body.printing-sheet #print-sheet:has(.pk22){padding:0}
 /* one case on paper (Apps.openReport): preview in a dialog, printed alone */
 #print-sheet{display:none}
 @media print{body.printing-sheet>*:not(#print-sheet){display:none !important}body.printing-sheet #print-sheet{display:block;padding:12mm 14mm}}
-.rp-preview{border:1px solid var(--ink-200);border-radius:var(--radius-md);padding:20px;background:var(--white);max-height:60vh;overflow:auto}
+.rp-preview{border:1px solid var(--ink-200);border-radius:var(--radius-md);padding:20px;background:var(--white);max-width:100%;overflow:auto;flex:none}
 .rp{font:14px/1.55 var(--font-body, 'Sarabun', sans-serif);color:#000}
 .rp-head{display:flex;align-items:center;gap:12px;border-bottom:2px solid var(--navy-800);padding-bottom:8px}
 .rp-head img{width:52px;height:52px}

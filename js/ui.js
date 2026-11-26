@@ -94,7 +94,7 @@
   /* Dialog */
   function dialog({ title, body, submitLabel = 'บันทึก', submitClass = 'primary', accent = false, size = '', onSubmit, cancelLabel = 'ยกเลิก', footer }) {
     const root = document.getElementById('dialog-root');
-    root.innerHTML = `<div class="scrim" data-close role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+    root.innerHTML = `<div class="scrim" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
       <form class="dialog ${accent ? 'accent' : ''} ${size}" novalidate>
         <div class="dialog-head"><h2 id="dialog-title">${esc(title)}</h2><button type="button" class="icon-btn" data-close aria-label="ปิด">${icon('x')}</button></div>
         <div class="dialog-body">${body}</div>
@@ -102,10 +102,11 @@
           ${onSubmit ? `<button type="submit" class="btn ${submitClass}">${esc(submitLabel)}</button>` : ''}`}</div>
       </form></div>`;
     const form = root.querySelector('form');
-    const close = () => { root.innerHTML = ''; document.removeEventListener('keydown', onKey); };
+    const close = () => { root.innerHTML = ''; document.body.classList.remove('modal-open'); document.removeEventListener('keydown', onKey); };
     const onKey = (e) => { if (e.key === 'Escape') close(); };
     document.addEventListener('keydown', onKey);
-    root.querySelector('.scrim').addEventListener('mousedown', (e) => { if (e.target.hasAttribute('data-close')) close(); });
+    document.body.classList.add('modal-open');
+    // rule (user, 26 Nov 2026): a dialog never closes by tapping outside it — only ✕, ปิด / ยกเลิก or Esc (on phones a stray tap closed forms)
     root.querySelectorAll('button[data-close], a[data-close]').forEach((b) => b.addEventListener('click', close));
     form.addEventListener('submit', (e) => {
       e.preventDefault();
