@@ -106,6 +106,12 @@ const tests = {
     const other = c({ id: '30002', first: 'a', last: 'b', grade: 4, room: 2, mine: false, guardianPhone: '' });
     assert.ok(!other.includes('tel:')); assert.match(other, /เฉพาะครูที่ดูแล/);
   },
+  'grade head: reads every grade, writes only own grades and homeroom': () => {
+    Store.profile = { id: 'g', role: 'grade_head', name: 'x' };
+    Store.data.teacherGrades = [{ userId: 'g', grade: 4 }]; Store.data.teacherRooms = [{ userId: 'g', grade: 2, room: 3 }];
+    assert.equal(Store.readsAll(), true); assert.equal(Store.seesAll(), false);
+    assert.deepEqual([{ grade: 4, room: 1, mine: true }, { grade: 2, room: 3, mine: true }, { grade: 5, room: 1, mine: true }].map((s) => Store.canWrite(s)), [true, true, false]);
+  },
   'settings: only the changed value is sent': async () => {
     await Store.saveSettings({ apps: { care: false } });
     assert.deepEqual(Object.keys(op(calls[0], 'update')[1]), ['apps']);

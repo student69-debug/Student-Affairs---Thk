@@ -77,14 +77,14 @@
   });
   const CUSTOM = {
     async cases() {
-      if (!Store.seesAll()) return [];
+      if (!Store.readsAll()) return [];
       return (await paged((a, b) => sb.from('counsel_cases').select(CASE_COLS).order('open_date', { ascending: false }).range(a, b))).map(caseFrom);
     },
     async progress() { return (await paged((a, b) => sb.rpc('case_progress').range(a, b))).map(progressFrom); },
     async counsellors() { return check(await sb.rpc('counsellor_list')); },
     // moved / missed appointments of counselling cases (counsellors and admins)
     async apptLog() {
-      if (!Store.seesAll()) return [];
+      if (!Store.readsAll()) return [];
       return (await paged((a, b) => sb.from('counsel_appt_log').select('id,case_id,at,action,appt_from,time_from,appt_to,time_to,note,by_name').order('at', { ascending: false }).range(a, b)))
         .map((r) => ({ id: r.id, caseId: r.case_id, at: r.at, action: r.action, from: r.appt_from || '', timeFrom: (r.time_from || '').slice(0, 5), to: r.appt_to || '', timeTo: (r.time_to || '').slice(0, 5), note: r.note || '', by: r.by_name || '' }));
     },
@@ -546,6 +546,15 @@
     // may this role see and restore the app's 30-day bin? (admins always; enforced in the database too)
     binOk(app) { const r = this.profile && this.profile.role; return this.isAdmin() || (((this.s.restoreRoles || {})[app] || []).includes(r) && (app === 'registry' || this.appOk(app))); },
     seesAll() { const r = this.profile && this.profile.role; return r === 'admin' || r === 'counselor'; },
+    // reads every student in full (since 26 Nov 2026 grade heads too); writing is still limited, see canWrite
+    readsAll() { const r = this.profile && this.profile.role; return r === 'admin' || r === 'counselor' || r === 'grade_head'; },
+    // may add records with personal data for this student (care, health…): grade heads only in their own grades or homeroom (the database checks again)
+    canWrite(s) {
+      if (!s || !this.profile) return false;
+      if (this.seesAll()) return true;
+      if (this.profile.role === 'grade_head') return this.myGrades().includes(Number(s.grade)) || this.homeroomOf(s);
+      return !!s.mine;
+    },
     roomsOf(userId) { return (this.data.teacherRooms || []).filter((t) => t.userId === userId).sort((a, b) => a.grade - b.grade || a.room - b.room); },
     myRooms() { return this.roomsOf(this.profile.id); },
     // may change this student's photo: admin, grade head of the grade, homeroom teacher of the room (checked again in the database)

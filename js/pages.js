@@ -60,13 +60,13 @@
     }
     if (on('counsel')) {
       const ids = new Set(act.map((s) => s.id));
-      const prog = (D().progress || []).filter((p) => Store.seesAll() || ids.has(p.studentId));
+      const prog = (D().progress || []).filter((p) => Store.readsAll() || ids.has(p.studentId));
       const months = Array.from({ length: 6 }, (_, i) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 5 + i); return { key: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'), k: d.toLocaleDateString('th-TH', { month: 'short' }), v: 0 }; });
       prog.forEach((p) => p.sessionDates.forEach((d) => { const m = months.find((x) => x.key === String(d).slice(0, 7)); if (m) m.v++; }));
       const open = prog.filter((p) => !p.closed).length;
       cards.push(chartCard('การให้คำปรึกษา 6 เดือนล่าสุด', `จำนวนครั้งต่อเดือน · เคสเปิดอยู่ ${open} · ปิดแล้ว ${prog.length - open}`, vbars(months, { unit: 'ครั้ง', color: 'var(--blue-600)' }), '#/apps/counsel'));
     }
-    return `<div class="dash-head"><h3>ภาพรวมข้อมูล</h3><span class="muted small">${Store.seesAll() ? 'นักเรียนทั้งโรงเรียน' : esc(Store.myScopeText() || 'นักเรียนในความดูแล')} · ภาคเรียน ${Store.termKey()}</span></div>
+    return `<div class="dash-head"><h3>ภาพรวมข้อมูล</h3><span class="muted small">${Store.readsAll() ? 'นักเรียนทั้งโรงเรียน' : esc(Store.myScopeText() || 'นักเรียนในความดูแล')} · ภาคเรียน ${Store.termKey()}</span></div>
       <div class="grid g-dash">${cards.join('')}</div>`;
   }
 
@@ -275,7 +275,9 @@
   }
 
   // admin: every grade · grade head: add / edit students only in the grades they look after (enforced by row level security)
+  // grade heads see every grade (26 Nov 2026) and change only their own; the database checks the same
   const regGrades = () => (Store.isAdmin() ? [1, 2, 3, 4, 5, 6] : Store.user().role === 'grade_head' ? Store.myGrades().map(Number) : []);
+  const viewGrades = () => (Store.isAdmin() || Store.user().role === 'grade_head' ? [1, 2, 3, 4, 5, 6] : []);
   // gender from the title (the registry has no separate column): ด.ช. / นาย = boy, ด.ญ. / นางสาว / นาง = girl
   const SEX = { m: 'ชาย', f: 'หญิง', x: 'ไม่ระบุ' };
   const sexOf = (s) => (/^(ด\.?\s?ช\.?|เด็กชาย|นาย)/.test(s.prefix || '') ? 'm' : /^(ด\.?\s?ญ\.?|เด็กหญิง|นาง)/.test(s.prefix || '') ? 'f' : 'x');
@@ -298,13 +300,13 @@
         <tr><td><b>รวม</b></td><td class="num"><b>${cell(0, 'm')}</b></td><td class="num"><b>${cell(0, 'f')}</b></td>${unknown ? `<td class="num"><b>${cell(0, 'x')}</b></td>` : ''}<td class="num"><b>${cell(0, '')}</b></td></tr></tbody></table></div></div>`;
   }
   function registry(q) {
-    const admin = Store.isAdmin(), grades = regGrades();
+    const admin = Store.isAdmin(), grades = viewGrades(), mineG = regGrades();
     if (!grades.length) return { title: 'ทะเบียนนักเรียน', html: `<div class="card lock-box">${icon('lock', 'i28')}<h3>เฉพาะผู้ดูแลระบบและหัวหน้าระดับ</h3><p class="muted" style="margin:0">ทะเบียนนักเรียน (ข้อมูลกลาง) แก้ไขได้เฉพาะผู้ดูแลระบบ และหัวหน้า/รองหัวหน้าระดับ (เฉพาะระดับชั้นที่ดูแล)${Store.user().role === 'grade_head' ? '<br>บัญชีของคุณยังไม่ได้กำหนดระดับชั้น — แจ้งผู้ดูแลระบบ' : ''}</p></div>` };
     const tab = q.tab || 'list';
     const trash = D().trash || [];
     const tabs = `<div class="tabs">${[['list', 'รายชื่อนักเรียน'], ['history', 'ประวัติการเปลี่ยนแปลง'], ['trash', `ที่ลบไว้ (30 วัน)${trash.length ? ' · ' + trash.length : ''}`]].map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/registry?tab=${k}">${l}</button>`).join('')}</div>`;
     const actions = (admin ? `<button class="btn secondary" data-action="registry-import">${icon('file-up')}นำเข้าจาก Excel</button><button class="btn secondary" data-action="registry-promote">${icon('arrow-up-circle')}เลื่อนชั้น</button>` : '') + `<button class="btn primary" data-action="registry-edit">${icon('user-plus')}เพิ่มนักเรียน</button>`;
-    const scopeNote = admin ? '' : `<div class="notice">${icon('shield-check', 'i16')}<span>คุณเพิ่ม แก้ไข และลบได้เฉพาะนักเรียน ${grades.map((g) => 'ม.' + g).join(', ')} (ระดับชั้นที่ดูแล) · นำเข้าและเลื่อนชั้น ทำได้เฉพาะผู้ดูแลระบบ</span></div>`;
+    const scopeNote = admin ? '' : `<div class="notice">${icon('shield-check', 'i16')}<span>คุณดูได้ทุกระดับชั้น · เพิ่ม แก้ไข และลบได้เฉพาะนักเรียน ${mineG.map((g) => 'ม.' + g).join(', ')} (ระดับชั้นที่ดูแล) · นำเข้าและเลื่อนชั้น ทำได้เฉพาะผู้ดูแลระบบ</span></div>`;
     if (tab === 'trash' && !Store.binOk('registry')) return { title: 'ทะเบียนนักเรียน (ข้อมูลกลาง)', actions, html: tabs + `<div class="notice">${icon('lock', 'i16')}<span>บทบาทของคุณไม่มีสิทธิ์ดูและกู้คืนนักเรียนที่ลบไว้ — ผู้ดูแลระบบเปิดสิทธิ์ได้ที่ ตั้งค่า → จัดการแอป → สิทธิ์กู้คืนข้อมูลที่ลบ</span></div>` };
     if (tab === 'trash') {
       const daysLeft = (d) => Math.max(0, Math.ceil((new Date(d) - Date.now()) / 864e5));
@@ -337,7 +339,7 @@
             .sort((a, b) => a.grade - b.grade || a.room - b.room || a.no - b.no);
           document.getElementById('rg-table').innerHTML = `<table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชื่อเล่น</th><th>ชั้น</th><th class="num">เลขที่</th><th>ครูที่ปรึกษา</th><th>สถานะ</th><th></th></tr></thead><tbody>
             ${list.slice(0, 300).map((s) => `<tr><td class="mono">${esc(s.id)}</td><td><a href="#/student/${esc(s.id)}">${esc(fullName(s))}</a></td><td>${esc(s.nick)}</td><td>${klass(s)}</td><td class="num">${s.no}</td><td>${esc(s.advisor)}</td><td>${statusBadge(s.status)}</td>
-            <td style="text-align:right;white-space:nowrap"><button class="icon-btn" title="แก้ไข" data-action="registry-edit" data-id="${esc(s.id)}">${icon('pencil', 'i16')}</button><button class="icon-btn" title="เปลี่ยนสถานะ" data-action="registry-status" data-id="${esc(s.id)}">${icon('user-cog', 'i16')}</button><button class="icon-btn" title="ลบ (เก็บไว้ 30 วันก่อนลบถาวร)" data-action="registry-delete" data-id="${esc(s.id)}">${icon('trash-2', 'i16')}</button></td></tr>`).join('') || `<tr><td colspan="8">${empty('ไม่พบข้อมูล')}</td></tr>`}</tbody></table>${list.length > 300 ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง 300 จาก ${list.length.toLocaleString()} คน — พิมพ์ค้นหาหรือเลือกชั้น/สถานะเพื่อกรอง</div>` : `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">ทั้งหมด ${list.length.toLocaleString()} คน</div>`}`;
+            <td style="text-align:right;white-space:nowrap">${mineG.includes(Number(s.grade)) ? `<button class="icon-btn" title="แก้ไข" data-action="registry-edit" data-id="${esc(s.id)}">${icon('pencil', 'i16')}</button><button class="icon-btn" title="เปลี่ยนสถานะ" data-action="registry-status" data-id="${esc(s.id)}">${icon('user-cog', 'i16')}</button><button class="icon-btn" title="ลบ (เก็บไว้ 30 วันก่อนลบถาวร)" data-action="registry-delete" data-id="${esc(s.id)}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="8">${empty('ไม่พบข้อมูล')}</td></tr>`}</tbody></table>${list.length > 300 ? `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">แสดง 300 จาก ${list.length.toLocaleString()} คน — พิมพ์ค้นหาหรือเลือกชั้น/สถานะเพื่อกรอง</div>` : `<div class="card-body muted small" style="border-top:1px solid var(--ink-200)">ทั้งหมด ${list.length.toLocaleString()} คน</div>`}`;
           UI.refreshIcons();
         };
         let drawn = 0;

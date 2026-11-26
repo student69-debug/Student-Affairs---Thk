@@ -36,7 +36,7 @@
   const optList = (list, sel) => list.map(([k, l]) => `<option value="${esc(k)}" ${String(k) === String(sel ?? '') ? 'selected' : ''}>${esc(l)}</option>`).join('');
   // only the grades this person may see in the app (homeroom teachers: own rooms' grades; grade heads: own grades);
   // the database decides what rows come back anyway — this keeps the dropdown from offering grades with nothing to show
-  const scopeAll = (app) => { const r = Store.user() && Store.user().role; return Store.seesAll() || (r === 'inspector' && ['behavior', 'drugs', 'nurse'].includes(app)); };
+  const scopeAll = (app) => { const r = Store.user() && Store.user().role; return Store.readsAll() || (r === 'inspector' && ['behavior', 'drugs', 'nurse'].includes(app)); };
   const scopeStudents = (app) => Store.activeStudents().filter((s) => scopeAll(app) || s.mine || (app === 'behavior' && s.taught));
   const scopeGrades = (app) => [...new Set(scopeStudents(app).map((s) => String(s.grade)))].sort((a, b) => a.localeCompare(b, 'th', { numeric: true }));
   const gradeOpts = (sel = '', app = 'behavior') => '<option value="">ทุกระดับชั้น</option>' + optList(scopeGrades(app).map((g) => [g, 'ม.' + g]), sel);
@@ -307,7 +307,7 @@
       const neg = cur.filter((r) => Number(r.points) < 0);
       const lv = C.byGrade(students, (l) => { const v = { ok: 0, watch: 0, high: 0 }; l.forEach((s) => { v[scoreLevel(this.score(s.id)).key]++; }); return { v }; });
       const perGrade = C.byGrade(students, (l) => { const g = new Set(l.map((s) => s.id)); return { v: neg.filter((r) => g.has(r.studentId)).length }; });
-      return C.dash('สรุปภาพรวม', `${esc(Store.user().role === 'inspector' || Store.seesAll() ? 'นักเรียนทั้งโรงเรียน' : Store.myScopeText() || 'นักเรียนในความดูแล')} · ภาคเรียน ${esc(term)} · บันทึก ${cur.length.toLocaleString()} รายการ`, [
+      return C.dash('สรุปภาพรวม', `${esc(Store.user().role === 'inspector' || Store.readsAll() ? 'นักเรียนทั้งโรงเรียน' : Store.myScopeText() || 'นักเรียนในความดูแล')} · ภาคเรียน ${esc(term)} · บันทึก ${cur.length.toLocaleString()} รายการ`, [
         C.chartCard('ระดับคะแนนพฤติกรรม', `เฝ้าระวังต่ำกว่า ${Store.s.warnBelow} · เสี่ยงสูงต่ำกว่า ${Store.s.alertBelow}`, C.stack(lv, [{ k: 'ok', l: 'ปกติ', c: 'var(--green-600)' }, { k: 'watch', l: 'เฝ้าระวัง', c: 'var(--amber-500)' }, { k: 'high', l: 'เสี่ยงสูง', c: 'var(--red-700)' }])),
         C.chartCard('สัดส่วนนักเรียนตามระดับคะแนน', `${students.length.toLocaleString()} คน`, C.donut([['ok', 'ปกติ', 'var(--green-600)'], ['watch', 'เฝ้าระวัง', 'var(--amber-500)'], ['high', 'เสี่ยงสูง', 'var(--red-700)']].map(([k, l, c]) => ({ l, c, v: lv.reduce((a, r) => a + r.v[k], 0) })), { center: 'คน', unit: 'คน' })),
         C.chartCard('การบันทึก 8 สัปดาห์ล่าสุด', 'จำนวนรายการต่อสัปดาห์', C.weekly(rec, (r) => r.at, [{ k: 'neg', l: 'หักคะแนน', c: 'var(--red-600)', test: (r) => Number(r.points) < 0 }, { k: 'pos', l: 'เพิ่มคะแนน', c: 'var(--green-600)' }]), '#/apps/behavior?tab=records'),
@@ -458,7 +458,7 @@
       const done = vis.reduce((a, x) => a + x.a, 0);
       const health = (c.health || []).filter((x) => ids.has(x.studentId)), ref = c.referrals.filter((x) => ids.has(x.studentId));
       const d90 = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
-      return C.dash('สรุปภาพรวม', `${esc(Store.seesAll() ? 'นักเรียนทั้งโรงเรียน' : Store.myScopeText() || 'นักเรียนในความดูแล')} · ${st.length.toLocaleString()} คน`, [
+      return C.dash('สรุปภาพรวม', `${esc(Store.readsAll() ? 'นักเรียนทั้งโรงเรียน' : Store.myScopeText() || 'นักเรียนในความดูแล')} · ${st.length.toLocaleString()} คน`, [
         C.chartCard('ผลคัดกรองล่าสุด', 'นับผลล่าสุดของแต่ละคน', C.stack(scr, [{ k: 'normal', l: 'ปกติ', c: 'var(--green-600)' }, { k: 'risk', l: 'เสี่ยง', c: 'var(--amber-500)' }, { k: 'problem', l: 'มีปัญหา', c: 'var(--red-700)' }, { k: 'none', l: 'ยังไม่คัดกรอง', c: 'var(--ink-200)' }]), '#/apps/care?tab=screen'),
         C.chartCard('การเยี่ยมบ้าน', `เยี่ยมแล้ว ${done.toLocaleString()} จาก ${st.length.toLocaleString()} คน (${C.pct(done, st.length)}%)`, C.progressRows(vis), '#/apps/care?tab=visit'),
         C.chartCard('บันทึกสุขภาพ 8 สัปดาห์ล่าสุด', `จำนวนครั้งต่อสัปดาห์ · ส่งต่อ ${health.filter((x) => x.referred).length} ครั้ง (ทั้งหมด)`, C.weekly(health, (x) => x.date + 'T10:00:00', [{ k: 'ref', l: 'ส่งต่อ', c: 'var(--amber-500)', test: (x) => x.referred }, { k: 'n', l: 'ดูแลที่ห้องพยาบาล', c: 'var(--blue-600)' }], 'ครั้ง'), '#/apps/care?tab=health'),

@@ -21,7 +21,8 @@
   const CLOSED = 'ยุติให้คำปรึกษา';
   const MAX_SESS = 6;
 
-  const isC = () => Store.seesAll();
+  const isC = () => Store.seesAll(); // opens and edits cases
+  const isR = () => Store.readsAll(); // reads full cases (grade heads too since 26 Nov 2026)
   const sevBadge = (s) => `<span class="badge ${SEVCLS[s] || 'b-neutral'}">${esc(s)}</span>`;
   const planBadge = (p) => `<span class="badge ${p === CLOSED ? 'b-neutral' : p === 'ส่งต่อผู้เชี่ยวชาญ' ? 'b-warning' : 'b-info'}">${esc(p)}</span>`;
   const kBadges = (types) => (types || []).map((k) => `<span class="badge b-navy" title="${esc(KMAP[k] || k)}">${esc(k)}</span>`).join(' ');
@@ -56,7 +57,7 @@
 
   /* ---------- summary card / timeline / student tab ---------- */
   function summary(sid) {
-    if (isC()) {
+    if (isR()) {
       const l = cases(sid), o = open(l)[0];
       return { big: `${l.length}<small> เคส</small>`, label: 'เคสให้คำปรึกษา', badge: o ? sevBadge(o.severity) : '',
         rows: [['สถานะ', o ? esc(o.plan) : l.length ? 'ยุติแล้ว' : '—'], ['นัดถัดไป', o && o.nextAppt ? apptText(o) : '—']] };
@@ -68,7 +69,7 @@
 
   function events(sid) {
     const ev = [];
-    if (isC()) {
+    if (isR()) {
       cases(sid).forEach((c) => {
         ev.push({ app: 'counsel', at: c.openDate + 'T08:00:00', studentId: c.studentId, by: ownerName(c.owner), dot: 'counsel', ic: 'folder-open', title: `เปิดเคสให้คำปรึกษา ${kBadges(c.types)} ${sevBadge(c.severity)}`, note: '' });
         c.sessions.filter((s) => s.date).forEach((s) => ev.push({ app: 'counsel', at: s.date + 'T09:00:00', studentId: c.studentId, by: ownerName(c.owner), dot: 'counsel', ic: 'message-circle', title: `ให้คำปรึกษาครั้งที่ ${s.no}`, note: '' }));
@@ -98,8 +99,9 @@
   }
 
   function studentTab(sid) {
-    if (!isC()) return progressTable(progress(sid), false);
+    if (!isR()) return progressTable(progress(sid), false);
     const list = cases(sid);
+    if (!isC()) return caseTable(list, false);
     return `<div class="card-body no-print" style="border-bottom:1px solid var(--ink-200);display:flex;justify-content:flex-end"><button class="btn primary sm" data-action="go" data-href="#/apps/counsel?case=new&student=${sid}">${icon('folder-plus', 'i16')}เปิดเคสใหม่</button></div>${caseTable(list, false)}`;
   }
 
@@ -111,6 +113,17 @@
 
   /* ---------- pages ---------- */
   function page(q) {
+    // grade heads: whole cases to read, nothing to change
+    if (!isC() && isR() && q.case) {
+      const r = window.CounselApp.report('case', q.case);
+      return { title: 'เคสให้คำปรึกษา', actions: `<button class="btn ghost" data-action="go" data-href="#/apps/counsel">${icon('arrow-left')}กลับ</button>${r ? `<button class="btn secondary" data-action="report" data-app="counsel" data-kind="case" data-id="${esc(q.case)}">${icon('printer')}รายงาน / พิมพ์</button>` : ''}`,
+        html: r ? `<div class="notice">${icon('eye', 'i16')}<span>ดูอย่างเดียว · เปิดเคสและบันทึกได้เฉพาะครูแนะแนวและผู้ดูแลระบบ</span></div><div class="card"><div class="card-body">${Apps.reportSheet(r)}</div></div>` : `<div class="card">${empty('ไม่พบเคสนี้', 'folder-x')}</div>` };
+    }
+    if (!isC() && isR() && !q.tab) {
+      const list = cases();
+      return { title: 'ให้คำปรึกษา', html: `<div class="notice">${icon('eye', 'i16')}<span>หัวหน้าระดับดูเคสได้ทุกระดับชั้น (ดูอย่างเดียว) · กดแถวเพื่ออ่านทั้งเคส</span></div>
+        <div class="card"><div class="card-head"><h3>เคสให้คำปรึกษา</h3><span class="muted small">${list.length} เคส · เปิดอยู่ ${open(list).length}</span></div>${caseTable(list)}</div>` };
+    }
     if (!isC()) {
       // other roles reach the case bin only when an admin allowed their role (Settings → จัดการแอป)
       const binBtn = Store.binOk('counsel') ? `<button class="btn secondary" data-action="go" data-href="#/apps/counsel?tab=${q.tab === 'trash' ? 'overview' : 'trash'}">${icon(q.tab === 'trash' ? 'arrow-left' : 'archive-restore')}${q.tab === 'trash' ? 'กลับ' : `ที่ลบไว้ (30 วัน)${(D().caseTrash || []).length ? ' · ' + D().caseTrash.length : ''}`}</button>` : '';

@@ -54,7 +54,7 @@
 
   // Student picker using datalist
   function studentOptions(mineOnly, list) {
-    return (list || (mineOnly ? Store.myStudents() : Store.activeStudents())).map((s) => `<option value="${esc(s.id)} — ${esc(fullName(s))} (${klass(s)})"></option>`).join('');
+    return (list || (mineOnly ? Store.myStudents().filter((s) => Store.canWrite(s)) : Store.activeStudents())).map((s) => `<option value="${esc(s.id)} — ${esc(fullName(s))} (${klass(s)})"></option>`).join('');
   }
   function studentField(name = 'student', value = '', mineOnly = false, list = null) {
     const s = value ? Store.student(value) : null;
@@ -89,7 +89,7 @@
   document.addEventListener('input', (e) => { if (e.target.matches && e.target.matches(PICKER)) showStudentCard(e.target); });
   const parseStudent = (v) => { const id = String(v || '').split(' ')[0].trim(); return Store.student(id) ? id : null; };
   // for apps that hold personal data: only students the user may see in full
-  const parseMyStudent = (v) => { const id = parseStudent(v); return id && Store.student(id).mine ? id : null; };
+  const parseMyStudent = (v) => { const id = parseStudent(v); return id && Store.student(id).mine && Store.canWrite(Store.student(id)) ? id : null; };
 
   /* Dialog */
   function dialog({ title, body, submitLabel = 'บันทึก', submitClass = 'primary', accent = false, size = '', onSubmit, cancelLabel = 'ยกเลิก', footer }) {
