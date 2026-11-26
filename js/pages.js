@@ -8,7 +8,7 @@
 
   function avatar(s, lg) {
     // photos load after render through short-lived signed links (UI.hydratePhotos)
-    if (s && s.photoPath) return `<img class="avatar ${lg ? 'lg' : ''}" data-photo="${esc(s.photoPath)}" alt="" style="object-fit:cover">`;
+    if (s && s.photoPath) return `<img class="avatar ${lg ? 'lg' : ''}" data-photo="${esc(s.photoPath)}" alt="${lg ? esc('รูปถ่าย ' + fullName(s)) : ''}"${lg ? ' role="button" tabindex="0" title="แตะเพื่อดูรูปเต็ม"' : ''} style="object-fit:cover">`;
     return `<div class="avatar ${lg ? 'lg' : ''}">${esc(initials(s))}</div>`;
   }
 

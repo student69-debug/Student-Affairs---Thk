@@ -67,7 +67,7 @@
   // (photo and numbers come masked from students_list outside the teacher's own students)
   function studentCard(s) {
     if (!s) return '';
-    const pic = s.photoPath ? `<img class="avatar lg" data-photo="${esc(s.photoPath)}" alt="" style="object-fit:cover">` : `<div class="avatar lg">${esc(initials(s))}</div>`;
+    const pic = s.photoPath ? `<img class="avatar lg" data-photo="${esc(s.photoPath)}" alt="${esc('รูปถ่าย ' + fullName(s))}" role="button" tabindex="0" title="แตะเพื่อดูรูปเต็ม" style="object-fit:cover">` : `<div class="avatar lg">${esc(initials(s))}</div>`;
     const tel = (p) => String(p || '').split(/[,/;]|\s{2,}/).map((t) => t.trim()).filter((t) => t.replace(/\D/g, '').length >= 9);
     const nums = [['ผู้ปกครอง', s.guardian, s.guardianPhone], ['บิดา', s.father, s.fatherPhone], ['มารดา', s.mother, s.motherPhone], ['นักเรียน', '', s.studentPhone]]
       .flatMap(([who, n, p]) => tel(p).map((t) => `<a class="btn secondary sm" href="tel:${t.replace(/[^\d+]/g, '')}">${icon('phone', 'i16')}${esc(who)}${n ? ' ' + esc(n) : ''} · ${esc(t)}</a>`));
@@ -223,6 +223,15 @@
       imgs.forEach((i) => { const u = urls.get(i.dataset.photo); if (u) i.src = u; });
     } catch (e) { /* photo stays as a blank circle */ }
   }
+  // tap a large student photo (profile, picker card) → full-size view with ✕ (user, 26 Nov 2026, for phones)
+  function openPhoto(img) {
+    if (!img.src) return;
+    const alt = img.getAttribute('alt') || 'รูปถ่ายนักเรียน';
+    dialog({ title: alt, size: 'lg', footer: '<button type="button" class="btn ghost" data-close>ปิด</button>',
+      body: `<img class="photo-full" src="${esc(img.src)}" alt="${esc(alt)}">` });
+  }
+  document.addEventListener('click', (e) => { const img = e.target.closest && e.target.closest('img.avatar.lg[data-photo]'); if (img) openPhoto(img); });
+  document.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('img.avatar.lg[data-photo]')) { e.preventDefault(); openPhoto(e.target); } });
 
   // resize an image file to fit `max` px on its longest side, return a JPEG Blob
   function shrinkImage(file, max = 400, quality = 0.82) {
