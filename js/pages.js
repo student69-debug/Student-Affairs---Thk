@@ -357,8 +357,8 @@
     const sel = (name, opts, cur) => `<select class="select" name="${name}">${opts.map((o) => `<option ${String(o) === String(cur) ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
     const d = UI.dialog({ title: s ? 'แก้ไขข้อมูลนักเรียน' : 'เพิ่มนักเรียนใหม่', submitLabel: 'บันทึก',
       body: `<div class="form-grid">
-        <div class="field"><label>รหัสนักเรียน <span class="req">*</span></label><input class="input mono" name="id" required pattern="[0-9]{5}" maxlength="5" inputmode="numeric" title="รหัสนักเรียน 5 หลัก" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,5)" value="${v('id')}" ${s ? 'readonly style="background:var(--ink-50)"' : ''}><span class="help">ตัวเลข 5 หลัก · คีย์หลัก ใช้เชื่อมทุกแอป${s ? ' — แก้ไขไม่ได้' : ''}</span></div>
-        <div class="field"><label>เลขประจำตัวประชาชน <span class="req">*</span></label><input class="input mono" name="cid" required pattern="[0-9]{13}" maxlength="13" value="${v('cid')}"><span class="help">13 หลัก</span></div>
+        <div class="field"><label>รหัสนักเรียน <span class="req">*</span></label><input class="input mono" name="id" required ${UI.numAttrs('sid')} value="${v('id')}" ${s ? 'readonly style="background:var(--ink-50)"' : ''}><span class="help">ตัวเลข 5 หลัก · คีย์หลัก ใช้เชื่อมทุกแอป${s ? ' — แก้ไขไม่ได้' : ''}</span></div>
+        <div class="field"><label>เลขประจำตัวประชาชน <span class="req">*</span></label><input class="input mono" name="cid" required ${UI.numAttrs('cid')} value="${v('cid')}"><span class="help">13 หลัก</span></div>
         <div class="field"><label>คำนำหน้า</label>${sel('prefix', ['ด.ช.', 'ด.ญ.', 'นาย', 'นางสาว'], s ? s.prefix : 'ด.ช.')}</div>
         <div class="field"><label>ชื่อเล่น</label><input class="input" name="nick" value="${v('nick')}"></div>
         <div class="field"><label>ชื่อ <span class="req">*</span></label><input class="input" name="first" required value="${v('first')}"></div>
@@ -367,12 +367,12 @@
         <div class="field"><label>เลขที่</label><input class="input mono" type="number" min="1" name="no" value="${v('no', 1)}"></div>
         <div class="field full"><label>ครูที่ปรึกษา</label><input class="input" name="advisor" value="${v('advisor')}"></div>
         <div class="field"><label>ผู้ปกครอง</label><input class="input" name="guardian" value="${v('guardian')}"></div>
-        <div class="field"><label>เบอร์โทรผู้ปกครอง</label><input class="input mono" name="guardianPhone" value="${v('guardianPhone')}"></div>
+        <div class="field"><label>เบอร์โทรผู้ปกครอง</label><input class="input mono" name="guardianPhone" ${UI.numAttrs('phone')} value="${esc(UI.numValue('phone', s ? s.guardianPhone : ''))}"></div>
         <div class="field"><label>ชื่อบิดา</label><input class="input" name="father" maxlength="200" value="${v('father')}"></div>
-        <div class="field"><label>เบอร์โทรบิดา</label><input class="input mono" name="fatherPhone" maxlength="60" value="${v('fatherPhone')}"></div>
+        <div class="field"><label>เบอร์โทรบิดา</label><input class="input mono" name="fatherPhone" ${UI.numAttrs('phone')} value="${esc(UI.numValue('phone', s ? s.fatherPhone : ''))}"></div>
         <div class="field"><label>ชื่อมารดา</label><input class="input" name="mother" maxlength="200" value="${v('mother')}"></div>
-        <div class="field"><label>เบอร์โทรมารดา</label><input class="input mono" name="motherPhone" maxlength="60" value="${v('motherPhone')}"></div>
-        <div class="field"><label>เบอร์โทรนักเรียน</label><input class="input mono" name="studentPhone" maxlength="60" value="${v('studentPhone')}"></div>
+        <div class="field"><label>เบอร์โทรมารดา</label><input class="input mono" name="motherPhone" ${UI.numAttrs('phone')} value="${esc(UI.numValue('phone', s ? s.motherPhone : ''))}"></div>
+        <div class="field"><label>เบอร์โทรนักเรียน</label><input class="input mono" name="studentPhone" ${UI.numAttrs('phone')} value="${esc(UI.numValue('phone', s ? s.studentPhone : ''))}"></div>
         <div class="field full"><label>ที่อยู่</label><textarea class="textarea" name="address" style="min-height:64px">${v('address')}</textarea></div>
         <div class="field full"><label>รูปถ่าย</label><input class="input" type="file" name="photoFile" accept="image/*" style="padding-top:6px"></div></div>`,
       onSubmit: (val, form) => {

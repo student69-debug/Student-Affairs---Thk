@@ -6,8 +6,8 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title>แบบประเมินตนเอง · ระบบกิจการนักเรียน</title>
-<link rel="icon" type="image/png" href="img/favicon.png?v=20261126k">
-<link rel="stylesheet" href="css/styles.css?v=20261126k">
+<link rel="icon" type="image/png" href="img/favicon.png?v=20261126l">
+<link rel="stylesheet" href="css/styles.css?v=20261126l">
 <style>
   body{background:var(--ink-50)}
   .sv{max-width:680px;margin:0 auto;padding:20px 14px 60px;display:flex;flex-direction:column;gap:14px}
@@ -26,7 +26,7 @@
 </head>
 <body>
 <main class="sv" id="sv"><div class="card card-body">กำลังโหลด…</div></main>
-<script src="js/config.js?v=20261126k"></script>
+<script src="js/config.js?v=20261126l"></script>
 <script>
 /* แบบประเมินตนเอง (นักเรียนกรอก) — ไม่ต้องเข้าระบบ: ใช้รหัสรอบจากครู + รหัสนักเรียน + เลขบัตรประชาชน 4 ตัวท้าย
    คะแนนคิดในฐานข้อมูล (survey_submit) หน้านี้ไม่ได้รับชื่อหรือข้อมูลของใคร */
@@ -55,8 +55,8 @@
       <div class="card card-body"><b>คำชี้แจง</b><br>ตอบตามความรู้สึกจริงใน <b>2 สัปดาห์ที่ผ่านมา</b> ไม่มีถูกหรือผิด คำตอบเห็นเฉพาะครูที่ดูแลนักเรียน ใช้เพื่อช่วยเหลือ ไม่มีผลต่อคะแนนเรียนหรือคะแนนความประพฤติ</div>
       <form id="f" class="sv" style="padding:0" novalidate>
         <div class="card card-body form-grid">
-          <div class="field"><label>รหัสนักเรียน</label><input class="input mono" name="sid" inputmode="numeric" autocomplete="off" required maxlength="10"></div>
-          <div class="field"><label>เลขบัตรประชาชน 4 ตัวท้าย</label><input class="input mono" name="cid4" inputmode="numeric" autocomplete="off" required maxlength="4" pattern="[0-9A-Za-z]{4}"></div></div>
+          <div class="field"><label>รหัสนักเรียน</label><input class="input mono" name="sid" inputmode="numeric" autocomplete="off" required maxlength="5" pattern="[0-9]{5}" placeholder="5 หลัก" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,5)"></div>
+          <div class="field"><label>เลขบัตรประชาชน 4 ตัวท้าย</label><input class="input mono" name="cid4" inputmode="numeric" autocomplete="off" required maxlength="4" pattern="[0-9A-Z]{4}" placeholder="4 หลัก" oninput="this.value=this.value.toUpperCase().replace(/[^0-9A-Z]/g,'').slice(0,4)"></div></div>
         ${Q.map((q, i) => `<div class="card sv-q"><p>${i + 1}. ${q}</p>${opt(4, i, SCALE)}</div>`).join('')}
         ${YN.map((q, j) => `<div class="card sv-q"><p>${Q.length + j + 1}. ${q}</p>${opt(2, Q.length + j, ['ไม่ใช่', 'ใช่'])}</div>`).join('')}
         <div class="card sv-q"><p>มีอะไรอยากบอกครูไหม (ไม่บังคับ)</p><textarea class="textarea" name="msg" maxlength="500"></textarea></div>
@@ -67,7 +67,7 @@
       e.preventDefault();
       const err = document.getElementById('err');
       const ans = [...Array(Q.length + YN.length)].map((_, i) => { const x = f.querySelector(`[name=q${i}]:checked`); return x ? Number(x.value) : null; });
-      if (!/^\d{3,10}$/.test(f.sid.value.trim())) { err.textContent = 'ใส่รหัสนักเรียนเป็นตัวเลข'; f.sid.focus(); return; }
+      if (!/^\d{5}$/.test(f.sid.value.trim())) { err.textContent = 'ใส่รหัสนักเรียน 5 หลัก'; f.sid.focus(); return; }
       if (f.cid4.value.trim().length !== 4) { err.textContent = 'ใส่เลขบัตรประชาชน 4 ตัวท้าย'; f.cid4.focus(); return; }
       const miss = ans.indexOf(null);
       if (miss >= 0) { err.textContent = `ยังไม่ได้ตอบข้อ ${miss + 1}`; f.querySelector(`[name=q${miss}]`).closest('.card').scrollIntoView({ block: 'center' }); return; }

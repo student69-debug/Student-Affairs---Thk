@@ -126,7 +126,7 @@
           ['เหตุผล', esc(REASONS[x.reason] || x.reason) + (x.detail ? ' · ' + esc(x.detail) : '')], ['การรับกลับ', esc(PICKUP[x.pickup] || '')],
           ['ผู้มารับ', [x.pickupName, x.pickupRelation && '(' + x.pickupRelation + ')', x.pickupPhone].filter(Boolean).map(esc).join(' ')], ['ติดต่อผู้ปกครองแล้ว', x.parentContacted ? 'ติดต่อแล้ว' : 'ยังไม่ได้ติดต่อ'],
           ['สถานะ', esc((STATUS[x.status] || STATUS.pending)[0])], ['เวลาออกจริง', x.outAt ? fmtDate(x.outAt, true) : ''], ['เวลากลับจริง', x.backAt ? fmtDate(x.backAt, true) : ''],
-          ['รูปถ่าย', (x.photos || []).length ? x.photos.length + ' รูป (ดูในระบบ)' : ''], ['ผู้ยื่นคำขอ', esc(x.by)]],
+          ['รูปถ่าย', (x.photos || []).length ? x.photos.length + ' รูป (ดูในระบบ)' + (x.pickupPhoto ? ' · มีรูปผู้มารับ' : '') : ''], ['ผู้ยื่นคำขอ', esc(x.by)]],
         extra: log ? `<h3>ลำดับการอนุมัติ</h3><table class="rp-kv"><tr><th>เวลา</th><th>ขั้นตอน</th><th>โดย</th></tr>${log}</table>` : '',
         signs: [[x.by, 'ผู้ยื่นคำขอ'], [x.advisorName, 'ครูที่ปรึกษา'], [x.approveName, 'หัวหน้าระดับ / หัวหน้ากลุ่มบริหารกิจการนักเรียน']] };
     },
@@ -144,7 +144,7 @@
           <div class="field"><label>การรับกลับ</label><select class="select" name="pickup">${Object.entries(PICKUP).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select></div>
           <div class="field"><label>ชื่อผู้มารับ</label><input class="input" name="pickupName" maxlength="200"></div>
           <div class="field"><label>เกี่ยวข้องเป็น</label><input class="input" name="pickupRelation" maxlength="100" placeholder="บิดา มารดา ญาติ"></div>
-          <div class="field"><label>เบอร์โทรผู้มารับ</label><input class="input mono" name="pickupPhone" maxlength="60" inputmode="tel"></div>
+          <div class="field"><label>เบอร์โทรผู้มารับ</label><input class="input mono" name="pickupPhone" ${UI.numAttrs('phone')}></div>
           <div class="field full"><label class="check"><input type="checkbox" name="parentContacted"> ติดต่อผู้ปกครองแล้ว</label></div>
           <div class="field full"><label>รูปถ่าย (ไม่บังคับ ไม่เกิน 5 รูป)</label><input class="input" type="file" name="photos" accept="image/*" multiple style="padding-top:6px"><span class="help">เช่น ผู้ปกครองที่มารับพร้อมนักเรียน ใบรับรองแพทย์ · เก็บสำเนาใน Google Drive ของงานกิจการนักเรียน</span></div></div>`,
         onSubmit: async (v, form) => {
@@ -167,6 +167,8 @@
       const x = all().find((y) => y.id === id);
       if (!x) return;
       const go = async (note) => { await Store.leaveAction(id, a, note); toast(ACT[a] + ' แล้ว'); App.render(); };
+      // step 2 (user, 26 Nov 2026): a photo of who picks the student up comes first, then the approval
+      if (a === 'approve2') { this.approveWithPhoto(x); return; }
       if (a === 'reject' || a === 'cancel') {
         dialog({ title: a === 'reject' ? 'ไม่อนุญาตให้ออก' : 'ยกเลิกคำขอ', size: 'sm', submitLabel: a === 'reject' ? 'ไม่อนุญาต' : 'ยกเลิกคำขอ', submitClass: 'accent',
           body: `<div>${Apps.sLink(x.studentId)}</div><div class="field"><label>เหตุผล ${a === 'reject' ? '<span class="req">*</span>' : ''}</label><textarea class="textarea" name="note" maxlength="500" ${a === 'reject' ? 'required' : ''}></textarea></div>`,
@@ -175,6 +177,23 @@
       }
       const s = Store.student(x.studentId);
       UI.confirmDialog(ACT[a], `${esc(s ? fullName(s) + ' ' + klass(s) : x.studentId)} · ${esc(REASONS[x.reason] || '')}<br>${a === 'out' ? 'บันทึกเวลาออกจากโรงเรียนเป็นตอนนี้' : a === 'back' ? 'บันทึกเวลากลับเข้าโรงเรียนเป็นตอนนี้' : 'ยืนยันการอนุมัติ'}`, ACT[a], () => go(''));
+    },
+    approveWithPhoto(x) {
+      const s = Store.student(x.studentId);
+      const d = dialog({ title: 'อนุญาต (หัวหน้าระดับ) · ถ่ายรูปผู้มารับ', submitLabel: 'อนุญาต', submitClass: 'primary',
+        body: `<div>${esc(s ? fullName(s) + ' ' + klass(s) : x.studentId)} · ${esc(REASONS[x.reason] || '')}${x.pickupName ? ` · ผู้มารับ ${esc(x.pickupName)}${x.pickupRelation ? ' (' + esc(x.pickupRelation) + ')' : ''}` : ''}</div>
+          <div class="notice warn">${icon('camera', 'i16')}<span>ถ่ายรูปผู้ปกครองที่มารับคู่กับนักเรียน เพื่อเป็นหลักฐาน แล้วจึงกดอนุญาต · รูปเก็บในระบบและ Google Drive</span></div>
+          <div class="field"><label>รูปผู้มารับ <span class="req">*</span></label><input class="input" type="file" name="photo" accept="image/*" capture="environment" required style="padding-top:6px"></div>
+          <img class="photo-preview" alt="ตัวอย่างรูปผู้มารับ" hidden style="max-width:100%;max-height:320px;object-fit:contain;border-radius:8px">`,
+        onSubmit: async (v, form) => {
+          const f = form.photo.files[0];
+          if (!f) { toast('ถ่ายรูปผู้มารับก่อน'); return false; }
+          const path = await Store.leavePhotoUpload(x.id, await UI.shrinkImage(f, 1280, 0.82));
+          await Store.leaveAction(x.id, 'approve2', '', [path]);
+          toast('อนุญาตแล้ว · บันทึกรูปผู้มารับแล้ว'); App.render();
+        } });
+      const inp = d.form.photo, img = d.form.querySelector('.photo-preview');
+      inp.addEventListener('change', () => { const f = inp.files[0]; if (f) { img.src = URL.createObjectURL(f); img.hidden = false; } });
     },
     async view(id) {
       const x = all().find((y) => y.id === id);

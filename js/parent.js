@@ -136,7 +136,7 @@
         <div class="field full"><label>กิจธุระ / รายละเอียด <span class="req">*</span></label><textarea class="textarea" name="detail" maxlength="1000" required placeholder="เช่น ไปพบแพทย์ตามนัด" style="min-height:56px"></textarea></div>
         <div class="field"><label>ชื่อผู้ปกครองที่มารับ <span class="req">*</span></label><input class="input" name="pickupName" maxlength="200" required></div>
         <div class="field"><label>เกี่ยวข้องเป็น</label><input class="input" name="pickupRelation" maxlength="100" placeholder="บิดา มารดา ญาติ"></div>
-        <div class="field"><label>เบอร์โทรผู้ปกครอง <span class="req">*</span></label><input class="input" name="pickupPhone" maxlength="60" inputmode="tel" required></div></div>
+        <div class="field"><label>เบอร์โทรผู้ปกครอง <span class="req">*</span></label><input class="input" name="pickupPhone" required ${UI.numAttrs('phone')}></div></div>
         <div class="notice">${icon('info', 'i16')}<span>คำขอจะส่งให้ครูที่ปรึกษาก่อน แล้วจึงถึงหัวหน้าระดับ ติดตามสถานะได้ที่หน้านี้</span></div>`,
       onSubmit: async (v) => {
         await Store.parentLeaveSave({ student_id: sid, leave_date: v.leaveDate, out_plan: v.outPlan, back_plan: v.backPlan, returns: v.returns === 'true', reason: v.reason,

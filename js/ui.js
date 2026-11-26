@@ -87,6 +87,24 @@
   }
   const studentCards = (root) => root.querySelectorAll(PICKER).forEach(showStudentCard);
   document.addEventListener('input', (e) => { if (e.target.matches && e.target.matches(PICKER)) showStudentCard(e.target); });
+  /* number fields (rule, user 26 Nov 2026): student id 5 digits, phone 10 digits starting with 0, national id 13 characters.
+     numAttrs(kind) gives the attributes; typing anything else is removed as it is typed; the form refuses a wrong length on save.
+     The database checks the same (students.id, leave pickup phone). */
+  const NUM = {
+    sid: { len: 5, pattern: '[0-9]{5}', title: 'รหัสนักเรียน 5 หลัก', keep: /[^0-9]/g },
+    phone: { len: 10, pattern: '0[0-9]{9}', title: 'เบอร์โทร 10 หลัก ขึ้นต้นด้วย 0 (ตัวเลขเท่านั้น)', keep: /[^0-9]/g, type: 'tel' },
+    cid: { len: 13, pattern: '[0-9A-Z]{13}', title: 'เลขประจำตัวประชาชน 13 หลัก', keep: /[^0-9A-Z]/g, upper: true },
+    cid4: { len: 4, pattern: '[0-9A-Z]{4}', title: 'เลขบัตร 4 ตัวท้าย', keep: /[^0-9A-Z]/g, upper: true },
+  };
+  const numAttrs = (kind) => { const n = NUM[kind]; return `data-num="${kind}" type="${n.type || 'text'}" inputmode="numeric" autocomplete="off" maxlength="${n.len}" pattern="${n.pattern}" title="${n.title}" placeholder="${n.len} หลัก"`; };
+  const numValue = (kind, v) => { const n = NUM[kind]; let s = String(v ?? ''); if (n.upper) s = s.toUpperCase(); return s.replace(n.keep, '').slice(0, n.len); };
+  document.addEventListener('input', (e) => {
+    const t = e.target, kind = t && t.dataset && t.dataset.num;
+    if (!kind || !NUM[kind]) return;
+    const v = numValue(kind, t.value);
+    if (v !== t.value) t.value = v;
+    t.setCustomValidity(v && v.length !== NUM[kind].len ? NUM[kind].title : '');
+  });
   const parseStudent = (v) => { const id = String(v || '').split(' ')[0].trim(); return Store.student(id) ? id : null; };
   // for apps that hold personal data: only students the user may see in full
   const parseMyStudent = (v) => { const id = parseStudent(v); return id && Store.student(id).mine && Store.canWrite(Store.student(id)) ? id : null; };
@@ -278,5 +296,5 @@
   new MutationObserver(queueA11y).observe(document.body, { childList: true, subtree: true });
   window.addEventListener('resize', queueA11y);
 
-  window.UI = { a11y, esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, studentCard, studentCards, parseStudent, parseMyStudent, dialog, confirmDialog, deleteDialog, toast, refreshIcons, hydratePhotos, shrinkImage, readSheet, download, parseCSV };
+  window.UI = { a11y, esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, studentCard, studentCards, numAttrs, numValue, NUM, parseStudent, parseMyStudent, dialog, confirmDialog, deleteDialog, toast, refreshIcons, hydratePhotos, shrinkImage, readSheet, download, parseCSV };
 })();

@@ -37,7 +37,7 @@
     needs: { table: 'care_needs', order: 'id', cols: [['id', 'id'], ['studentId', 'student_id'], ['kind', 'kind'], ['text', 'text']] },
     referrals: { table: 'care_referrals', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['type', 'type'], ['to', 'to'], ['note', 'note']] },
     discipline: { table: 'discipline_checks', order: 'at', desc: true, cols: [['id', 'id'], ['at', 'at'], ['term', 'term'], ['grade', 'grade'], ['room', 'room'], ['items', 'items'], ['checked', 'checked'], ['findings', 'findings'], ['note', 'note'], ['by', 'by_name'], ['byUser', 'by_user']] },
-    leave: { table: 'leave_requests', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['term', 'term'], ['leaveDate', 'leave_date'], ['outPlan', 'out_plan'], ['backPlan', 'back_plan'], ['returns', 'returns'], ['reason', 'reason'], ['detail', 'detail'], ['pickup', 'pickup'], ['pickupName', 'pickup_name'], ['pickupRelation', 'pickup_relation'], ['pickupPhone', 'pickup_phone'], ['parentContacted', 'parent_contacted'], ['photos', 'photos'], ['status', 'status'], ['log', 'log'], ['advisorName', 'advisor_name'], ['approveName', 'approve_name'], ['outAt', 'out_at'], ['backAt', 'back_at'], ['by', 'by_name'], ['byUser', 'by_user'], ['docNo', 'doc_no'], ['docYear', 'doc_year'], ['advisorBy', 'advisor_by'], ['approveBy', 'approve_by'], ['advisorAt', 'advisor_at'], ['approveAt', 'approve_at']] },
+    leave: { table: 'leave_requests', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['term', 'term'], ['leaveDate', 'leave_date'], ['outPlan', 'out_plan'], ['backPlan', 'back_plan'], ['returns', 'returns'], ['reason', 'reason'], ['detail', 'detail'], ['pickup', 'pickup'], ['pickupName', 'pickup_name'], ['pickupRelation', 'pickup_relation'], ['pickupPhone', 'pickup_phone'], ['parentContacted', 'parent_contacted'], ['photos', 'photos'], ['status', 'status'], ['log', 'log'], ['advisorName', 'advisor_name'], ['approveName', 'approve_name'], ['outAt', 'out_at'], ['backAt', 'back_at'], ['by', 'by_name'], ['byUser', 'by_user'], ['docNo', 'doc_no'], ['pickupPhoto', 'pickup_photo'], ['docYear', 'doc_year'], ['advisorBy', 'advisor_by'], ['approveBy', 'approve_by'], ['advisorAt', 'advisor_at'], ['approveAt', 'approve_at']] },
     surveyRounds: { table: 'survey_rounds', order: 'opens_at', desc: true, cols: [['id', 'id'], ['code', 'code'], ['grade', 'grade'], ['room', 'room'], ['opensAt', 'opens_at'], ['closesAt', 'closes_at'], ['closed', 'closed'], ['by', 'by_name'], ['byUser', 'by_user']] },
     surveyResponses: { table: 'survey_responses', order: 'at', desc: true, cols: [['id', 'id'], ['roundId', 'round_id'], ['studentId', 'student_id'], ['at', 'at'], ['score', 'score'], ['result', 'result'], ['urgent', 'urgent'], ['wantsHelp', 'wants_help'], ['message', 'message']] },
     drugs: { table: 'drug_cases', order: 'at', desc: true, cols: [['id', 'id'], ['studentId', 'student_id'], ['at', 'at'], ['term', 'term'], ['category', 'category'], ['substance', 'substance'], ['act', 'act'], ['foundBy', 'found_by'], ['place', 'place'], ['items', 'items'], ['level', 'level'], ['actions', 'actions'], ['points', 'points'], ['recordId', 'behavior_record_id'], ['status', 'status'], ['followUp', 'follow_up'], ['note', 'note'], ['photos', 'photos'], ['by', 'by_name'], ['byUser', 'by_user'], ['updatedAt', 'updated_at']] },
@@ -400,7 +400,14 @@
     async surveyClose(id) { check(await sb.rpc('survey_close', { p_id: id })); await this.refresh('surveyRounds'); },
     // ขออนุญาตออกนอกโรงเรียน: every step goes through leave_save / leave_action (the database checks who may do what)
     async saveLeave(p) { const id = check(await sb.rpc('leave_save', { p })); await this.pull('leave', id); return id; },
-    async leaveAction(id, action, note = '') { check(await sb.rpc('leave_action', { p_id: id, p_action: action, p_note: note })); await this.pull('leave', id); },
+    async leaveAction(id, action, note = '', photos = null) { check(await sb.rpc('leave_action', { p_id: id, p_action: action, p_note: note, p_photos: photos })); await this.pull('leave', id); },
+    // one photo into the request's folder (e.g. who picks the student up), copied to Google Drive in the background
+    async leavePhotoUpload(id, blob) {
+      const path = `${id}/pickup-${Date.now().toString(36)}.jpg`;
+      check(await sb.storage.from('leave-photos').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '3600' }));
+      this.driveSync('leave-photos', path);
+      return path;
+    },
     // photos: private bucket leave-photos, <request id>/<name>.jpg, copied to Google Drive in the background
     async leavePhotos(id, blobs) {
       const x = this.data.leave.find((y) => y.id === id), paths = [...((x && x.photos) || [])];
