@@ -673,6 +673,12 @@ body.printing-sheet #print-sheet:has(.pk22){padding:0}
 .fb-msg-cell{white-space:pre-wrap;max-width:420px}
 @media (max-width:640px){.fb{right:12px;bottom:12px}.fb-fab{width:52px;height:52px}.fb-fab svg{width:46px;height:46px}.fb-panel{max-height:calc(100vh - 96px)}}
 @media print{.fb{display:none}}
+/* reminder count on a menu item */
+.nav-badge{margin-left:auto;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--red-700);color:#fff;font:600 12px/22px var(--font-body);text-align:center}
+.lv-remind{text-decoration:none;color:inherit;margin-bottom:12px}
+.menu-btn{position:relative}
+.menu-btn.has-badge::after{content:'';position:absolute;top:6px;right:6px;width:10px;height:10px;border-radius:50%;background:var(--red-700);box-shadow:0 0 0 2px var(--white)}
+.lv-remind:hover{filter:brightness(.97)}
 /* the feedback mascot never covers a dialog's buttons */
 body.modal-open .fb{display:none}
 .fb-home-row .ic-kind{width:32px;height:32px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--navy-50,#eef0fb);color:var(--navy-800)}

@@ -128,6 +128,16 @@ const tests = {
     const r = ctx.LeaveApp.pk22({ studentId: '30001', leaveDate: '2026-11-26', reason: 'sick', status: 'rejected', advisorName: 'ครู ข', log: [{ action: 'reject', step: 1, note: 'ไม่ได้ติดต่อผู้ปกครอง' }] });
     assert.match(r, /☑<\/b> ไม่ควรอนุญาต เนื่องจาก <span class="u w">ไม่ได้ติดต่อผู้ปกครอง/);
   },
+  'leave reminder: waits on the homeroom teacher, then the grade head (not the one who gave step 1), then the gate': () => {
+    Store.data.students = [{ id: '30001', first: 'ก', last: 'ข', grade: 4, room: 1, advisor: 'ครู ก, ครู ข', status: 'studying', mine: true }, { id: '30002', first: 'ค', last: 'ง', grade: 4, room: 2, advisor: 'ครู ค', status: 'studying', mine: true }];
+    Store.data.leave = [{ id: 'a', studentId: '30001', status: 'pending', at: '2' }, { id: 'b', studentId: '30002', status: 'pending', at: '1' }, { id: 'c', studentId: '30001', status: 'advisor_ok', advisorBy: 'g', at: '3' }, { id: 'd', studentId: '30001', status: 'advisor_ok', advisorBy: 't', at: '4' }];
+    const L = ctx.LeaveApp;
+    Store.profile = { id: 't', role: 'teacher', name: 'x' }; Store.data.teacherRooms = [{ userId: 't', grade: 4, room: 1 }]; Store.data.teacherGrades = [];
+    assert.deepEqual(L.forMe().map((x) => x.id), ['a']);
+    Store.profile = { id: 'g', role: 'grade_head', name: 'x' }; Store.data.teacherRooms = []; Store.data.teacherGrades = [{ userId: 'g', grade: 4 }];
+    assert.deepEqual(L.forMe().map((x) => x.id).sort(), ['b', 'd']);
+    assert.match(L.homeNotice(), /รอคุณ 2 รายการ/);
+  },
   'settings: only the changed value is sent': async () => {
     await Store.saveSettings({ apps: { care: false } });
     assert.deepEqual(Object.keys(op(calls[0], 'update')[1]), ['apps']);

@@ -24,6 +24,16 @@
   const step1 = (x) => { const s = Store.student(x.studentId); return Store.isAdmin() || (s && Store.homeroomOf(s)) || headOf(x); };
   const head2 = (x) => headOf(x) && x.advisorBy !== Store.user().id;
   const step2 = () => Store.isAdmin() || role() === 'inspector';
+  // who is waited on (for the reminder): the homeroom teacher (or the grade head when the room has one listed advisor),
+  // then the grade head / head of student affairs, then the gate for approved passes
+  const advisorsOf = (s) => new Set(String((s && s.advisor) || '').split(/\s*[,/]\s*/).map((t) => t.trim()).filter(Boolean)).size;
+  function waitsOnMe(x) {
+    const s = Store.student(x.studentId);
+    if (x.status === 'pending') return !!s && (Store.homeroomOf(s) || (headOf(x) && !Store.isAdmin() && advisorsOf(s) <= 1));
+    if (x.status === 'advisor_ok') return head2(x);
+    if (x.status === 'approved' || (x.status === 'out' && x.returns)) return role() === 'inspector';
+    return false;
+  }
   const OPEN = ['pending', 'advisor_ok', 'approved', 'out'];
   function actions(x) {
     const b = (a, l, cls = 'secondary', ic = 'check') => `<button class="btn ${cls} sm" data-action="leave-act" data-act="${a}" data-id="${esc(x.id)}">${icon(ic, 'i16')}${l}</button>`;
@@ -40,6 +50,13 @@
   const RETURNS_OPTS = '<option value="false">กลับบ้าน (ไม่กลับมาเรียนต่อ)</option><option value="true">กลับมาเรียนต่อในวันนี้</option>';
   const app = {
     REASONS, STATUS, RETURNS_OPTS,
+    forMe() { return all().filter(waitsOnMe).sort(byDate); },
+    homeNotice() {
+      const l = this.forMe();
+      if (!l.length) return '';
+      const p = l.filter((x) => x.status === 'pending').length, h = l.filter((x) => x.status === 'advisor_ok').length, g = l.length - p - h;
+      return `<a class="notice warn lv-remind" href="#/apps/leave?tab=list&who=me">${icon('bell-ring', 'i16')}<span><b>ขออนุญาตออกนอกโรงเรียน รอคุณ ${l.length} รายการ</b><br>${[p && `รอความเห็นครูที่ปรึกษา ${p}`, h && `รออนุญาตจากหัวหน้าระดับ ${h}`, g && `รอบันทึกออก-กลับ ${g}`].filter(Boolean).join(' · ')} — กดเพื่อดู</span></a>`;
+    },
     id: 'leave', name: 'ขออนุญาตออกนอกโรงเรียน', short: 'ขอออกนอกโรงเรียน', icon: 'door-open', rule: 'rule',
     list(sid) { return all().filter((x) => !sid || x.studentId === sid).sort(byDate); },
     summary(sid) {
@@ -180,7 +197,7 @@
     page(q) {
       const tab = q.tab || 'overview', base = '#/apps/leave';
       const t = Store.termKey(), cur = all().filter((x) => x.term === t), open = all().filter((x) => OPEN.includes(x.status)).sort(byDate);
-      const mine = open.filter((x) => (x.status === 'pending' && step1(x)) || (x.status === 'advisor_ok' && head2(x)) || (['approved', 'out'].includes(x.status) && step2()));
+      const mine = open.filter(waitsOnMe);
       const cards = `<div class="grid g4">
         ${Apps.stat('inbox', 'รอฉันดำเนินการ', mine.length, 'รายการ', 'amber', step2() ? 'บันทึกออก-กลับ' : 'รอความเห็น / การอนุญาตจากคุณ', base + '?tab=list&who=me')}
         ${Apps.stat('hourglass', 'ยังไม่จบ', open.length, 'รายการ', '', 'รออนุมัติ / รอออก / ออกไปแล้ว', base + '?tab=list&status=open')}

@@ -20,6 +20,42 @@
       ${link('settings', 'settings', 'ตั้งค่า', is('settings'))}` : ''}`;
   }
 
+  /* ---- reminders: leave requests waiting on this person (badge on the menu, a line on the home page, a toast when a new one arrives) ---- */
+  let remindSeen = null, remindTimer = null;
+  function leaveBadge() {
+    const a = document.querySelector('#nav a[href="#/apps/leave"]');
+    if (!a || !window.LeaveApp) return;
+    const n = Store.s.apps.leave === false || !Store.appOk('leave') ? 0 : LeaveApp.forMe().length;
+    // phones: the menu is behind the ☰ button, so the button gets a red dot too
+    document.querySelectorAll('.menu-btn').forEach((m) => m.classList.toggle('has-badge', n > 0));
+    let b = a.querySelector('.nav-badge');
+    if (!n) { if (b) b.remove(); return; }
+    if (!b) { b = document.createElement('span'); b.className = 'nav-badge'; a.appendChild(b); }
+    b.textContent = n > 99 ? '99+' : String(n);
+    b.setAttribute('aria-label', `รอคุณ ${n} รายการ`);
+  }
+  async function checkReminders() {
+    if (!window.LeaveApp || Store.s.apps.leave === false || !Store.appOk('leave')) return;
+    if (document.hidden) return;
+    try { await Store.refresh('leave'); } catch (e) { return; }
+    const ids = LeaveApp.forMe().map((x) => x.id + ':' + x.status);
+    const fresh = remindSeen ? ids.filter((k) => !remindSeen.has(k)) : [];
+    remindSeen = new Set(ids);
+    leaveBadge();
+    if (fresh.length) {
+      UI.toast(`มีคำขอออกนอกโรงเรียนรอคุณ ${fresh.length} รายการใหม่ · เปิดเมนู "ขออนุญาตออกนอกโรงเรียน"`, 'info');
+      // refresh the page only when nothing is being typed (no dialog open)
+      if (!document.getElementById('dialog-root').innerHTML && /^#\/(apps\/leave)?(\?|$)/.test(location.hash || '#/')) render();
+    }
+  }
+  function startReminders() {
+    remindSeen = new Set((window.LeaveApp ? LeaveApp.forMe() : []).map((x) => x.id + ':' + x.status));
+    leaveBadge();
+    clearInterval(remindTimer);
+    remindTimer = setInterval(checkReminders, 60000);
+    if (!startReminders.on) { startReminders.on = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) checkReminders(); }); }
+  }
+
   function parse() {
     const h = location.hash.replace(/^#\/?/, '');
     const [p, qs] = h.split('?');
@@ -54,6 +90,7 @@
     lastPath = path;
     const page = route(path, q);
     document.getElementById('nav').innerHTML = navHTML(path);
+    leaveBadge();
     document.getElementById('page-title').textContent = page.title;
     document.querySelector('.topbar .home-btn').hidden = path === '';
     document.title = page.title + ' · Student Affairs – Thk';
@@ -815,6 +852,7 @@
       document.querySelector('.shell').hidden = false;
       render();
       if (window.Feedback) Feedback.mount();
+      startReminders();
     } catch (err) {
       gate(`<div class="card rule login">${BRAND}${icon('wifi-off', 'i28')}<h2>เชื่อมต่อฐานข้อมูลไม่ได้</h2><p class="muted" style="margin:0">${esc(err.message)}</p><button class="btn primary" id="gate-reload">ลองอีกครั้ง</button></div>`);
       document.getElementById('gate-reload').addEventListener('click', () => location.reload());
