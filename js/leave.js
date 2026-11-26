@@ -3,7 +3,7 @@
    · ทุกขั้นตอนตรวจสิทธิ์ในฐานข้อมูล (leave_save / leave_action) · รูปถ่ายเก็บใน bucket ส่วนตัว leave-photos และสำเนาลง Google Drive
      โฟลเดอร์ "ขออนุญาตออกนอกโรงเรียน" / ปีการศึกษา / ห้อง */
 (function () {
-  const { esc, fmtDate, icon, fullName, klass, empty, studentField, parseStudent, dialog, toast } = UI;
+  const { esc, fmtDate, icon, fullName, klass, empty, dialog, toast } = UI;
   const D = () => Store.data;
   const all = () => D().leave || [];
   const REASONS = { sick: 'ป่วย / ไม่สบาย', doctor: 'ไปพบแพทย์ / ทำฟัน', family: 'ธุระครอบครัว', parent: 'ผู้ปกครองขอรับกลับ', activity: 'กิจกรรม / ภารกิจของโรงเรียน', other: 'อื่น ๆ' };
@@ -35,8 +35,6 @@
     return false;
   }
   const OPEN = ['pending', 'advisor_ok', 'approved', 'out'];
-  // user, 26 Nov 2026: homeroom / subject teachers only approve (students / parents file from the parent page); nurse-room teachers still file
-  const canFile = () => role() !== 'teacher' || Store.nurseStaff();
   /* signature pad (finger, stylus or mouse): white JPEG so it prints and fits the photo bucket */
   function signPad(root) {
     const c = root.querySelector('canvas.sign-pad'), g = c.getContext('2d');
@@ -89,7 +87,7 @@
         title: `ออกนอกโรงเรียน · ${esc(REASONS[x.reason] || x.reason)} ${badge(x.status)}`, note: [x.detail, x.backAt && 'กลับ ' + time(x.backAt)].filter(Boolean).join(' · ') }));
     },
     studentTab(sid) {
-      return `${canFile() ? `<div class="card-body no-print" style="border-bottom:1px solid var(--ink-200)"><div class="actions"><button class="btn accent sm" data-action="leave-new" data-student="${esc(sid)}">${icon('plus', 'i16')}ยื่นขออนุญาตออก</button></div></div>` : ''}${this.table(this.list(sid), false)}`;
+      return this.table(this.list(sid), false);
     },
     table(list, withStudent = true) {
       if (!list.length) return empty('ยังไม่มีคำขอ', 'door-open');
@@ -154,37 +152,6 @@
         signs: [[x.by, 'ผู้ยื่นคำขอ'], [x.advisorName, 'ครูที่ปรึกษา'], [x.approveName, 'หัวหน้าระดับ / หัวหน้ากลุ่มบริหารกิจการนักเรียน']] };
     },
 
-    openNew(sid) {
-      const list = Store.user().role === 'teacher' && !Store.nurseStaff() ? Store.myStudents() : Store.nurseStudents();
-      const d = dialog({ title: 'ขออนุญาตออกนอกโรงเรียน', submitLabel: 'ยื่นคำขอ', accent: true, submitClass: 'accent',
-        body: `<div class="form-grid">${studentField('student', sid, false, list)}
-          <div class="field"><label>วันที่ <span class="req">*</span></label><input class="input" type="date" name="leaveDate" value="${today()}" required></div>
-          <div class="field"><label>เวลาที่ขอออก</label><input class="input" type="time" name="outPlan"></div>
-          <div class="field"><label>เหตุผล <span class="req">*</span></label><select class="select" name="reason">${Object.entries(REASONS).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select></div>
-          <div class="field"><label>หลังออกจากโรงเรียน</label><select class="select" name="returns">${RETURNS_OPTS}</select></div>
-          <div class="field"><label>เวลาที่จะกลับ (ถ้ากลับ)</label><input class="input" type="time" name="backPlan"></div>
-          <div class="field full"><label>รายละเอียด</label><textarea class="textarea" name="detail" maxlength="1000" placeholder="เช่น มีไข้ 38.5 ห้องพยาบาลแนะนำให้กลับบ้าน" style="min-height:56px"></textarea></div>
-          <div class="field"><label>การรับกลับ</label><select class="select" name="pickup">${Object.entries(PICKUP).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select></div>
-          <div class="field"><label>ชื่อผู้มารับ</label><input class="input" name="pickupName" maxlength="200"></div>
-          <div class="field"><label>เกี่ยวข้องเป็น</label><input class="input" name="pickupRelation" maxlength="100" placeholder="บิดา มารดา ญาติ"></div>
-          <div class="field"><label>เบอร์โทรผู้มารับ</label><input class="input mono" name="pickupPhone" ${UI.numAttrs('phone')}></div>
-          <div class="field full"><label class="check"><input type="checkbox" name="parentContacted"> ติดต่อผู้ปกครองแล้ว</label></div>
-          <div class="field full"><label>รูปถ่าย (ไม่บังคับ ไม่เกิน 5 รูป)</label><input class="input" type="file" name="photos" accept="image/*" multiple style="padding-top:6px"><span class="help">เช่น ผู้ปกครองที่มารับพร้อมนักเรียน ใบรับรองแพทย์ · เก็บสำเนาใน Google Drive ของงานกิจการนักเรียน</span></div></div>`,
-        onSubmit: async (v, form) => {
-          const id = parseStudent(v.student);
-          if (!id) { toast('เลือกนักเรียนจากรายการ'); return false; }
-          const files = [...form.photos.files].slice(0, 5);
-          const newId = await Store.saveLeave({ student_id: id, leave_date: v.leaveDate, out_plan: v.outPlan, back_plan: v.backPlan, returns: v.returns === 'true', reason: v.reason, detail: v.detail.trim(),
-            pickup: v.pickup, pickup_name: v.pickupName.trim(), pickup_relation: v.pickupRelation.trim(), pickup_phone: v.pickupPhone.trim(), parent_contacted: !!form.parentContacted.checked });
-          if (files.length) {
-            try { await Store.leavePhotos(newId, await Promise.all(files.map((f) => UI.shrinkImage(f, 1280, 0.82)))); }
-            catch (e) { toast('ยื่นคำขอแล้ว แต่แนบรูปไม่สำเร็จ: ' + e.message, 'error'); }
-          }
-              toast('ยื่นคำขอแล้ว · รอครูที่ปรึกษาให้ความเห็น');
-          App.render();
-        } });
-      return d;
-    },
     async act(id, a) {
       const x = all().find((y) => y.id === id);
       if (!x) return;
@@ -262,11 +229,10 @@
       const search = Apps.searchCard({ id: 'leave', title: 'ค้นหาคำขอออกนอกโรงเรียน', typeLabel: 'เหตุผล', typeHtml: '<option value="">ทุกเหตุผล</option>' + Apps.optList(Object.entries(REASONS), q.type), q });
       const bindS = () => Apps.bindSearch('leave', (v) => Apps.hashOf(base, { tab: 'list', grade: v.grade, type: v.type, from: v.from, to: v.to }));
       const tabs = Apps.tabsBar([['overview', 'ภาพรวม'], ['list', 'รายการคำขอ'], ['guide', 'ขั้นตอน']], tab, base);
-      const actionsBar = canFile() ? `<button class="btn accent" data-action="leave-new">${icon('plus')}ยื่นขออนุญาตออก</button>` : '';
-      const out = (html) => ({ title: this.name, actions: actionsBar, html: search + cards + tabs + html, after: bindS });
+      const out = (html) => ({ title: this.name, html: search + cards + tabs + html, after: bindS });
       if (tab === 'trash') return out(Apps.trashView('leave', 'คำขอออกนอกโรงเรียน'));
       if (tab === 'guide') return out(`<div class="card"><div class="card-body"><ol style="margin:0;padding-left:20px;line-height:2">
-        <li><b>ยื่นคำขอ</b> — นักเรียน / ผู้ปกครองยื่นจากหน้าผู้ปกครอง (ครูห้องพยาบาล หัวหน้าระดับ ฝ่ายปกครอง ยื่นแทนได้) · ครูที่ปรึกษาไม่ต้องยื่น รอแจ้งเตือนเพื่ออนุมัติ</li>
+        <li><b>ยื่นคำขอ</b> — นักเรียน / ผู้ปกครองยื่นจากหน้าผู้ปกครองเท่านั้น · ครูไม่ต้องยื่น รอแจ้งเตือนเพื่ออนุมัติ</li>
         <li><b>ความเห็นของครูที่ปรึกษา</b> — ครูที่ปรึกษาเข้าระบบแล้วกด "เห็นควรอนุญาต" หรือ "ไม่อนุญาต" · ห้องที่มีครูที่ปรึกษาคนเดียว (หรือครูที่ปรึกษายังไม่มีบัญชี) หัวหน้าระดับ / รองหัวหน้าระดับให้ความเห็นแทนได้ · ต้องลงลายมือชื่อบนจอก่อนอนุญาต</li>
         <li><b>ความเห็นของหัวหน้าระดับ / รองหัวหน้าระดับ / หัวหน้ากลุ่มบริหารกิจการนักเรียน</b> — ต้องเป็นคนละคนกับขั้นที่ 1 · ถ่ายรูปผู้มารับและลงลายมือชื่อบนจอก่อนอนุญาต</li>
         <li><b>ประตู (ฝ่ายปกครอง): บันทึกออก</b> แล้ว <b>บันทึกกลับ</b> ถ้านักเรียนกลับมาเรียนต่อ</li>

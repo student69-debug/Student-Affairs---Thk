@@ -144,7 +144,6 @@
     'survey-qr': (el) => Apps.get('care').openQr(el.dataset.id),
     'survey-close': (el) => UI.confirmDialog('ปิดรอบแบบประเมิน', 'นักเรียนจะส่งคำตอบรอบนี้ไม่ได้อีก', 'ปิดรอบ', async () => { await Store.surveyClose(el.dataset.id); UI.toast('ปิดรอบแล้ว'); render(); }),
     'survey-refresh': async () => { await Store.refresh('surveyRounds', 'surveyResponses', 'screenings'); UI.toast('โหลดผลล่าสุดแล้ว'); render(); },
-    'leave-new': (el) => Apps.get('leave').openNew(S(el)),
     'leave-act': (el) => Apps.get('leave').act(el.dataset.id, el.dataset.act),
     'leave-view': (el) => Apps.get('leave').view(el.dataset.id),
     'leave-del': (el) => UI.deleteDialog({ title: 'ลบคำขอออกนอกโรงเรียน', text: '<p style="margin:0">ต้องการลบคำขอนี้ใช่หรือไม่? เก็บไว้ 30 วันที่แท็บ "ที่ลบไว้" กู้คืนได้</p>',

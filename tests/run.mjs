@@ -143,12 +143,13 @@ const tests = {
     assert.equal(v('phone', '08-1234-5678 9'), '0812345678'); assert.equal(v('sid', 'ab12345678'), '12345'); assert.equal(v('cid', 'g1234567890123x'), 'G123456789012');
     assert.match(ctx.UI.numAttrs('phone'), /pattern="0\[0-9\]\{9\}"/); assert.match(ctx.UI.numAttrs('sid'), /maxlength="5"/);
   },
-  'leave: teachers get no file button (students / parents file), grade heads still do': () => {
-    const L = ctx.LeaveApp;
-    Store.profile = { id: 't', role: 'teacher', name: 'x' }; Store.data.leave = [];
-    assert.doesNotMatch(L.studentTab('30001'), /leave-new/);
-    Store.profile = { id: 'g', role: 'grade_head', name: 'x' };
-    assert.match(L.studentTab('30001'), /leave-new/);
+  'leave: no file button on the staff side for any role (students / parents file)': () => {
+    const L = ctx.LeaveApp; Store.data.leave = [];
+    for (const role of ['teacher', 'grade_head', 'admin', 'inspector']) {
+      Store.profile = { id: 'u', role, name: 'x' };
+      assert.doesNotMatch(L.studentTab('30001'), /leave-new|ยื่นขออนุญาต/);
+      assert.doesNotMatch(JSON.stringify(L.page({ tab: 'list' })), /leave-new|ยื่นขออนุญาตออก</);
+    }
   },
   'settings: only the changed value is sent': async () => {
     await Store.saveSettings({ apps: { care: false } });
