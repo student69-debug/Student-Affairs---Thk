@@ -31,7 +31,7 @@
     const s = Store.student(x.studentId);
     if (x.status === 'pending') return !!s && (Store.homeroomOf(s) || (headOf(x) && !Store.isAdmin() && advisorsOf(s) <= 1));
     if (x.status === 'advisor_ok') return head2(x);
-    if (x.status === 'approved' || (x.status === 'out' && x.returns)) return role() === 'inspector';
+    if (x.status === 'approved' || (x.status === 'out' && x.returns !== false)) return role() === 'inspector';
     return false;
   }
   const OPEN = ['pending', 'advisor_ok', 'approved', 'out'];
@@ -60,12 +60,12 @@
     if (x.status === 'advisor_ok' && head2(x)) out.push(b('approve2', 'อนุญาต (หัวหน้าระดับ)', 'primary'));
     if ((x.status === 'pending' && step1(x)) || (x.status === 'advisor_ok' && head2(x))) out.push(b('reject', 'ไม่อนุญาต', 'ghost', 'x'));
     if (x.status === 'approved' && step2()) out.push(b('out', 'บันทึกออก', 'accent', 'log-out'));
-    if (x.status === 'out' && step2() && x.returns) out.push(b('back', 'บันทึกกลับ', 'secondary', 'log-in'));
+    if (x.status === 'out' && step2() && x.returns !== false) out.push(b('back', 'บันทึกกลับ', 'secondary', 'log-in'));
     if (['pending', 'advisor_ok', 'approved'].includes(x.status) && (x.byUser === Store.user().id || Store.isAdmin())) out.push(b('cancel', 'ยกเลิก', 'ghost', 'ban'));
     return out.join('');
   }
 
-  const RETURNS_OPTS = '<option value="false">กลับบ้าน (ไม่กลับมาเรียนต่อ)</option><option value="true">กลับมาเรียนต่อในวันนี้</option>';
+  const RETURNS_OPTS = '<option value="false">กลับบ้าน (ไม่กลับมาเรียนต่อ)</option><option value="true">กลับมาเรียนต่อในวันนี้</option><option value="other">อื่น ๆ (ระบุในรายละเอียด)</option>';
   const app = {
     REASONS, STATUS, RETURNS_OPTS,
     forMe() { return all().filter(waitsOnMe).sort(byDate); },
@@ -96,7 +96,7 @@
           <td>${esc(REASONS[x.reason] || x.reason)}${x.detail ? `<div class="muted small">${esc(x.detail)}</div>` : ''}</td>
           <td class="small">${esc(PICKUP[x.pickup] || '')}${x.pickupName ? `<div class="muted">${esc(x.pickupName)}${x.pickupRelation ? ' (' + esc(x.pickupRelation) + ')' : ''}</div>` : ''}</td>
           <td>${badge(x.status)}${(x.photos || []).length ? ` <span class="muted small">${icon('camera', 'i16')}${x.photos.length}</span>` : ''}</td>
-          <td class="small">${x.outAt ? 'ออก ' + time(x.outAt) : '—'}${x.backAt ? '<br>กลับ ' + time(x.backAt) : x.status === 'out' && !x.returns ? '<br><span class="muted">กลับบ้าน</span>' : ''}</td>
+          <td class="small">${x.outAt ? 'ออก ' + time(x.outAt) : '—'}${x.backAt ? '<br>กลับ ' + time(x.backAt) : x.status === 'out' && x.returns === false ? '<br><span class="muted">กลับบ้าน</span>' : ''}</td>
           <td class="no-print" style="text-align:right;white-space:nowrap"><div class="actions" style="justify-content:flex-end">${actions(x)}<button class="icon-btn" title="ดูรายละเอียด / รูปถ่าย" data-action="leave-view" data-id="${esc(x.id)}">${icon('eye', 'i16')}</button>${Apps.reportBtn('leave', 'pass', x.id)}${(Store.isAdmin() || x.byUser === Store.user().id) ? `<button class="icon-btn" title="ลบ (เก็บไว้ 30 วัน)" data-action="leave-del" data-id="${esc(x.id)}">${icon('trash-2', 'i16')}</button>` : ''}</div></td></tr>`).join('')}
         </tbody></table></div>`;
     },
@@ -143,7 +143,7 @@
           root.querySelectorAll('img[data-lv]').forEach((img) => { const v = m.get(img.dataset.lv); if (v) img.src = v; }); } };
       const log = (x.log || []).map((l) => `<tr><td>${fmtDate(l.at, true)}</td><td>${esc(ACT[l.action] || l.action)}${l.note ? ' · ' + esc(l.note) : ''}</td><td>${esc(l.by)}</td></tr>`).join('');
       return { title: 'ใบขออนุญาตออกนอกโรงเรียน', studentId: x.studentId, by: x.by,
-        rows: [['ที่', x.docNo ? `${x.docNo}/${x.docYear}` : ''], ['วันที่', fmtDate(x.leaveDate)], ['เวลาที่ขอออก', hhmm(x.outPlan)], ['หลังออกจากโรงเรียน', x.returns ? 'กลับมาเรียนต่อ' + (x.backPlan ? ' ประมาณ ' + hhmm(x.backPlan) : '') : 'กลับบ้าน ไม่กลับมาเรียนต่อ'],
+        rows: [['ที่', x.docNo ? `${x.docNo}/${x.docYear}` : ''], ['วันที่', fmtDate(x.leaveDate)], ['เวลาที่ขอออก', hhmm(x.outPlan)], ['หลังออกจากโรงเรียน', x.returns ? 'กลับมาเรียนต่อ' + (x.backPlan ? ' ประมาณ ' + hhmm(x.backPlan) : '') : x.returns === false ? 'กลับบ้าน ไม่กลับมาเรียนต่อ' : 'อื่น ๆ (ดูรายละเอียด)'],
           ['เหตุผล', esc(REASONS[x.reason] || x.reason) + (x.detail ? ' · ' + esc(x.detail) : '')], ['การรับกลับ', esc(PICKUP[x.pickup] || '')],
           ['ผู้มารับ', [x.pickupName, x.pickupRelation && '(' + x.pickupRelation + ')', x.pickupPhone].filter(Boolean).map(esc).join(' ')], ['ติดต่อผู้ปกครองแล้ว', x.parentContacted ? 'ติดต่อแล้ว' : 'ยังไม่ได้ติดต่อ'],
           ['สถานะ', esc((STATUS[x.status] || STATUS.pending)[0])], ['เวลาออกจริง', x.outAt ? fmtDate(x.outAt, true) : ''], ['เวลากลับจริง', x.backAt ? fmtDate(x.backAt, true) : ''],

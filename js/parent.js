@@ -140,7 +140,7 @@
         <div class="field"><label>เบอร์โทรผู้ปกครอง <span class="req">*</span></label><input class="input" name="pickupPhone" required ${UI.numAttrs('phone')}></div></div>
         <div class="notice">${icon('info', 'i16')}<span>คำขอจะส่งให้ครูที่ปรึกษาก่อน แล้วจึงถึงหัวหน้าระดับ ติดตามสถานะได้ที่หน้านี้</span></div>`,
       onSubmit: async (v) => {
-        await Store.parentLeaveSave({ student_id: sid, leave_date: v.leaveDate, out_plan: v.outPlan, back_plan: v.backPlan, returns: v.returns === 'true', reason: v.reason,
+        await Store.parentLeaveSave({ student_id: sid, leave_date: v.leaveDate, out_plan: v.outPlan, back_plan: v.backPlan, returns: v.returns === 'other' ? 'other' : v.returns === 'true', reason: v.reason,
           detail: v.detail.trim(), pickup_name: v.pickupName.trim(), pickup_relation: v.pickupRelation.trim(), pickup_phone: v.pickupPhone.trim() });
         UI.toast('ยื่นคำขอแล้ว · รอครูที่ปรึกษาให้ความเห็น');
         render(gate);
