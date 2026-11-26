@@ -571,6 +571,10 @@ details.card>summary::-webkit-details-marker{display:none}
 .update-bar>span{flex:1;line-height:1.45}
 .update-bar .btn{flex:none}
 @media print{.update-bar{display:none}}
+/* student picker: who was chosen (UI.studentCard) */
+.st-card{display:flex;gap:12px;align-items:flex-start;margin-top:8px;padding:10px 12px;border:1px solid var(--ink-200);border-radius:var(--radius-md);background:var(--ink-50)}
+.st-tel{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.dialog:has(.nh-call) .st-tel{display:none} /* the nurse form shows the numbers in its own box */
 /* one case on paper (Apps.openReport): preview in a dialog, printed alone */
 #print-sheet{display:none}
 @media print{body.printing-sheet>*:not(#print-sheet){display:none !important}body.printing-sheet #print-sheet{display:block;padding:12mm 14mm}}

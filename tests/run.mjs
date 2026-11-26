@@ -99,6 +99,13 @@ const tests = {
     assert.ok(!/<img src=x>|<b>x<\/b>|<i>/.test(h)); assert.ok(!h.includes('ว่าง')); assert.match(h, /เอกสารลับ/); assert.match(h, /ครูที่ปรึกษา/);
     for (const a of ctx.Apps.all.concat([ctx.Apps.get('drugs'), ctx.Apps.get('nurse')])) assert.equal(typeof a.report, 'function', a.id);
   },
+  'student picker card: numbers only for own students, every value escaped': () => {
+    const c = ctx.UI.studentCard;
+    const own = c({ id: '30001', first: '<b>', last: 'x', prefix: '', grade: 4, room: 1, mine: true, guardian: '<i>', guardianPhone: '081-234-5678', fatherPhone: '0899999999' });
+    assert.match(own, /href="tel:0812345678"/); assert.match(own, /href="tel:0899999999"/); assert.match(own, /&lt;b&gt;/); assert.ok(!own.includes('<i>') && !own.includes('<b><'));
+    const other = c({ id: '30002', first: 'a', last: 'b', grade: 4, room: 2, mine: false, guardianPhone: '' });
+    assert.ok(!other.includes('tel:')); assert.match(other, /เฉพาะครูที่ดูแล/);
+  },
   'settings: only the changed value is sent': async () => {
     await Store.saveSettings({ apps: { care: false } });
     assert.deepEqual(Object.keys(op(calls[0], 'update')[1]), ['apps']);

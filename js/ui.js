@@ -63,6 +63,30 @@
       <input class="input" name="${name}" list="dl-students" value="${esc(v)}" placeholder="พิมพ์รหัสหรือชื่อนักเรียน" required autocomplete="off">
       <datalist id="dl-students">${studentOptions(mineOnly, list)}</datalist></div>`;
   }
+  // who is this? photo, class and parents' numbers under every student picker; only what this person may already see
+  // (photo and numbers come masked from students_list outside the teacher's own students)
+  function studentCard(s) {
+    if (!s) return '';
+    const pic = s.photoPath ? `<img class="avatar lg" data-photo="${esc(s.photoPath)}" alt="" style="object-fit:cover">` : `<div class="avatar lg">${esc(initials(s))}</div>`;
+    const tel = (p) => String(p || '').split(/[,/;]|\s{2,}/).map((t) => t.trim()).filter((t) => t.replace(/\D/g, '').length >= 9);
+    const nums = [['ผู้ปกครอง', s.guardian, s.guardianPhone], ['บิดา', s.father, s.fatherPhone], ['มารดา', s.mother, s.motherPhone], ['นักเรียน', '', s.studentPhone]]
+      .flatMap(([who, n, p]) => tel(p).map((t) => `<a class="btn secondary sm" href="tel:${t.replace(/[^\d+]/g, '')}">${icon('phone', 'i16')}${esc(who)}${n ? ' ' + esc(n) : ''} · ${esc(t)}</a>`));
+    const telHtml = !s.mine ? '<span class="muted small">เบอร์โทรและรูปถ่ายเห็นได้เฉพาะครูที่ดูแลนักเรียนคนนี้</span>'
+      : nums.length ? nums.join('') : `<span class="muted small">${s.guardianPhone ? 'ผู้ปกครอง ' + esc(s.guardianPhone) : 'ยังไม่มีเบอร์โทรในทะเบียน'}</span>`;
+    return `${pic}<div class="grow"><div><b>${esc(fullName(s))}</b> <span class="muted small">${klass(s)} · ${esc(s.id)}</span></div>${s.advisor ? `<div class="muted small">ครูที่ปรึกษา ${esc(s.advisor)}</div>` : ''}<div class="st-tel">${telHtml}</div></div>`;
+  }
+  const PICKER = '.field input[list="dl-students"], .field input[list="dl-cs"]';
+  function showStudentCard(inp) {
+    const field = inp.closest('.field');
+    let box = field.querySelector('.st-card');
+    if (!box) { box = document.createElement('div'); box.className = 'st-card'; field.appendChild(box); }
+    const id = parseStudent(inp.value);
+    box.innerHTML = id ? studentCard(Store.student(id)) : '';
+    box.hidden = !id;
+    if (id) { refreshIcons(); hydratePhotos(box); }
+  }
+  const studentCards = (root) => root.querySelectorAll(PICKER).forEach(showStudentCard);
+  document.addEventListener('input', (e) => { if (e.target.matches && e.target.matches(PICKER)) showStudentCard(e.target); });
   const parseStudent = (v) => { const id = String(v || '').split(' ')[0].trim(); return Store.student(id) ? id : null; };
   // for apps that hold personal data: only students the user may see in full
   const parseMyStudent = (v) => { const id = parseStudent(v); return id && Store.student(id).mine ? id : null; };
@@ -102,6 +126,7 @@
       if (res !== false) done();
     });
     refreshIcons();
+    studentCards(form);
     const first = form.querySelector('input:not([type=hidden]),select,textarea');
     if (first) setTimeout(() => first.focus(), 30);
     return { close, form };
@@ -252,5 +277,5 @@
   new MutationObserver(queueA11y).observe(document.body, { childList: true, subtree: true });
   window.addEventListener('resize', queueA11y);
 
-  window.UI = { a11y, esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, parseStudent, parseMyStudent, dialog, confirmDialog, deleteDialog, toast, refreshIcons, hydratePhotos, shrinkImage, readSheet, download, parseCSV };
+  window.UI = { a11y, esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, studentCard, studentCards, parseStudent, parseMyStudent, dialog, confirmDialog, deleteDialog, toast, refreshIcons, hydratePhotos, shrinkImage, readSheet, download, parseCSV };
 })();
