@@ -107,7 +107,7 @@
   }
 
   /* ---- ขออนุญาตออกนอกโรงเรียน: the student / parent files it, the homeroom teacher then the grade head decide ---- */
-  let leaves = [];
+  let leaves = [], students = [];
   const L = () => window.LeaveApp;
   const STEP = { pending: 'รอครูที่ปรึกษาให้ความเห็น', advisor_ok: 'รอหัวหน้าระดับอนุญาต', approved: 'อนุญาตแล้ว · แสดงที่ป้อมยามเมื่อออก', out: 'ออกจากโรงเรียนแล้ว', returned: 'กลับเข้าโรงเรียนแล้ว', rejected: 'ไม่อนุญาต', cancelled: 'ยกเลิกแล้ว' };
   function leaveCard(c) {
@@ -122,7 +122,8 @@
           <div class="small"><span class="badge ${tone(x.status)}">${esc(STEP[x.status] || x.status)}</span>
             ${x.advisor_name ? ` ครูที่ปรึกษา: ${esc(x.advisor_name)}` : ''}${x.approve_name ? ` · หัวหน้าระดับ: ${esc(x.approve_name)}` : ''}</div>
           ${x.reject_note ? `<div class="small" style="color:var(--red-700)">เหตุผล: ${esc(x.reject_note)}</div>` : ''}</div>
-          ${x.mine && ['pending', 'advisor_ok', 'approved'].includes(x.status) ? `<button class="btn ghost sm" data-pv-cancel="${esc(x.id)}">ยกเลิก</button>` : ''}</div>`).join('')}</div>` : ''}</div>`;
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">${['approved', 'out', 'returned'].includes(x.status) ? `<button class="btn primary sm" data-pv-doc="${esc(x.id)}">${icon('file-text', 'i16')}ดูใบอนุญาต</button>` : ''}
+          ${x.mine && ['pending', 'advisor_ok', 'approved'].includes(x.status) ? `<button class="btn ghost sm" data-pv-cancel="${esc(x.id)}">ยกเลิก</button>` : ''}</div></div>`).join('')}</div>` : ''}</div>`;
   }
   function openLeave(sid, gate) {
     const today = new Date(Date.now() + 7 * 36e5).toISOString().slice(0, 10);
@@ -145,7 +146,17 @@
         render(gate);
       } });
   }
+  // the finished form ปค.22, only after both steps are given (the database lists only this parent's own child)
+  function showDoc(id) {
+    const x = leaves.find((y) => y.id === id), c = students.find((s) => s.id === (x && x.student_id));
+    if (!x || !c || !['approved', 'out', 'returned'].includes(x.status)) return;
+    const pass = { studentId: x.student_id, leaveDate: x.leave_date, docNo: x.doc_no, docYear: x.doc_year, outPlan: x.out_plan, backPlan: x.back_plan, returns: x.returns, reason: x.reason, detail: x.detail,
+      pickupName: x.pickup_name, pickupRelation: x.pickup_relation, pickupPhone: x.pickup_phone, status: x.status, advisorName: x.advisor_name, advisorAt: x.advisor_at,
+      approveName: x.approve_name, approveAt: x.approve_at, outAt: x.out_at, backAt: x.back_at, log: x.log || [] };
+    Apps.showReport({ title: `ใบขออนุญาตออกนอกบริเวณโรงเรียน (ปค.22)${x.doc ? ' ที่ ' + x.doc : ''}`, studentId: x.student_id, html: L().pk22(pass, c) });
+  }
   function bindLeave(root, gate) {
+    root.querySelectorAll('[data-pv-doc]').forEach((b) => b.addEventListener('click', () => showDoc(b.dataset.pvDoc)));
     root.querySelectorAll('[data-pv-leave]').forEach((b) => b.addEventListener('click', () => openLeave(b.dataset.pvLeave, gate)));
     root.querySelectorAll('[data-pv-cancel]').forEach((b) => b.addEventListener('click', () => UI.confirmDialog('ยกเลิกคำขอ', 'ต้องการยกเลิกคำขอออกนอกโรงเรียนนี้?', 'ยกเลิกคำขอ', async () => {
       await Store.parentLeaveCancel(b.dataset.pvCancel); UI.toast('ยกเลิกคำขอแล้ว'); render(gate);
@@ -168,6 +179,7 @@
     let v;
     try { v = await Store.parentView(); } catch (e) { v = { error: e.message }; }
     try { leaves = await Store.parentLeaves(); } catch (e) { leaves = []; }
+    students = (v && v.students) || [];
     const head = `<header class="pv-top"><div class="brand-row" style="border:0;padding:0"><div class="brand-mark"><img src="img/logo.png?v=20261117e" alt=""></div><div><b>STUDENT AFFAIRS</b><span>สำหรับผู้ปกครอง · ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม</span></div></div>
       <button class="btn ghost sm" id="pv-out">${icon('log-out', 'i16')}ออกจากระบบ</button></header>`;
     let body;

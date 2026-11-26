@@ -83,8 +83,8 @@
         </tbody></table></div>`;
     },
     // แบบ ปค.22: two identical halves (for the gate guard / for the parent), filled from the request and its approvals
-    pk22(x) {
-      const s = Store.student(x.studentId) || { id: x.studentId, first: '', last: '', prefix: '' };
+    pk22(x, student) {
+      const s = student || Store.student(x.studentId) || { id: x.studentId, first: '', last: '', prefix: '' };
       const d = new Date(x.leaveDate + 'T12:00:00+07:00');
       const part = (o) => new Intl.DateTimeFormat('th-TH', o).format(d);
       const u = (v, w = '') => `<span class="u ${w}">${esc(v || '')}&nbsp;</span>`;

@@ -632,6 +632,10 @@
   function openReport(appId, kind, id) {
     const a = ALL.find((x) => x.id === appId), r = a && a.report ? a.report(kind, id) : null;
     if (!r) { toast('ไม่พบรายการ หรือคุณไม่มีสิทธิ์ดู'); return; }
+    showReport(r);
+  }
+  // preview + print of a report object (also used by the parent page, which builds its own)
+  function showReport(r) {
     const html = reportSheet(r);
     const d = dialog({ title: 'รายงาน · ' + r.title, size: 'lg', submitLabel: 'พิมพ์ / บันทึกเป็น PDF', cancelLabel: 'ปิด',
       body: `<p class="muted small" style="margin:0">ตรวจข้อมูลก่อนพิมพ์ · ส่งต่อเป็นไฟล์: ในหน้าต่างพิมพ์เลือก "บันทึกเป็น PDF"</p><div class="rp-preview">${html}</div>`,
@@ -657,7 +661,7 @@
   }
 
   window.Apps = {
-    all: ALL, reportBtn, reportSheet, openReport, fitSheet,
+    all: ALL, reportBtn, reportSheet, openReport, showReport, fitSheet,
     get: (id) => ALL.find((a) => a.id === id),
     enabled: () => ALL.filter((a) => Store.s.apps[a.id] !== false && Store.appOk(a.id)),
     events: (sid) => window.Apps.enabled().flatMap((a) => a.events(sid)).sort(byDate),
