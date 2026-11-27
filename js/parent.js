@@ -220,7 +220,7 @@
     try { leaves = await Store.parentLeaves(); } catch (e) { leaves = []; }
     try { const r = await Store.sb.rpc('parent_inquiry_list'); inquiries = r.error ? [] : r.data || []; } catch (e) { inquiries = []; }
     students = (v && v.students) || [];
-    const head = `<header class="pv-top"><div class="brand-row" style="border:0;padding:0"><div class="brand-mark"><img src="img/logo.png?v=20261117e" alt=""></div><div><b>STUDENT PLUS</b><span>สำหรับผู้ปกครอง · ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม</span></div></div>
+    const head = `<header class="pv-top"><div class="brand-row" style="border:0;padding:0"><div class="brand-mark"><img src="img/logo.png?v=20261117e" alt=""></div><div><b>STUDENT LIFE</b><span>สำหรับผู้ปกครอง · ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม</span></div></div>
       <button class="btn ghost sm" id="pv-out">${icon('log-out', 'i16')}ออกจากระบบ</button></header>`;
     let body;
     if (!v || v.error) body = `<div class="card">${empty('โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่', 'wifi-off')}</div>`;

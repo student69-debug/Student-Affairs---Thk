@@ -143,7 +143,7 @@
     leaveBadge();
     document.getElementById('page-title').textContent = page.title;
     document.querySelector('.topbar .home-btn').hidden = path === '';
-    document.title = page.title + ' · Student Plus – Thk';
+    document.title = page.title + ' · Student Life – Thk';
     const head = page.actions ? `<div class="page-head no-print"><div><h2>${esc(page.title)}</h2></div><div class="actions">${page.actions}</div></div>` : `<h2 class="sr-only">${esc(page.title)}</h2>`;
     const contentEl = document.getElementById('content');
     contentEl.classList.toggle('anim', !samePage);  // charts animate when another page/app opens, not on refresh of the same page
@@ -438,7 +438,7 @@
   let heroTimer = null;
   function gate(html, light = false, auth = false) {
     if (heroTimer) { clearInterval(heroTimer); heroTimer = null; }
-    gateEl.innerHTML = '<h1 class="sr-only">ระบบกิจการนักเรียน · Student Plus – Thk</h1>' + html;
+    gateEl.innerHTML = '<h1 class="sr-only">ระบบกิจการนักเรียน · Student Life – Thk</h1>' + html;
     gateEl.classList.toggle('light', light);
     gateEl.classList.toggle('auth-mode', auth);
     if (!auth) document.documentElement.lang = 'th';
@@ -446,13 +446,13 @@
     document.querySelector('.shell').hidden = true;
     UI.refreshIcons();
   }
-  const BRAND = `<div class="brand-row"><div class="brand-mark"><img src="img/logo.png?v=20261117e" alt=""></div><div><b>STUDENT PLUS</b><span>กลุ่มบริหารกิจการนักเรียน · ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม</span></div></div>`;
+  const BRAND = `<div class="brand-row"><div class="brand-mark"><img src="img/logo.png?v=20261117e" alt=""></div><div><b>STUDENT LIFE</b><span>กลุ่มบริหารกิจการนักเรียน · ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม</span></div></div>`;
 
   /* ---- sign-in pages in Thai or English (TH/EN switch; the rest of the site stays Thai) ---- */
   const SCHOOL_TH = 'ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม', SCHOOL_EN = 'Thammasat Klongluang Wittayakom School';
   const L = {
     th: {
-      school: 'โรงเรียนธรรมศาสตร์คลองหลวงวิทยาคม', dept: 'กลุ่มบริหารกิจการนักเรียน · Student Plus',
+      school: 'โรงเรียนธรรมศาสตร์คลองหลวงวิทยาคม', dept: 'กลุ่มบริหารกิจการนักเรียน · Student Life',
       title1: 'ระบบกิจการนักเรียน', title2: 'ครบในที่เดียว',
       lead: 'พฤติกรรม ดูแลช่วยเหลือ ให้คำปรึกษา ห้องพยาบาล และผู้ปกครอง ข้อมูลนักเรียนเชื่อมกันทุกงาน',
       chips: ['พฤติกรรม & คะแนน', 'ดูแลช่วยเหลือ', 'ให้คำปรึกษา', 'บุหรี่ / สารเสพติด', 'ห้องพยาบาล', 'ผู้ปกครอง'],
@@ -493,13 +493,13 @@
     },
     en: {
       school: SCHOOL_EN, dept: 'Student Affairs Division',
-      title1: 'Student Plus', title2: 'all in one place',
+      title1: 'Student Life', title2: 'all in one place',
       lead: 'Behaviour, student care, counselling, the nurse room and parents: every task shares one student record.',
       chips: ['Behaviour & points', 'Student care', 'Counselling', 'Tobacco & drugs', 'Nurse room', 'Parents'],
       stats: ['Students', 'Classrooms', 'Staff in the system'], slides: 'Illustrations', slide: 'Slide',
       secure: 'Encrypted · you see only what your role allows', foot: '© 2026 Student Affairs Division · ' + SCHOOL_EN, langLabel: 'Language',
       tabStaff: 'Staff', tabParent: 'Students',
-      welcome: 'Welcome back', welcomeSub: 'Sign in to Student Plus · ' + SCHOOL_EN,
+      welcome: 'Welcome back', welcomeSub: 'Sign in to Student Life · ' + SCHOOL_EN,
       signupT: 'Create an account', signupSub: 'For teachers and staff · an administrator approves your access',
       parentT: 'For students / parents', parentSub: 'Student records · leave requests · ' + SCHOOL_EN,
       parentHow: "Use the <b>student ID</b> and the <b>student's 13-digit national ID</b> every time. No password needed.",
@@ -568,7 +568,7 @@
         <div class="auth-art" aria-hidden="true">${HERO_ART.map((a, i) => `<div class="auth-slide${i ? '' : ' on'}">${a}</div>`).join('')}</div>
         <div class="auth-hero-top"><div class="brand-mark"><img src="img/logo.png?v=20261117e" alt=""></div><div><b>${t('school')}</b><span>${t('dept')}</span></div></div>
         <div class="auth-hero-body">
-          <span class="auth-pill">${icon('sparkles', 'i16')} Student Plus – Thk</span>
+          <span class="auth-pill">${icon('sparkles', 'i16')} Student Life – Thk</span>
           <div class="auth-title">${t('title1')}<br><em>${t('title2')}</em></div>
           <p class="auth-lead">${t('lead')}</p>
           <div class="auth-chips">${HERO_ICONS.map((ic, i) => `<span>${icon(ic, 'i16')}${t('chips')[i]}</span>`).join('')}</div>
