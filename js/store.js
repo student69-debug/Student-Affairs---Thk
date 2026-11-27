@@ -316,18 +316,11 @@
       }
       const lists = await Promise.all(kinds.map(fetchAll));
       kinds.forEach((k, i) => setSlot(k, lists[i]));
+      // 30-day bins are NOT loaded here: ensureBin() fetches one when its tab opens (main.js render)
       this.data.trash = [];
       this.data.appTrash = {};
       this.data.caseTrash = [];
-      // 30-day bins: one per app (+ the student registry); who may use each is set per role in Settings — loaded together, not one after another
-      const bins = [];
-      if (this.binOk('registry')) bins.push(this.loadTrash());
-      for (const app of Object.keys(this.s.restoreRoles || {})) {
-        if (app === 'registry' || app === 'counsel' || !this.binOk(app)) continue;
-        bins.push(this.loadAppTrash(app));
-      }
-      if (this.binOk('counsel')) bins.push(this.loadCaseTrash());
-      await Promise.allSettled(bins); // a bin that fails stays empty, as before
+      this.binLoaded = {};
       if (this.isAdmin()) this.purgePhotos().catch(() => {});
     },
     // put rows just written (as returned by the database) into the list, newest first / drop a deleted one
@@ -383,6 +376,13 @@
       return r;
     },
     // deleted counselling cases, kept 30 days (counsellors and admins)
+    // bin of one app ('registry', 'counsel' or an app id): a promise while it must be fetched (first time, or fresh = tab just entered), else null
+    ensureBin(bin, fresh) {
+      this.binLoaded = this.binLoaded || {};
+      if (!this.binOk(bin) || (this.binLoaded[bin] && !fresh)) return null;
+      const load = bin === 'registry' ? this.loadTrash() : bin === 'counsel' ? this.loadCaseTrash() : this.loadAppTrash(bin);
+      return load.catch((e) => { if (window.UI) UI.toast('โหลดรายการที่ลบไว้ไม่สำเร็จ: ' + e.message); }).finally(() => { this.binLoaded[bin] = true; });
+    },
     async loadCaseTrash() {
       this.data.caseTrash = (check(await sb.rpc('case_trash_list')) || []).map((r) => ({ id: r.id, studentId: r.student_id, openDate: r.open_date, sessions: r.sessions_n, deletedAt: r.deleted_at, by: r.deleted_by_name || '', purgeAt: r.purge_at }));
       return this.data.caseTrash;

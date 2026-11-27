@@ -112,10 +112,22 @@
     return { title: 'ไม่พบหน้า', html: `<div class="card">${UI.empty('ไม่พบหน้าที่ต้องการ', 'map-pin-off')}</div>` };
   }
 
-  let lastPath = null;
+  let lastPath = null, lastBin = null;
   function render() {
     if (!Store.data) return;
     const { path, q } = parse();
+    // bins load only when their tab opens (user, 27 Nov 2026), fresh each time the tab is entered
+    if (q.tab === 'trash') {
+      const parts = path.split('/'), bin = parts[0] === 'registry' ? 'registry' : parts[0] === 'apps' ? parts[1] : null;
+      const wait = bin && Store.ensureBin(bin, path + '?' + q.tab !== lastBin);
+      lastBin = path + '?' + q.tab;
+      if (wait) {
+        document.getElementById('content').innerHTML = `<div class="card card-body muted">${UI.icon('loader', 'i16')} กำลังโหลดรายการที่ลบไว้…</div>`;
+        UI.refreshIcons();
+        wait.then(render);
+        return;
+      }
+    } else lastBin = null;
     const samePage = path === lastPath;
     window.__keepScroll = samePage ? window.scrollY : 0;
     lastPath = path;

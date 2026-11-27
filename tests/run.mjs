@@ -291,6 +291,22 @@ const tests = {
     assert.equal(calls.length, 1);
     assert.deepEqual(Array.from(Store.data.behavior.records, (r) => r.id), ['old', 'new', 'older']);
   },
+  'bins: fetched only when the tab opens, again when it is entered again, never without permission': async () => {
+    const was = Store.binOk;
+    Store.binLoaded = {};
+    answer = () => ({ data: [{ id: 't1', kind: 'record', label: 'x', deleted_at: '2026-11-01T00:00:00Z', purge_at: '2026-12-01T00:00:00Z' }], error: null });
+    Store.binOk = () => true;
+    await Store.ensureBin('behavior', false);
+    assert.equal(Store.data.appTrash.behavior.length, 1);
+    const n = calls.length;
+    assert.equal(Store.ensureBin('behavior', false), null); // same tab redrawn: no new fetch
+    assert.equal(calls.length, n);
+    await Store.ensureBin('behavior', true);                 // tab entered again: fresh
+    assert.equal(calls.length, n + 1);
+    Store.binOk = () => false;
+    assert.equal(Store.ensureBin('drugs', true), null);
+    Store.binOk = was;
+  },
   'nurse-room teacher: the school list stays inside the nurse app': async () => {
     Store.profile.role = 'teacher';
     answer = (c) => ({ data: c.table.startsWith('rpc:students_list') ? [{ id: '1', status: 'studying', mine: true }, { id: '2', status: 'studying', mine: false, taught: false }] : [], error: null });
