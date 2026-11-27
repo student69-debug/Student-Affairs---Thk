@@ -478,7 +478,7 @@
     },
     filtered() {
       const $ = (id) => document.getElementById(id);
-      const tq = $('nv-q').value.trim().toLowerCase(), term = $('nv-term').value, g = $('nv-group').value, oc = $('nv-out').value, grade = $('nv-grade').value, from = $('nv-from').value, to = $('nv-to').value;
+      const tq = $('nv-q').value.trim().toLowerCase(), term = $('nv-term').value, g = $('nv-group').value, oc = $('nv-out').value, grade = $('nv-grade').value, room = Apps.roomVal('nv-grade'), from = $('nv-from').value, to = $('nv-to').value;
       return this.list().filter((x) => {
         if (term && x.term !== term) return false;
         if (g && x.symptomGroup !== g) return false;
@@ -487,6 +487,7 @@
         if ((from && day < from) || (to && day > to)) return false;
         const s = Store.student(x.studentId);
         if (grade && (!s || String(s.grade) !== grade)) return false;
+        if (grade && room && String(s.room) !== room) return false;
         if (tq && !(x.studentId.includes(tq) || (s && fullName(s).toLowerCase().includes(tq)) || String(x.symptom).toLowerCase().includes(tq))) return false;
         return true;
       });

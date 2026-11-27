@@ -21,8 +21,8 @@
   const CLOSED = 'ยุติให้คำปรึกษา';
   const MAX_SESS = 6;
 
-  const isC = () => Store.seesAll(); // opens and edits cases
-  const isR = () => Store.readsAll(); // reads full cases (grade heads too since 26 Nov 2026)
+  const isC = () => Store.seesAll() || Store.counselStaff(); // opens and edits cases (+ ครูให้คำปรึกษา chosen by the admin, 27 Nov 2026)
+  const isR = () => Store.readsAll() || Store.counselStaff(); // reads full cases (grade heads too since 26 Nov 2026)
   const sevBadge = (s) => `<span class="badge ${SEVCLS[s] || 'b-neutral'}">${esc(s)}</span>`;
   const planBadge = (p) => `<span class="badge ${p === CLOSED ? 'b-neutral' : p === 'ส่งต่อผู้เชี่ยวชาญ' ? 'b-warning' : 'b-info'}">${esc(p)}</span>`;
   const kBadges = (types) => (types || []).map((k) => `<span class="badge b-navy" title="${esc(KMAP[k] || k)}">${esc(k)}</span>`).join(' ');
@@ -224,10 +224,11 @@
   function bindCasesFilter() {
     const $ = (id) => document.getElementById(id);
     const draw = () => {
-      const t = $('cf-q').value.trim().toLowerCase(), st = $('cf-status').value, sev = $('cf-sev').value, k = $('cf-k').value, ow = $('cf-owner').value, g = $('cf-grade').value, from = $('cf-from').value, to = $('cf-to').value, sfrom = $('cf-sfrom').value;
+      const t = $('cf-q').value.trim().toLowerCase(), st = $('cf-status').value, sev = $('cf-sev').value, k = $('cf-k').value, ow = $('cf-owner').value, g = $('cf-grade').value, room = Apps.roomVal('cf-grade'), from = $('cf-from').value, to = $('cf-to').value, sfrom = $('cf-sfrom').value;
       const list = cases().filter((c) => {
         const s = Store.student(c.studentId);
         if (g && (!s || String(s.grade) !== g)) return false;
+        if (g && room && String(s.room) !== room) return false;
         // from the home card "ให้คำปรึกษาเดือนนี้": cases with a session on or after this date
         if (sfrom && !(c.sessions || []).some((x) => String(x.date || '').slice(0, 10) >= sfrom)) return false;
         const d = String(c.openDate || '').slice(0, 10);
@@ -268,7 +269,7 @@
       <div class="card rule"><div class="card-head"><h3>${existing ? 'เคสให้คำปรึกษา' : 'เปิดเคสใหม่'}</h3>${existing ? `<span class="muted small">แก้ไขล่าสุด ${fmtDate(existing.updatedAt, true)}</span>` : ''}</div>
         <div class="card-body"><div class="form-grid">
           ${existing ? `<div class="field full"><label>นักเรียน</label><div class="t" style="font:500 17px var(--font-display)">${sLink(c.studentId)} <span class="mono muted small">${esc(c.studentId)}</span></div></div>`
-            : `<div class="field full"><label>นักเรียน <span class="req">*</span></label><input class="input" name="student" list="dl-cs" required autocomplete="off" placeholder="พิมพ์รหัสหรือชื่อนักเรียน" value="${s ? esc(s.id + ' — ' + fullName(s) + ' (' + klass(s) + ')') : ''}"><datalist id="dl-cs">${Store.activeStudents().map((x) => `<option value="${esc(x.id)} — ${esc(fullName(x))} (${klass(x)})"></option>`).join('')}</datalist></div>`}
+            : `<div class="field full"><label>นักเรียน <span class="req">*</span></label><input class="input" name="student" list="dl-cs" required autocomplete="off" placeholder="พิมพ์รหัสหรือชื่อนักเรียน" value="${s ? esc(s.id + ' — ' + fullName(s) + ' (' + klass(s) + ')') : ''}"><datalist id="dl-cs">${Store.counselStudents().map((x) => `<option value="${esc(x.id)} — ${esc(fullName(x))} (${klass(x)})"></option>`).join('')}</datalist></div>`}
           <div class="field"><label>วันที่เปิดเคส</label><input class="input" type="date" name="openDate" value="${esc(c.openDate)}"></div>
           <div class="field"><label>ผู้รับผิดชอบเคส</label><select class="select" name="owner">${ownerOpts.map((x) => `<option value="${esc(x.email)}" ${x.email === c.owner ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
           <div class="field"><label>ระดับความรุนแรง</label><div class="radio-row" style="min-height:40px">${SEV.map((v) => `<label><input type="radio" name="severity" value="${v}" ${c.severity === v ? 'checked' : ''}> ${sevBadge(v)}</label>`).join('')}</div></div>

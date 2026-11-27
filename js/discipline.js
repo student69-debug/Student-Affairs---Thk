@@ -120,7 +120,7 @@
     },
     filter(q) {
       const inDate = (d) => { d = String(d || '').slice(0, 10); return (!q.from || d >= q.from) && (!q.to || d <= q.to); };
-      const checks = all().filter((c) => (q.term === 'all' || q.from || q.to || c.term === Store.termKey()) && (!q.grade || String(c.grade) === String(q.grade)) && inDate(c.at)).sort(byDate);
+      const checks = all().filter((c) => (q.term === 'all' || q.from || q.to || c.term === Store.termKey()) && (!q.grade || String(c.grade) === String(q.grade)) && (!q.grade || !q.room || String(c.room) === String(q.room)) && inDate(c.at)).sort(byDate);
       const fs = findings(checks).filter((f) => (!q.type || f.ruleId === q.type) && (!q.mode || f.mode === q.mode));
       return { checks: q.type ? checks.filter((c) => (c.items || []).includes(q.type)) : checks, fs };
     },

@@ -575,6 +575,9 @@
     // students the nurse app may record: everyone for a nurse-room teacher the admin chose
     nurseStudents() { return this.profile.role === 'teacher' ? this.directory.filter((s) => s.status === 'studying') : this.activeStudents(); },
     nurseStaff() { return !!(this.profile.apps && this.profile.apps.nurse_staff === true); },
+    // ครูให้คำปรึกษา (user, 27 Nov 2026): a teacher the admin chose works the counselling app for every grade (database: private.counsel_staff)
+    counselStaff() { return this.profile.role === 'teacher' && !!(this.profile.apps && this.profile.apps.counsel_staff === true) && this.appOk('counsel'); },
+    counselStudents() { return this.counselStaff() ? this.directory.filter((s) => s.status === 'studying') : this.activeStudents(); },
     // whose allergies / chronic illness this person may read, and may edit (both enforced in the database)
     healthStudents() { return this.seesAll() || this.nurseStaff() ? this.nurseStudents() : this.myStudents(); },
     canHealth(s) { return this.isAdmin() || this.nurseStaff() || this.homeroomOf(s); },

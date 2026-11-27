@@ -179,6 +179,18 @@ const tests = {
     const h = ctx.LeaveApp.table(Store.data.leave);
     assert.match(h, /data-lv-sign="r\/sign1-a.jpg"/); assert.match(h, /data-lv-sign="r\/sign2-b.jpg"/); assert.match(h, />แทนครูที่ปรึกษา</); assert.doesNotMatch(h, /<b>x<\/b>/);
   },
+  'counselling teacher: only a teacher with the switch, and the room filter of the care lists': () => {
+    Store.profile = { id: 't', role: 'teacher', name: 'x', apps: { counsel_staff: true } }; assert.equal(Store.counselStaff(), true);
+    Store.profile = { id: 'g', role: 'grade_head', name: 'x', apps: { counsel_staff: true } }; assert.equal(Store.counselStaff(), false);
+    Store.profile = { id: 't', role: 'teacher', name: 'x', apps: {} }; assert.equal(Store.counselStaff(), false);
+    Store.profile = { id: 'a', role: 'admin', name: 'x' };
+    Store.data.students = [{ id: '50001', grade: 1, room: 1, status: 'studying', first: 'ก', last: 'ข', prefix: '' }, { id: '50002', grade: 1, room: 2, status: 'studying', first: 'ค', last: 'ง', prefix: '' }];
+    Object.assign(Store.data.care, { screenings: [], needs: [], referrals: [], health: [] });
+    Store.data.care.visits = [{ id: 'v1', studentId: '50001', at: '2026-11-20T08:00:00Z', note: '' }, { id: 'v2', studentId: '50002', at: '2026-11-21T08:00:00Z', note: '' }];
+    const care = ctx.Apps.get('care');
+    care.tables(undefined, { grade: '1', room: '2' }); assert.equal(care._n.visit, 1);
+    care.tables(undefined, { grade: '1' }); assert.equal(care._n.visit, 2);
+  },
   'settings: only the changed value is sent': async () => {
     await Store.saveSettings({ apps: { care: false } });
     assert.deepEqual(Object.keys(op(calls[0], 'update')[1]), ['apps']);

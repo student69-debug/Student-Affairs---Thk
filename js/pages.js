@@ -742,7 +742,7 @@
     if (u.role === 'admin') return '<span class="muted small">ทุกแอป</span>';
     if (u.role === 'pending') return '<span class="muted small">—</span>';
     const blocked = Apps.all.filter((a) => u.apps && u.apps[a.id] === false);
-    return `<div class="chips">${blocked.length ? Apps.all.filter((a) => !blocked.includes(a)).map((a) => `<span class="badge b-info">${esc(a.short)}</span>`).join('') || '<span class="badge b-danger">ไม่มีแอป</span>' : '<span class="badge b-success">ทุกแอป</span>'}${u.role === 'teacher' && u.apps && u.apps.nurse_staff === true ? '<span class="badge b-navy">ครูห้องพยาบาล</span>' : ''}
+    return `<div class="chips">${blocked.length ? Apps.all.filter((a) => !blocked.includes(a)).map((a) => `<span class="badge b-info">${esc(a.short)}</span>`).join('') || '<span class="badge b-danger">ไม่มีแอป</span>' : '<span class="badge b-success">ทุกแอป</span>'}${u.role === 'teacher' && u.apps && u.apps.nurse_staff === true ? '<span class="badge b-navy">ครูห้องพยาบาล</span>' : ''}${u.role === 'teacher' && u.apps && u.apps.counsel_staff === true ? '<span class="badge b-navy">ครูให้คำปรึกษา</span>' : ''}
       ${admin ? `<button class="icon-btn" title="กำหนดแอปที่ใช้ได้" data-action="apps-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>`;
   }
   function appsDialog(userId) {
@@ -755,12 +755,15 @@
           <div class="grow"><div class="t">${esc(a.name)}</div><div class="s">${esc(NOTE[a.id] || '')}</div></div>
           <span class="switch"><input type="checkbox" name="app_${a.id}" ${cur[a.id] === false ? '' : 'checked'}><span></span></span></label>`).join('')}
           ${u.role === 'teacher' ? `<label class="list-row" style="cursor:pointer"><span class="app-ic">${icon('stethoscope')}</span><div class="grow"><div class="t">ครูห้องพยาบาล</div><div class="s">บันทึกห้องพยาบาลให้นักเรียนทุกห้อง เห็นชื่อ ชั้น และห้องของนักเรียนทั้งโรงเรียนในแอปนี้ (ต้องเปิดแอปห้องพยาบาล)</div></div>
-          <span class="switch"><input type="checkbox" name="nurse_staff" ${cur.nurse_staff === true ? 'checked' : ''}><span></span></span></label>` : ''}</div>
+          <span class="switch"><input type="checkbox" name="nurse_staff" ${cur.nurse_staff === true ? 'checked' : ''}><span></span></span></label>
+          <label class="list-row" style="cursor:pointer"><span class="app-ic">${icon('messages-square')}</span><div class="grow"><div class="t">ครูให้คำปรึกษา</div><div class="s">เปิด บันทึก และดูเคสให้คำปรึกษาของนักเรียนทุกระดับชั้น รวมรายละเอียดลับ เหมือนครูแนะแนว (ต้องเปิดแอปให้คำปรึกษา) · แอปอื่นยังเห็นเฉพาะห้องตัวเอง</div></div>
+          <span class="switch"><input type="checkbox" name="counsel_staff" ${cur.counsel_staff === true ? 'checked' : ''}><span></span></span></label>` : ''}</div>
         <div class="notice">${icon('shield', 'i16')}<span>ปิดแล้ว แอปนั้นจะหายจากเมนูและหน้านักเรียนของคนนี้ และฐานข้อมูลจะไม่ให้อ่านหรือบันทึกข้อมูลของแอปนั้น — ผู้ดูแลระบบใช้ได้ทุกแอปเสมอ</span></div>`,
       onSubmit: async (v) => {
         const apps = {};
         Apps.all.forEach((a) => { if (!v['app_' + a.id]) apps[a.id] = false; });
         if (v.nurse_staff) apps.nurse_staff = true;
+        if (v.counsel_staff) apps.counsel_staff = true;
         await Store.update('users', userId, { apps });
         UI.toast('บันทึกแอปที่ใช้ได้แล้ว · ' + u.name); App.render();
       } });

@@ -105,6 +105,7 @@
     UI.refreshIcons();
     // a selected tab past the right edge of a scrolling tab bar: bring it into view
     contentEl.querySelectorAll('.tabs').forEach((t) => { const b = t.querySelector('button.on'); if (!b || t.scrollWidth <= t.clientWidth) return; const tr = t.getBoundingClientRect(), br = b.getBoundingClientRect(); if (br.right > tr.right || br.left < tr.left) t.scrollLeft += br.left - tr.left - (tr.width - br.width) / 2; });
+    if (window.Apps && Apps.attachRooms) Apps.attachRooms(contentEl);
     if (page.after) page.after();
     if (!samePage && window.Charts) Charts.animate(contentEl);
     UI.studentCards(document.getElementById('content'));

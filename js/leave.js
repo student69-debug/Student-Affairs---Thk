@@ -257,7 +257,7 @@
         const tday = new Date().toISOString().slice(0, 10);
         const list = (q.who === 'me' ? mine : all()).filter((x) => (!q.status || (q.status === 'open' ? OPEN.includes(x.status) : q.status === 'done' ? ['out', 'returned'].includes(x.status) && x.term === t : x.status === q.status))
           && (q.day !== 'today' || (x.outAt && x.outAt.slice(0, 10) === tday)) && (!q.type || x.reason === q.type) && inDate(x.leaveDate)
-          && (!q.grade || String((Store.student(x.studentId) || {}).grade) === String(q.grade))).sort(byDate);
+          && (!q.grade || String((Store.student(x.studentId) || {}).grade) === String(q.grade)) && (!q.grade || !q.room || String((Store.student(x.studentId) || {}).room) === String(q.room))).sort(byDate);
         return out(`<div class="card" id="lv-list"><div class="card-head"><h3>รายการคำขอ</h3><span class="muted small">${list.length} รายการ</span></div>${this.table(list)}</div>`);
       }
       return out(`<div class="card"><div class="card-head"><h3>รอดำเนินการ</h3><span class="muted small">${mine.length ? 'รายการที่คุณอนุมัติหรือบันทึกได้' : 'ไม่มีรายการที่รอคุณ'}</span></div>${this.table(mine.length ? mine : open.slice(0, 20))}</div>

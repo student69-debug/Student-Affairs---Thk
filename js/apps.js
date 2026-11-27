@@ -63,6 +63,29 @@
         <button class="btn primary" type="submit">${icon('search', 'i16')}ค้นหา</button>
       </div></form>`;
   }
+  /* a ห้อง select beside a grade select (search cards and list toolbars of every app, user 27 Nov 2026): rooms of the chosen
+     grade among the students this person may see; changing it re-runs the list (the toolbars listen to 'input' on the grade) */
+  const roomOf = (gradeEl) => { const f = gradeEl && gradeEl.closest('.field'); const r = f ? f.nextElementSibling && f.nextElementSibling.querySelector('select[name=room]') : gradeEl && gradeEl.nextElementSibling; return r && r.name === 'room' ? r : null; };
+  function attachRoom(gradeEl) {
+    if (!gradeEl || gradeEl.tagName !== 'SELECT' || gradeEl.hidden || gradeEl.dataset.roomed) return;
+    gradeEl.dataset.roomed = '1';
+    const r = document.createElement('select');
+    r.className = 'select'; r.name = 'room'; r.setAttribute('aria-label', 'ห้อง');
+    const fill = (keep) => {
+      const g = gradeEl.value, rooms = [...new Set(Store.activeStudents().filter((s) => String(s.grade) === g).map((s) => Number(s.room)))].sort((a, b) => a - b);
+      r.innerHTML = '<option value="">ทุกห้อง</option>' + rooms.map((x) => `<option value="${x}" ${String(keep) === String(x) ? 'selected' : ''}>ม.${esc(g)}/${x}</option>`).join('');
+      r.disabled = !g;
+    };
+    fill(new URLSearchParams((location.hash.split('?')[1] || '')).get('room') || '');
+    const field = gradeEl.closest('.field');
+    if (field) { const f = document.createElement('div'); f.className = 'field'; f.innerHTML = '<label>ห้อง</label>'; f.appendChild(r); field.after(f); }
+    else gradeEl.after(r);
+    gradeEl.addEventListener('change', () => { fill(''); gradeEl.dispatchEvent(new Event('input', { bubbles: true })); });
+    r.addEventListener('change', () => gradeEl.dispatchEvent(new Event('input', { bubbles: true })));
+  }
+  const attachRooms = (root) => (root || document).querySelectorAll('form[data-search] select[name=grade], select#bf-grade, select#cf-grade, select#dr-grade, select#nv-grade').forEach(attachRoom);
+  // '' or the chosen room of the grade select with this id
+  const roomVal = (gradeId) => { const r = roomOf(document.getElementById(gradeId)); return r ? r.value : ''; };
   // go(values) → hash; empty values are left out of the address
   function bindSearch(id, go) {
     const f = document.querySelector(`form[data-search="${id}"]`);
@@ -71,7 +94,8 @@
       e.preventDefault();
       if (f.from.value && f.to.value && f.from.value > f.to.value) { toast('วันที่เริ่มต้องไม่หลังวันที่สิ้นสุด'); return; }
       const v = {}; ['grade', 'type', 'from', 'to'].forEach((k) => { v[k] = f[k].value; });
-      location.hash = go(v);
+      const room = f.grade.value && f.room ? f.room.value : '', h = go(v);
+      location.hash = room ? h + (h.includes('?') ? '&' : '?') + 'room=' + encodeURIComponent(room) : h;
     });
   }
   const hashOf = (base, o) => base + '?' + new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== '')).toString();
@@ -338,7 +362,7 @@
       const $ = (id) => document.getElementById(id);
       if (!$('bf-out')) return;
       const draw = () => {
-        const tq = $('bf-q').value.trim().toLowerCase(), title = $('bf-title').value, term = $('bf-term').value, grade = $('bf-grade').value, from = $('bf-from').value, to = $('bf-to').value, view = $('bf-view').value;
+        const tq = $('bf-q').value.trim().toLowerCase(), title = $('bf-title').value, term = $('bf-term').value, grade = $('bf-grade').value, room = roomVal('bf-grade'), from = $('bf-from').value, to = $('bf-to').value, view = $('bf-view').value;
         const rec = D().behavior.records.filter((r) => {
           if (title && r.title !== title) return false;
           if (term && r.term !== term) return false;
@@ -348,6 +372,7 @@
           if (grade || tq) {
             const s = Store.student(r.studentId);
             if (grade && (!s || String(s.grade) !== grade)) return false;
+            if (grade && room && String(s.room) !== room) return false;
             if (tq && !(String(r.studentId).includes(tq) || (s && fullName(s).toLowerCase().includes(tq)))) return false;
           }
           return true;
@@ -444,7 +469,7 @@
       return null;
     },
     tables(sid, flt = {}) {
-      const inGrade = (x) => !flt.grade || String((Store.student(x.studentId) || {}).grade) === String(flt.grade);
+      const inGrade = (x) => { const s = Store.student(x.studentId) || {}; return (!flt.grade || String(s.grade) === String(flt.grade)) && (!flt.grade || !flt.room || String(s.room) === String(flt.room)); };
       const inDate = (d) => { d = String(d || '').slice(0, 10); return (!flt.from || d >= flt.from) && (!flt.to || d <= flt.to); };
       const f = (x) => (!sid || x.studentId === sid) && inGrade(x) && (x.date !== undefined ? inDate(x.date) : x.at !== undefined ? inDate(x.at) : true);
       const st = !sid;
@@ -551,7 +576,7 @@
     page(q) {
       const tab = q.tab || 'overview';
       const RES = { normal: 'ปกติ', risk: 'เสี่ยง', problem: 'มีปัญหา' };
-      const flt = { grade: q.grade || '', from: q.from || '', to: q.to || '', result: tab === 'screen' && RES[q.result] ? q.result : '' }, filtered = !!(flt.grade || flt.from || flt.to || flt.result);
+      const flt = { grade: q.grade || '', room: q.grade && /^\d+$/.test(q.room || '') ? q.room : '', from: q.from || '', to: q.to || '', result: tab === 'screen' && RES[q.result] ? q.result : '' }, filtered = !!(flt.grade || flt.from || flt.to || flt.result);
       const t = this.tables(undefined, flt), n = this._n;
       const KINDS = [['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ']];
       const add = { screen: ['care-screen', 'บันทึกผลคัดกรอง'], visit: ['care-visit', 'บันทึกเยี่ยมบ้าน'], health: ['care-health', 'บันทึกสุขภาพ'], needs: ['care-need', 'เพิ่มข้อมูล'], referral: ['care-referral', 'บันทึกการส่งต่อ'] }[['trash', 'overview', 'survey'].includes(tab) ? 'health' : tab];
@@ -561,11 +586,11 @@
       return { title: this.name, actions: `<button class="btn primary" data-action="${add[0]}">${icon('plus')}${add[1]}</button>`,
         html: searchCard({ id: 'care', title: 'ค้นหาบันทึกดูแลช่วยเหลือ', hint: 'ความต้องการพิเศษไม่มีวันที่ — กรองได้เฉพาะระดับชั้น', typeLabel: 'ประเภทบันทึก', typeHtml: optList(KINDS, tab), q: flt }) + `<div class="grid g3">${[['smile', 'normal', 'green'], ['triangle-alert', 'risk', 'amber'], ['siren', 'problem', 'red']].map(([ic, r, tone]) => stat(ic, RES[r], cnt(r), 'คน', tone, 'ผลคัดกรองล่าสุด', '#/apps/care?tab=screen&result=' + r)).join('')}</div>` +
           tabsBar([['overview', 'ภาพรวม'], ['screen', 'คัดกรอง'], ['visit', 'เยี่ยมบ้าน'], ['health', 'บันทึกสุขภาพ'], ['needs', 'ความต้องการพิเศษ / สุขภาพ'], ['referral', 'การส่งต่อ'], ['survey', 'แบบประเมินออนไลน์']], tab, '#/apps/care') +
-          (tab === 'survey' ? this.surveyHtml(q) : tab === 'visit' && !filtered ? this.roomSummaryHtml(q) + `<div class="card"><div class="card-head"><h3>${titles.visit}</h3></div>${t.visit}</div>` : tab === 'trash' ? trashView('care', 'บันทึกสุขภาพ') : (tab === 'overview' ? this.dashHtml() : `<div class="card"><div class="card-head"><h3>${flt.result ? 'ผลคัดกรองล่าสุด: ' + RES[flt.result] : titles[tab]}</h3>${filtered ? `<span class="muted small"><b>${(n[tab] || 0).toLocaleString()}</b> ${flt.result ? 'คน' : 'รายการ'}${[flt.grade && 'ม.' + esc(flt.grade), (flt.from || flt.to) && `${flt.from ? fmtDate(flt.from) : '…'} – ${flt.to ? fmtDate(flt.to) : '…'}`].filter(Boolean).map((x) => ' · ' + x).join('')} · <a href="#/apps/care?tab=${tab}">ล้างการค้นหา</a></span>` : ''}</div>${t[tab]}</div>`)),
+          (tab === 'survey' ? this.surveyHtml(q) : tab === 'visit' && !filtered ? this.roomSummaryHtml(q) + `<div class="card"><div class="card-head"><h3>${titles.visit}</h3></div>${t.visit}</div>` : tab === 'trash' ? trashView('care', 'บันทึกสุขภาพ') : (tab === 'overview' ? this.dashHtml() : `<div class="card"><div class="card-head"><h3>${flt.result ? 'ผลคัดกรองล่าสุด: ' + RES[flt.result] : titles[tab]}</h3>${filtered ? `<span class="muted small"><b>${(n[tab] || 0).toLocaleString()}</b> ${flt.result ? 'คน' : 'รายการ'}${[flt.grade && 'ม.' + esc(flt.grade) + (flt.room ? '/' + esc(flt.room) : ''), (flt.from || flt.to) && `${flt.from ? fmtDate(flt.from) : '…'} – ${flt.to ? fmtDate(flt.to) : '…'}`].filter(Boolean).map((x) => ' · ' + x).join('')} · <a href="#/apps/care?tab=${tab}">ล้างการค้นหา</a></span>` : ''}</div>${t[tab]}</div>`)),
         after: () => {
           bindSearch('care', (v) => hashOf('#/apps/care', { tab: v.type, grade: v.grade, from: v.from, to: v.to }));
           const sel = document.getElementById('vr-room');
-          if (sel) sel.addEventListener('change', () => { location.hash = hashOf('#/apps/care', { tab: 'visit', room: sel.value }); });
+          if (sel) sel.addEventListener('change', () => { location.hash = hashOf('#/apps/care', { tab: 'visit', vroom: sel.value }); });
         } };
     },
     /* ---- สรุปการเยี่ยมบ้านประจำห้อง (แบบฟอร์มของโรงเรียน): items 1–18 counted from the registry and each student's latest visit this year ---- */
@@ -594,7 +619,7 @@
     roomSummaryHtml(q) {
       const rooms = this.summaryRooms(), year = Number(q.year) || this.visitYear();
       if (!rooms.length) return '';
-      const pick = rooms.find((r) => `${r.grade}/${r.room}` === q.room) || rooms.find((r) => r.edit) || rooms[0];
+      const pick = rooms.find((r) => `${r.grade}/${r.room}` === q.vroom) || rooms.find((r) => r.edit) || rooms[0];
       const n = this.roomCounts(pick.grade, pick.room, year), cnt = (k) => (n.who[k] || []).length;
       const names = (k) => (n.who[k] || []).length ? `<details><summary class="muted small">รายชื่อ</summary><div class="small">${n.who[k].map((s) => sLink(s.id)).join('<br>')}</div></details>` : '';
       const ans = (D().care.visitRooms || []).find((x) => x.year === year && x.grade === pick.grade && x.room === pick.room) || {};
@@ -759,6 +784,6 @@
     get: (id) => ALL.find((a) => a.id === id),
     enabled: () => ALL.filter((a) => Store.s.apps[a.id] !== false && Store.appOk(a.id)),
     events: (sid) => window.Apps.enabled().flatMap((a) => a.events(sid)).sort(byDate),
-    stat, markStats, sLink, tabsBar, trashView, searchCard, bindSearch, hashOf, optList, gradeOpts, gradeLock,
+    stat, markStats, sLink, tabsBar, trashView, searchCard, bindSearch, attachRooms, roomVal, hashOf, optList, gradeOpts, gradeLock,
   };
 })();

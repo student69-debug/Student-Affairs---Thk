@@ -299,7 +299,7 @@
       if (!$('dr-out')) return;
       if (location.hash.includes('status=active')) $('dr-term').value = '';
       const draw = () => {
-        const tq = $('dr-q').value.trim().toLowerCase(), term = $('dr-term').value, cat = $('dr-cat').value, level = $('dr-level').value, st = $('dr-status').value, grade = $('dr-grade').value, from = $('dr-from').value, to = $('dr-to').value;
+        const tq = $('dr-q').value.trim().toLowerCase(), term = $('dr-term').value, cat = $('dr-cat').value, level = $('dr-level').value, st = $('dr-status').value, grade = $('dr-grade').value, room = Apps.roomVal('dr-grade'), from = $('dr-from').value, to = $('dr-to').value;
         const list = this.list().filter((x) => {
           if (term && x.term !== term) return false;
           if (cat && x.category !== cat) return false;
@@ -309,6 +309,7 @@
           if (st === 'active' ? x.status === 'closed' : st && x.status !== st) return false;
           const s = Store.student(x.studentId);
           if (grade && (!s || String(s.grade) !== grade)) return false;
+          if (grade && room && String(s.room) !== room) return false;
           if (tq && !(x.studentId.includes(tq) || (s && fullName(s).toLowerCase().includes(tq)) || x.substance.toLowerCase().includes(tq))) return false;
           return true;
         });
