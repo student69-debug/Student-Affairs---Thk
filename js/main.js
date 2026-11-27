@@ -410,15 +410,15 @@
       chips: ['พฤติกรรม & คะแนน', 'ดูแลช่วยเหลือ', 'ให้คำปรึกษา', 'บุหรี่ / สารเสพติด', 'ห้องพยาบาล', 'ผู้ปกครอง'],
       stats: ['นักเรียน', 'ห้องเรียน', 'บุคลากรในระบบ'], slides: 'ภาพประกอบ', slide: 'ภาพที่',
       secure: 'ข้อมูลเข้ารหัส · เห็นเฉพาะส่วนที่มีสิทธิ์', foot: '© 2569 กลุ่มบริหารกิจการนักเรียน · ' + SCHOOL_TH, langLabel: 'ภาษา',
-      tabStaff: 'บุคลากร', tabParent: 'ผู้ปกครอง',
+      tabStaff: 'บุคลากร', tabParent: 'นักเรียน',
       welcome: 'ยินดีต้อนรับกลับ', welcomeSub: 'เข้าสู่ระบบกิจการนักเรียน · ' + SCHOOL_TH,
       signupT: 'สมัครใช้งาน', signupSub: 'สำหรับครูและบุคลากร · ผู้ดูแลระบบจะอนุมัติสิทธิ์ให้',
-      parentT: 'สำหรับผู้ปกครอง', parentSub: 'ดูข้อมูลบุตรหลาน · ' + SCHOOL_TH,
+      parentT: 'สำหรับนักเรียน / ผู้ปกครอง', parentSub: 'ดูข้อมูลนักเรียน · ขออนุญาตออกนอกโรงเรียน · ' + SCHOOL_TH,
       parentHow: 'ใช้ <b>รหัสนักเรียน</b> และ <b>เลขประจำตัวประชาชน 13 หลักของนักเรียน</b> เข้าได้ทุกครั้ง ไม่ต้องตั้งรหัสผ่าน',
       studentId: 'รหัสนักเรียน', studentIdTitle: 'รหัสนักเรียน 5 หลัก', cid: 'เลขประจำตัวประชาชนของนักเรียน', cidTitle: 'เลขประจำตัวประชาชน 13 หลัก',
       cidPh: '13 หลัก', showDigits: 'แสดงตัวเลข', digits: 'หลัก', cidLen: (n) => `เลขประจำตัวประชาชนต้องมี 13 หลัก (ตอนนี้ ${n} หลัก)`,
       signIn: 'เข้าสู่ระบบ', signingIn: 'กำลังเข้าสู่ระบบ…', working: 'กำลังดำเนินการ…',
-      staffAlt: 'ครูและบุคลากร เข้าสู่ระบบด้วยอีเมล', parentAlt: 'ผู้ปกครองดูข้อมูลบุตรหลาน',
+      staffAlt: 'ครูและบุคลากร เข้าสู่ระบบด้วยอีเมล', parentAlt: 'นักเรียน / ผู้ปกครอง เข้าด้วยรหัสนักเรียน',
       name: 'ชื่อ – นามสกุล', email: 'อีเมล', password: 'รหัสผ่าน', showPw: 'แสดงรหัสผ่าน', hidePw: 'ซ่อนรหัสผ่าน',
       or: 'หรือ', google: 'เข้าสู่ระบบด้วยบัญชี Google', googleUp: 'สมัครด้วยบัญชี Google', googleGo: 'กำลังไปที่ Google…',
       googleOff: 'ยังไม่ได้เปิดการเข้าสู่ระบบด้วย Google — ใช้อีเมลและรหัสผ่านไปก่อน หรือแจ้งผู้ดูแลระบบ',
@@ -450,15 +450,15 @@
       chips: ['Behaviour & points', 'Student care', 'Counselling', 'Tobacco & drugs', 'Nurse room', 'Parents'],
       stats: ['Students', 'Classrooms', 'Staff in the system'], slides: 'Illustrations', slide: 'Slide',
       secure: 'Encrypted · you see only what your role allows', foot: '© 2026 Student Affairs Division · ' + SCHOOL_EN, langLabel: 'Language',
-      tabStaff: 'Staff', tabParent: 'Parents',
+      tabStaff: 'Staff', tabParent: 'Students',
       welcome: 'Welcome back', welcomeSub: 'Sign in to Student Affairs · ' + SCHOOL_EN,
       signupT: 'Create an account', signupSub: 'For teachers and staff · an administrator approves your access',
-      parentT: 'For parents', parentSub: "See your child's records · " + SCHOOL_EN,
+      parentT: 'For students / parents', parentSub: 'Student records · leave requests · ' + SCHOOL_EN,
       parentHow: "Use the <b>student ID</b> and the <b>student's 13-digit national ID</b> every time. No password needed.",
       studentId: 'Student ID', studentIdTitle: '5-digit student ID', cid: "Student's national ID", cidTitle: '13-digit national ID',
       cidPh: '13 digits', showDigits: 'Show digits', digits: 'digits', cidLen: (n) => `The national ID has 13 digits (you typed ${n})`,
       signIn: 'Sign in', signingIn: 'Signing in…', working: 'Working…',
-      staffAlt: 'Teachers and staff: sign in with email', parentAlt: "Parents: see your child's records",
+      staffAlt: 'Teachers and staff: sign in with email', parentAlt: 'Students / parents: sign in with the student ID',
       name: 'Full name', email: 'Email', password: 'Password', showPw: 'Show password', hidePw: 'Hide password',
       or: 'or', google: 'Sign in with Google', googleUp: 'Sign up with Google', googleGo: 'Opening Google…',
       googleOff: 'Google sign-in is not turned on yet. Use your email and password, or contact the administrator.',
@@ -561,7 +561,7 @@
     else Store.loginStats().then((st) => { heroStats = st; if (gateEl.contains(box)) fill(st); }).catch(() => fill(null));
   }
 
-  const tabsHtml = (parent) => `<div class="login-tabs"><button type="button" class="${parent ? '' : 'on'}" data-login="in">${icon('briefcase', 'i16')}${t('tabStaff')}</button><button type="button" class="${parent ? 'on' : ''}" data-login="parent">${icon('users', 'i16')}${t('tabParent')}</button></div>`;
+  const tabsHtml = (parent) => `<div class="login-tabs"><button type="button" class="${parent ? '' : 'on'}" data-login="in">${icon('briefcase', 'i16')}${t('tabStaff')}</button><button type="button" class="${parent ? 'on' : ''}" data-login="parent">${icon('graduation-cap', 'i16')}${t('tabParent')}</button></div>`;
   const GOOGLE_G = '<svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
   const googleBtn = (up) => `<div class="auth-or"><span>${t('or')}</span></div><button type="button" class="btn auth-google" data-google><span class="g">${GOOGLE_G}</span><span>${t(up ? 'googleUp' : 'google')}</span></button>`;
   const submitBtn = (label) => `<button class="btn primary" type="submit">${label} ${icon('arrow-right', 'i16')}</button>`;
@@ -677,7 +677,7 @@
       ${up ? '' : `<label class="auth-remember" title="${t('rememberHint')}"><input type="checkbox" name="remember" ${Store.remembers() ? 'checked' : ''}><span class="sw" aria-hidden="true"></span><span>${t('remember')}</span></label>`}
       ${submitBtn(up ? t('signupT') : t('signIn'))}
       ${googleBtn(up)}
-      ${up ? '' : `<a href="#" class="auth-alt" data-login="parent">${icon('users', 'i16')} ${t('parentAlt')}</a>`}
+      ${up ? '' : `<a href="#" class="auth-alt" data-login="parent">${icon('graduation-cap', 'i16')} ${t('parentAlt')}</a>`}
       <div class="muted small" style="text-align:center">${up ? `${t('haveAcct')} <a href="#" data-login="in">${t('signIn')}</a>` : `${t('noAcct')} <a href="#" data-login="up">${t('signupT')}</a> · ${t('approveNote')}`}</div>
     </form>`);
     const form = document.getElementById('login-form');
