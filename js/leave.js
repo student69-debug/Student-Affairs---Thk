@@ -232,7 +232,7 @@
     },
 
     page(q) {
-      const tab = q.tab || 'overview', base = '#/apps/leave';
+      const tab = q.tab || 'list', base = '#/apps/leave';
       const t = Store.termKey(), cur = all().filter((x) => x.term === t), open = all().filter((x) => OPEN.includes(x.status)).sort(byDate);
       const mine = open.filter(waitsOnMe);
       const cards = `<div class="grid g4">
@@ -242,7 +242,7 @@
         ${Apps.stat('calendar', 'ภาคเรียนนี้', cur.filter((x) => ['out', 'returned'].includes(x.status)).length, 'ครั้ง', '', `ภาคเรียน ${t}`, base + '?tab=list&status=done')}</div>`;
       const search = Apps.searchCard({ id: 'leave', title: 'ค้นหาคำขอออกนอกโรงเรียน', typeLabel: 'เหตุผล', typeHtml: '<option value="">ทุกเหตุผล</option>' + Apps.optList(Object.entries(REASONS), q.type), q });
       const bindS = () => Apps.bindSearch('leave', (v) => Apps.hashOf(base, { tab: 'list', grade: v.grade, type: v.type, from: v.from, to: v.to }));
-      const tabs = Apps.tabsBar([['overview', 'ภาพรวม'], ['list', 'รายการคำขอ'], ['guide', 'ขั้นตอน']], tab, base);
+      const tabs = Apps.tabsBar([['list', 'รายการคำขอ'], ['overview', 'ภาพรวม'], ['guide', 'ขั้นตอน']], tab, base);
       const out = (html) => ({ title: this.name, html: search + cards + tabs + html, after: bindS });
       if (tab === 'trash') return out(Apps.trashView('leave', 'คำขอออกนอกโรงเรียน'));
       if (tab === 'guide') return out(`<div class="card"><div class="card-body"><ol style="margin:0;padding-left:20px;line-height:2">
