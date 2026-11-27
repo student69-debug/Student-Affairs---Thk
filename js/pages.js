@@ -92,6 +92,7 @@
 
     return { title: 'หน้าแรก', html: `
       ${on('leave') && window.LeaveApp ? LeaveApp.homeNotice() : ''}
+      ${on('behavior') && window.Inquiry && Inquiry.forMe().length ? `<a class="notice warn lv-remind" href="#/apps/behavior?tab=inquiry">${icon('file-search', 'i16')}<span><b>บันทึกการสอบสวน (ปค.03) รอคุณ ${Inquiry.forMe().length} รายการ</b> — กดเพื่อดู</span></a>` : ''}
       <div class="page-head"><div><h2>ภาพรวมวันนี้</h2><p>${fmtDate(new Date().toISOString())} · ภาคเรียนที่ ${Store.s.term}/${Store.s.year}${Store.seesAll() ? ' · นักเรียนทั้งโรงเรียน' : Store.myScopeText() ? ' · ' + Store.myScopeText() + ' (' + act.length.toLocaleString() + ' คน)' : ''}</p></div>
         <div class="actions">${on('behavior') ? `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}
         ${on('counsel') && Store.seesAll() ? `<button class="btn secondary" data-action="counsel-record">${icon('message-square-plus')}บันทึกให้คำปรึกษา</button>` : ''}</div></div>
@@ -739,10 +740,12 @@
   const FUTURE = [['calendar-check', 'เช็กชื่อเข้าแถว / มาสาย'], ['graduation-cap', 'ทุนการศึกษา'], ['door-open', 'ขออนุญาตออกนอกโรงเรียน'], ['heart-handshake', 'กิจกรรม / จิตอาสา']];
   /* ---- Per-person app access ---- */
   function appsCell(u, admin) {
-    if (u.role === 'admin') return '<span class="muted small">ทุกแอป</span>';
+    // admins use every app; they may still hold a ปค.03 signing post (27 Nov 2026)
+    if (u.role === 'admin') return `<div class="chips"><span class="muted small">ทุกแอป</span>${u.apps && u.apps.affairs_head === true ? '<span class="badge b-navy">หัวหน้ากลุ่มบริหารกิจการนักเรียน</span>' : ''}${u.apps && u.apps.deputy_director === true ? '<span class="badge b-navy">รองผู้อำนวยการ (ปค.03)</span>' : ''}
+      ${admin ? `<button class="icon-btn" title="ตำแหน่งลงนาม ปค.03" data-action="apps-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>`;
     if (u.role === 'pending') return '<span class="muted small">—</span>';
     const blocked = Apps.all.filter((a) => u.apps && u.apps[a.id] === false);
-    return `<div class="chips">${blocked.length ? Apps.all.filter((a) => !blocked.includes(a)).map((a) => `<span class="badge b-info">${esc(a.short)}</span>`).join('') || '<span class="badge b-danger">ไม่มีแอป</span>' : '<span class="badge b-success">ทุกแอป</span>'}${u.role === 'teacher' && u.apps && u.apps.nurse_staff === true ? '<span class="badge b-navy">ครูห้องพยาบาล</span>' : ''}${u.role === 'teacher' && u.apps && u.apps.counsel_staff === true ? `<span class="badge b-navy">ครูให้คำปรึกษา ${esc(counselGradesText(u.apps))}</span>` : ''}
+    return `<div class="chips">${blocked.length ? Apps.all.filter((a) => !blocked.includes(a)).map((a) => `<span class="badge b-info">${esc(a.short)}</span>`).join('') || '<span class="badge b-danger">ไม่มีแอป</span>' : '<span class="badge b-success">ทุกแอป</span>'}${u.role === 'teacher' && u.apps && u.apps.nurse_staff === true ? '<span class="badge b-navy">ครูห้องพยาบาล</span>' : ''}${u.role === 'teacher' && u.apps && u.apps.counsel_staff === true ? `<span class="badge b-navy">ครูให้คำปรึกษา ${esc(counselGradesText(u.apps))}</span>` : ''}${u.apps && u.apps.affairs_head === true ? '<span class="badge b-navy">หัวหน้ากลุ่มบริหารกิจการนักเรียน</span>' : ''}${u.apps && u.apps.deputy_director === true ? '<span class="badge b-navy">รองผู้อำนวยการ (ปค.03)</span>' : ''}
       ${admin ? `<button class="icon-btn" title="กำหนดแอปที่ใช้ได้" data-action="apps-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>`;
   }
   // grades a counselling teacher handles (user, 27 Nov 2026); none = every grade
@@ -762,12 +765,19 @@
           <label class="list-row" style="cursor:pointer"><span class="app-ic">${icon('messages-square')}</span><div class="grow"><div class="t">ครูให้คำปรึกษา</div><div class="s">เปิด บันทึก และดูเคสให้คำปรึกษาของนักเรียนในระดับชั้นที่เลือกด้านล่าง รวมรายละเอียดลับ เหมือนครูแนะแนว (ต้องเปิดแอปให้คำปรึกษา) · แอปอื่นยังเห็นเฉพาะห้องตัวเอง</div></div>
           <span class="switch"><input type="checkbox" name="counsel_staff" ${cur.counsel_staff === true ? 'checked' : ''}><span></span></span></label>
           <div class="list-row" style="display:block"><div class="t" style="margin-bottom:6px">ระดับชั้นที่ให้คำปรึกษา</div><div class="chips">${[1, 2, 3, 4, 5, 6].map((g) => `<label class="chip-check"><input type="checkbox" name="cg_${g}" ${counselGradesOf(cur).includes(g) ? 'checked' : ''}> ม.${g}</label>`).join('')}</div>
-          <div class="s muted small" style="margin-top:6px">ไม่เลือกเลย = ทุกระดับชั้น · ไม่ขึ้นกับห้องที่เป็นครูประจำชั้น</div></div>` : ''}</div>
+          <div class="s muted small" style="margin-top:6px">ไม่เลือกเลย = ทุกระดับชั้น · ไม่ขึ้นกับห้องที่เป็นครูประจำชั้น</div></div>` : ''}
+          ${u.role !== 'parent' && u.role !== 'pending' ? `<div class="list-row" style="display:block"><div class="t">ตำแหน่งลงนามบันทึกการสอบสวน (ปค.03)</div><div class="s muted small">ลงนามขั้นที่ 3 และ 4 ของความผิดที่ไม่ใช่ความผิดเบา · ควรมีคนละ 1 คนขึ้นไป</div></div>
+          <label class="list-row" style="cursor:pointer"><span class="app-ic">${icon('signature')}</span><div class="grow"><div class="t">หัวหน้ากลุ่มบริหารกิจการนักเรียน</div></div>
+          <span class="switch"><input type="checkbox" name="affairs_head" ${cur.affairs_head === true ? 'checked' : ''}><span></span></span></label>
+          <label class="list-row" style="cursor:pointer"><span class="app-ic">${icon('signature')}</span><div class="grow"><div class="t">ครูปฏิบัติหน้าที่รองผู้อำนวยการ กลุ่มบริหารกิจการนักเรียน</div></div>
+          <span class="switch"><input type="checkbox" name="deputy_director" ${cur.deputy_director === true ? 'checked' : ''}><span></span></span></label>` : ''}</div>
         <div class="notice">${icon('shield', 'i16')}<span>ปิดแล้ว แอปนั้นจะหายจากเมนูและหน้านักเรียนของคนนี้ และฐานข้อมูลจะไม่ให้อ่านหรือบันทึกข้อมูลของแอปนั้น — ผู้ดูแลระบบใช้ได้ทุกแอปเสมอ</span></div>`,
       onSubmit: async (v) => {
         const apps = {};
         Apps.all.forEach((a) => { if (!v['app_' + a.id]) apps[a.id] = false; });
         if (v.nurse_staff) apps.nurse_staff = true;
+        if (v.affairs_head) apps.affairs_head = true;
+        if (v.deputy_director) apps.deputy_director = true;
         if (v.counsel_staff) { apps.counsel_staff = true; const g = [1, 2, 3, 4, 5, 6].filter((x) => v['cg_' + x]); if (g.length) apps.counsel_grades = g; }
         await Store.update('users', userId, { apps });
         UI.toast('บันทึกแอปที่ใช้ได้แล้ว · ' + u.name); App.render();

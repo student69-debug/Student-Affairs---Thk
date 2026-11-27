@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>ให้ข้อเท็จจริง · ระบบกิจการนักเรียน</title>
+<link rel="icon" type="image/png" href="img/favicon.png?v=20261127r">
+<link rel="stylesheet" href="css/styles.css?v=20261127r">
+<style>
+  body{background:var(--ink-50)}
+  .sv{max-width:680px;margin:0 auto;padding:20px 14px 60px;display:flex;flex-direction:column;gap:14px}
+  .sv-head{display:flex;gap:12px;align-items:center}
+  .sv-head img{width:48px;height:48px}
+  .sv dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0}
+  .sv dt{color:var(--ink-500)}
+  .sv dd{margin:0;font-weight:500}
+  .sign-pad{width:100%;height:160px;border:1px dashed var(--ink-300);border-radius:var(--radius-md);background:#fff;touch-action:none;display:block}
+</style>
+</head>
+<body>
+<main class="sv" id="sv"><div class="card card-body">กำลังโหลด…</div></main>
+<script src="js/config.js?v=20261127r"></script>
+<script>
+/* ปค.03 บันทึกการสอบสวนข้อเท็จจริง — นักเรียนให้การเอง (ไม่ต้องเข้าระบบ): รหัสจากครู + รหัสนักเรียน + เลขบัตรประชาชน 4 ตัวท้าย
+   ตรวจในฐานข้อมูล (inquiry_check / inquiry_submit): ผิด 5 ครั้งล็อก · รหัสใช้ได้ 2 ชั่วโมง · ส่งได้ครั้งเดียว */
+(function () {
+  const C = window.SA_CONFIG, root = document.getElementById('sv');
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const rpc = (fn, body) => fetch(C.supabaseUrl + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error('การเชื่อมต่อขัดข้อง (' + r.status + ')'))));
+  const code = (new URLSearchParams(location.search).get('c') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  history.replaceState(null, '', location.pathname + (code ? '?c=' + code : ''));
+  const head = `<div class="sv-head"><img src="img/logo.png" alt=""><div><b>โรงเรียนธรรมศาสตร์คลองหลวงวิทยาคม</b><div class="muted small">บันทึกการสอบสวนข้อเท็จจริง (ปค.03) · กลุ่มบริหารกิจการนักเรียน</div></div></div>`;
+  const msg = (t) => { root.innerHTML = head + `<div class="card card-body">${t}</div>`; };
+  const STATE = { invalid: 'รหัสนักเรียนหรือเลขบัตรประชาชน 4 ตัวท้ายไม่ถูกต้อง (ผิด 5 ครั้งจะถูกล็อก)', locked: 'ใส่ผิดเกิน 5 ครั้ง ลิงก์นี้ถูกล็อก ติดต่อครูผู้สอบสวนเพื่อขอรหัสใหม่',
+    closed: 'ลิงก์นี้หมดอายุ ถูกใช้ไปแล้ว หรือรหัสไม่ถูกต้อง ติดต่อครูผู้สอบสวน', bad: 'เขียนรายละเอียดอย่างน้อย 10 ตัวอักษร', nosign: 'ลงลายมือชื่อในกรอบก่อนส่ง' };
+  if (!code) { msg('ไม่พบรหัส — สแกน QR หรือเปิดลิงก์ที่ครูให้อีกครั้ง'); return; }
+
+  // step 1: who are you
+  root.innerHTML = head + `<form id="id" class="card card-body form-grid" novalidate>
+      <div class="field full"><b>ยืนยันตัวตน</b><div class="muted small">ใช้รหัสนักเรียนและเลขบัตรประชาชน 4 ตัวท้ายของตัวเอง</div></div>
+      <div class="field"><label>รหัสนักเรียน</label><input class="input mono" name="sid" inputmode="numeric" autocomplete="off" required maxlength="5" placeholder="5 หลัก" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,5)"></div>
+      <div class="field"><label>เลขบัตรประชาชน 4 ตัวท้าย</label><input class="input mono" name="cid4" inputmode="numeric" autocomplete="off" required maxlength="4" placeholder="4 หลัก" oninput="this.value=this.value.toUpperCase().replace(/[^0-9A-Z]/g,'').slice(0,4)"></div>
+      <div class="field full"><button class="btn primary" type="submit" style="height:48px">ถัดไป</button><div id="err" class="muted" role="alert"></div></div></form>`;
+  const f1 = document.getElementById('id');
+  f1.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const err = document.getElementById('err'), sid = f1.sid.value.trim(), cid4 = f1.cid4.value.trim();
+    if (!/^\d{5}$/.test(sid)) { err.textContent = 'ใส่รหัสนักเรียน 5 หลัก'; return; }
+    if (cid4.length !== 4) { err.textContent = 'ใส่เลขบัตรประชาชน 4 ตัวท้าย'; return; }
+    rpc('inquiry_check', { p_code: code, p_student: sid, p_cid4: cid4 }).then((r) => {
+      if (!r || r.state !== 'ok') { if (r && (r.state === 'locked' || r.state === 'closed')) msg(STATE[r.state]); else err.textContent = STATE[(r && r.state) || 'invalid']; return; }
+      form(sid, cid4, r);
+    }).catch((e2) => { err.textContent = 'ไม่สำเร็จ: ' + e2.message; });
+  });
+
+  // step 2: statement + signature
+  function form(sid, cid4, r) {
+    const d = r.event_date ? new Date(r.event_date + 'T00:00').toLocaleDateString('th-TH', { dateStyle: 'long' }) : '';
+    root.innerHTML = head + `<div class="card card-body"><dl>
+        <dt>ชื่อ</dt><dd>${esc(r.name)} · ม.${esc(r.grade)}/${esc(r.room)}</dd>
+        <dt>เรื่อง</dt><dd>${esc(r.topic)}${r.involvement ? ` (เกี่ยวข้องเป็น ${esc(r.involvement)})` : ''}</dd>
+        ${d || r.place ? `<dt>เหตุการณ์</dt><dd>${esc(d)}${r.event_time ? ' เวลาประมาณ ' + esc(r.event_time) + ' น.' : ''}${r.place ? ' · ' + esc(r.place) : ''}</dd>` : ''}</dl></div>
+      <form id="st" class="card card-body form-grid" novalidate>
+        <div class="field full"><label>รายละเอียดข้อเท็จจริง <span class="req">*</span></label>
+          <textarea class="textarea" name="text" maxlength="5000" required style="min-height:220px" placeholder="ข้าพเจ้า ... เล่าตามที่เกิดขึ้นจริง ใคร ทำอะไร ที่ไหน เมื่อไร อย่างไร"></textarea></div>
+        <div class="field full"><label>ลงลายมือชื่อผู้ให้การ <span class="req">*</span></label><canvas class="sign-pad" aria-label="ช่องลงลายมือชื่อ"></canvas>
+          <div class="actions" style="justify-content:space-between"><span class="help">เซ็นด้วยนิ้วในกรอบ</span><button type="button" class="btn ghost sm" id="clr">ล้าง เซ็นใหม่</button></div></div>
+        <label class="full check" style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" name="ok" required style="margin-top:4px"> <span>ข้าพเจ้าขอรับรองว่าข้อความที่เขียนและให้การเป็นความจริงทุกประการ โดยมิได้ถูกบังคับ</span></label>
+        <div class="field full"><button class="btn primary" type="submit" style="height:48px">ส่งคำให้การ</button><div id="err2" class="muted" role="alert"></div></div></form>`;
+    // signature pad: finger / stylus / mouse, white JPEG
+    const c = root.querySelector('canvas'), g = c.getContext('2d');
+    let drawn = false, last = null;
+    const fit = () => { const b = c.getBoundingClientRect(), k = window.devicePixelRatio || 1; c.width = Math.round(b.width * k); c.height = Math.round(b.height * k);
+      g.setTransform(k, 0, 0, k, 0, 0); g.fillStyle = '#fff'; g.fillRect(0, 0, b.width, b.height); g.lineWidth = 2.4; g.lineCap = g.lineJoin = 'round'; g.strokeStyle = '#0b1d6b'; drawn = false; };
+    const pt = (e) => { const b = c.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; };
+    fit();
+    c.addEventListener('pointerdown', (e) => { e.preventDefault(); c.setPointerCapture(e.pointerId); last = pt(e); g.beginPath(); g.arc(last[0], last[1], 1.1, 0, 7); g.fillStyle = '#0b1d6b'; g.fill(); drawn = true; });
+    c.addEventListener('pointermove', (e) => { if (!last) return; const p = pt(e); g.beginPath(); g.moveTo(last[0], last[1]); g.lineTo(p[0], p[1]); g.stroke(); last = p; });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => c.addEventListener(t, () => { last = null; }));
+    document.getElementById('clr').addEventListener('click', fit);
+    const f = document.getElementById('st');
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const err = document.getElementById('err2'), text = f.text.value.trim();
+      if (text.length < 10) { err.textContent = STATE.bad; f.text.focus(); return; }
+      if (!drawn) { err.textContent = STATE.nosign; return; }
+      if (!f.ok.checked) { err.textContent = 'ติ๊กรับรองว่าเป็นความจริงก่อนส่ง'; return; }
+      // a small signature: at most 600 px wide JPEG
+      const w = Math.min(600, c.width), h = Math.round(c.height * w / c.width), o = document.createElement('canvas'); o.width = w; o.height = h;
+      const og = o.getContext('2d'); og.fillStyle = '#fff'; og.fillRect(0, 0, w, h); og.drawImage(c, 0, 0, w, h);
+      const sign = o.toDataURL('image/jpeg', 0.8);
+      const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'กำลังส่ง…';
+      rpc('inquiry_submit', { p_code: code, p_student: sid, p_cid4: cid4, p_statement: text, p_sign: sign }).then((x) => {
+        if (x === 'ok') { msg('<b>ส่งคำให้การแล้ว</b><br>ครูผู้สอบสวนจะพิจารณาต่อ ปิดหน้านี้ได้เลย'); return; }
+        if (x === 'locked' || x === 'closed') { msg(STATE[x]); return; }
+        err.textContent = STATE[x] || 'ส่งไม่สำเร็จ ลองใหม่'; btn.disabled = false; btn.textContent = 'ส่งคำให้การ';
+      }).catch((e2) => { err.textContent = 'ส่งไม่สำเร็จ: ' + e2.message; btn.disabled = false; btn.textContent = 'ส่งคำให้การ'; });
+    });
+  }
+})();
+</script>
+</body>
+</html>

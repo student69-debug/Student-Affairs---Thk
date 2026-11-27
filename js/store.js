@@ -367,7 +367,7 @@
     },
     async deleteItem(kind, id, password) {
       const r = check(await sb.rpc('delete_item', { p_kind: kind, p_id: String(id), p_password: password }));
-      const slots = { nurse: ['nurseNow', 'nurseFollow'], case: ['cases', 'progress'], subjects: ['subjects'], discipline: ['records'] }[kind];
+      const slots = { nurse: ['nurseNow', 'nurseFollow'], case: ['cases', 'progress'], subjects: ['subjects'], discipline: ['records'], inquiry: ['records'] }[kind];
       const list = { record: 'records', health: 'health', drug: 'drugs', nurse: 'nurse', discipline: 'discipline', leave: 'leave' }[kind];
       if (r === 'ok') {
         const d = kind === 'drug' && this.data.drugs.find((x) => x.id === id);
@@ -376,7 +376,7 @@
         await this.refresh(...(slots || []), ...(this.isAdmin() ? ['history'] : []));
       }
       if (r === 'ok' && kind === 'case') await this.loadCaseTrash();
-      if (r === 'ok' && (kind === 'record' || kind === 'health' || kind === 'drug' || kind === 'nurse' || kind === 'discipline' || kind === 'leave')) await this.loadAppTrash({ record: 'behavior', health: 'care', drug: 'drugs', nurse: 'nurse', discipline: 'discipline', leave: 'leave' }[kind]);
+      if (r === 'ok' && (kind === 'record' || kind === 'health' || kind === 'drug' || kind === 'nurse' || kind === 'discipline' || kind === 'leave' || kind === 'inquiry')) await this.loadAppTrash({ record: 'behavior', health: 'care', drug: 'drugs', nurse: 'nurse', discipline: 'discipline', leave: 'leave', inquiry: 'behavior' }[kind]);
       return r;
     },
     // deleted counselling cases, kept 30 days (counsellors and admins)

@@ -103,7 +103,24 @@
     if ('score' in c) parts.push(scoreCard(c), behaviorCard(c));
     parts.push(careCard(c));
     parts.push(leaveCard(c));
+    parts.push(inquiryCard(c));
     return `<section class="pv-child">${parts.join('')}</section>`;
+  }
+
+  /* ---- ปค.03 บันทึกการสอบสวนข้อเท็จจริง: finished forms of this child (user, 27 Nov 2026: parents see the full form, no signature pictures) ---- */
+  let inquiries = [];
+  function inquiryCard(c) {
+    const l = inquiries.filter((x) => x.student_id === c.id);
+    if (!l.length) return '';
+    return `<div class="card"><div class="card-head"><h3>${icon('file-search', 'i16')} บันทึกการสอบสวนข้อเท็จจริง (ปค.03)</h3></div><div class="list">
+      ${l.map((x) => `<div class="list-row"><div class="grow"><div class="t">${esc(x.topic || '')}</div>
+        <div class="s">${fmtDate(x.at)} · ${x.verdict === 'guilty' ? 'กระทำผิด: ' + esc(x.rule_name || '') + (x.points ? ` (${x.points} คะแนน)` : '') : 'ไม่ได้กระทำความผิด'}</div></div>
+        <button class="btn secondary sm" data-pv-inq="${esc(x.id)}">${icon('file-text', 'i16')}ดูบันทึก</button></div>`).join('')}</div></div>`;
+  }
+  function showInquiry(id) {
+    const x = inquiries.find((y) => y.id === id), c = students.find((s) => s.id === (x && x.student_id));
+    if (!x || !c || !window.Inquiry) return;
+    Apps.showReport(Inquiry.report(x, c, { noSign: true }));
   }
 
   /* ---- ขออนุญาตออกนอกโรงเรียน: the student / parent files it, the homeroom teacher then the grade head decide ---- */
@@ -173,6 +190,7 @@
   }
   function bindLeave(root, gate) {
     root.querySelectorAll('[data-pv-doc]').forEach((b) => b.addEventListener('click', () => showDoc(b.dataset.pvDoc)));
+    root.querySelectorAll('[data-pv-inq]').forEach((b) => b.addEventListener('click', () => showInquiry(b.dataset.pvInq)));
     root.querySelectorAll('[data-pv-leave]').forEach((b) => b.addEventListener('click', () => openLeave(b.dataset.pvLeave, gate)));
     root.querySelectorAll('[data-pv-cancel]').forEach((b) => b.addEventListener('click', () => UI.confirmDialog('ยกเลิกคำขอ', 'ต้องการยกเลิกคำขอออกนอกโรงเรียนนี้?', 'ยกเลิกคำขอ', async () => {
       await Store.parentLeaveCancel(b.dataset.pvCancel); UI.toast('ยกเลิกคำขอแล้ว'); render(gate);
@@ -200,6 +218,7 @@
     let v;
     try { v = await Store.parentView(); } catch (e) { v = { error: e.message }; }
     try { leaves = await Store.parentLeaves(); } catch (e) { leaves = []; }
+    try { const r = await Store.sb.rpc('parent_inquiry_list'); inquiries = r.error ? [] : r.data || []; } catch (e) { inquiries = []; }
     students = (v && v.students) || [];
     const head = `<header class="pv-top"><div class="brand-row" style="border:0;padding:0"><div class="brand-mark"><img src="img/logo.png?v=20261117e" alt=""></div><div><b>STUDENT AFFAIRS</b><span>สำหรับผู้ปกครอง · ร.ร.ธรรมศาสตร์คลองหลวงวิทยาคม</span></div></div>
       <button class="btn ghost sm" id="pv-out">${icon('log-out', 'i16')}ออกจากระบบ</button></header>`;

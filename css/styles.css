@@ -828,3 +828,24 @@ img.avatar.lg[data-photo]{cursor:zoom-in}
 /* tap-to-call phone numbers on the student page (27 Nov 2026) */
 .tel-link{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:6px 10px;margin:2px 0;border:1px solid var(--ink-200);border-radius:999px;color:var(--navy-700,#111770);text-decoration:none;font-weight:600;min-height:36px;background:#fff}
 .tel-link:hover,.tel-link:focus-visible{background:var(--navy-50,#eef0fb);border-color:var(--navy-600,#111770)}
+/* ปค.03 บันทึกการสอบสวนข้อเท็จจริง (A4 portrait, 27 Nov 2026) */
+@page pk03{size:A4 portrait;margin:0}
+.pk03{page:pk03;width:210mm;min-height:280mm;padding:10mm 14mm;box-sizing:border-box;font:13.5px/1.8 'Sarabun',var(--font-body),sans-serif;color:#000;background:#fff}
+.pk03 .pk-top{display:flex;justify-content:space-between;font-size:12.5px}
+.pk03 h2{text-align:center;font-size:17px;margin:2px 0 0}
+.pk03 h3{font-size:14.5px;margin:10px 0 2px;text-decoration:underline}
+.pk03 .pk-c{text-align:center}
+.pk03 .pk-r{text-align:right}
+.pk03 p{margin:0}
+.pk03 .pk-u{display:inline-block;border-bottom:1px dotted #000;min-width:3em;padding:0 6px;line-height:1.35}
+.pk03 .pk-u.w{min-width:12em}
+.pk03 .pk-box{display:inline-flex;width:13px;height:13px;border:1px solid #000;align-items:center;justify-content:center;font-size:11px;vertical-align:-1px;margin:0 3px}
+.pk03 .pk-text{white-space:pre-wrap;border-bottom:1px dotted #000;min-height:9em;margin:4px 0 6px;line-height:1.9;text-indent:3em}
+.pk03 .pk-sign{height:34px;max-width:150px;vertical-align:middle;object-fit:contain}
+.pk03 .pk-steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px;border-top:1px solid #000;padding-top:6px;font-size:12.5px;text-align:center}
+.pk03 .pk-step b{display:block;min-height:3.4em}
+.pk03 .pk-note{border-bottom:1px dotted #000;min-height:3.6em;text-align:left;white-space:pre-wrap}
+.rp-preview:has(.pk03){overflow:auto}
+@media (max-width:900px){.rp-preview .pk03{width:auto;min-height:0;padding:12px}.rp-preview .pk03 .pk-steps{grid-template-columns:1fr}.rp-preview .pk03 .pk-u.w{min-width:6em}}
+.inq-statement{white-space:pre-wrap;background:var(--ink-50,#f6f7f9);border:1px solid var(--ink-200);border-radius:var(--radius-md,8px);padding:10px;max-height:240px;overflow:auto}
+body.printing-sheet #print-sheet:has(.pk03){padding:0}

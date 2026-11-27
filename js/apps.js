@@ -275,6 +275,7 @@
       const tab = q.tab || 'overview';
       const base = '#/apps/behavior';
       let body = '';
+      let extra = null; // a tab's own loader (ปค.03 list)
       // summary cards stay on top of every tab (app standard, like the care app); each opens its list below
       const list = (Store.user().role === 'inspector' ? Store.activeStudents() : Store.myStudents()).map((s) => ({ s, sc: this.score(s.id) })).sort((a, b) => a.sc - b.sc);
       const isHi = (x) => x.sc < Store.s.alertBelow, isW = (x) => x.sc >= Store.s.alertBelow && x.sc < Store.s.warnBelow;
@@ -293,7 +294,7 @@
         body = body.replace('<div class="card" id="score-list">', this.dashHtml(list.map((x) => x.s)) + '<div class="card" id="score-list">');
       } else if (tab === 'records') {
         return { title: this.name, actions: `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>`,
-          html: cards + tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + this.recordsSearch(q),
+          html: cards + tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['inquiry', 'สอบสวน (ปค.03)'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + this.recordsSearch(q),
           after: () => { this.bindSearchCard(); this.bindRecordsSearch(); } };
       } else if (tab === 'rules') {
         const admin = Store.user().role === 'admin';
@@ -316,6 +317,8 @@
           <div class="field"><label>เฝ้าระวัง เมื่อต่ำกว่า</label><input class="input mono" type="number" name="warnBelow" value="${s.warnBelow}"><span class="help">ข้อ 51.1: ถูกตัดรวม 20 คะแนน (เหลือ 80) → หนังสือแจ้งผู้ปกครอง · ใส่ 81 จึงนับคนที่ได้ 80 พอดีด้วย</span></div>
           <div class="field"><label>เสี่ยงสูง เมื่อต่ำกว่า</label><input class="input mono" type="number" name="alertBelow" value="${s.alertBelow}"><span class="help">ข้อ 51.4: ต่ำกว่า 60 → เชิญผู้ปกครองทำทัณฑ์บน</span></div>
           </div></div><div class="dialog-foot"><button class="btn primary" type="submit">บันทึกเกณฑ์</button></div></form>`;
+      } else if (tab === 'inquiry' && window.Inquiry) {
+        body = Inquiry.html(); extra = () => Inquiry.after();
       } else if (tab === 'trash') {
         body = trashView('behavior', 'บันทึกพฤติกรรม');
       } else if (tab === 'restore') {
@@ -326,8 +329,8 @@
           ${rec.map((r) => `<tr><td>${fmtDate(r.at)}</td><td>${sLink(r.studentId)}</td><td>${esc(r.title)}${r.note ? `<div class="muted small">${esc(r.note)}</div>` : ''}</td><td class="num pts-pos">${signed(r.points)}</td><td>${esc(r.by)}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีกิจกรรมคืนคะแนน', 'heart-handshake')}</div>`;
       }
       return { title: this.name, actions: `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>`,
-        html: cards + tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + body,
-        after: () => this.bindSearchCard() };
+        html: cards + tabsBar([['overview', 'ภาพรวมคะแนน'], ['records', 'รายการบันทึก'], ['inquiry', 'สอบสวน (ปค.03)'], ['rules', 'ตารางพฤติกรรม'], ['threshold', 'เกณฑ์แจ้งเตือน'], ['restore', 'กิจกรรมคืนคะแนน']], tab, base) + body,
+        after: () => { this.bindSearchCard(); if (extra) extra(); } };
     },
     // รายการบันทึก: กรองตามประเภทพฤติกรรม ภาคเรียน ชั้น ช่วงวันที่ และชื่อ/รหัส — ดูได้ทั้งรายรายการและสรุปรายคน
     // พฤติกรรมแบบเดียวกับหน้าบันทึก: ตัดคะแนน / เพิ่มคะแนน (+ ชื่อที่มีในบันทึกเก่าแต่ไม่อยู่ในตาราง)

@@ -36,7 +36,33 @@
     b.textContent = n > 99 ? '99+' : String(n);
     b.setAttribute('aria-label', `รอคุณ ${n} รายการ`);
   }
+  // ปค.03 inquiries waiting on this person: red count on the behaviour menu (27 Nov 2026)
+  let inqSeen = null;
+  const inqOn = () => window.Inquiry && Store.s.apps.behavior !== false && Store.appOk('behavior');
+  function inqBadge() {
+    const a = document.querySelector('#nav a[href="#/apps/behavior"]');
+    if (!a) return;
+    const n = inqOn() ? Inquiry.forMe().length : 0;
+    let b = a.querySelector('.nav-badge');
+    if (!n) { if (b) b.remove(); return; }
+    if (!b) { b = document.createElement('span'); b.className = 'nav-badge'; a.appendChild(b); }
+    b.textContent = n > 99 ? '99+' : String(n);
+    b.setAttribute('aria-label', `บันทึกการสอบสวนรอคุณ ${n} รายการ`);
+    document.querySelectorAll('.menu-btn').forEach((m) => m.classList.add('has-badge'));
+  }
+  async function checkInquiries(first) {
+    if (!inqOn() || document.hidden) return;
+    try { await Inquiry.load(); } catch (e) { return; }
+    const ids = Inquiry.forMe().map((x) => x.id + ':' + x.status);
+    const fresh = inqSeen && !first ? ids.filter((k) => !inqSeen.has(k)) : [];
+    inqSeen = new Set(ids);
+    inqBadge();
+    if (fresh.length) UI.toast(`บันทึกการสอบสวน (ปค.03) รอคุณ ${fresh.length} รายการใหม่ · เมนูพฤติกรรม → สอบสวน`, 'info');
+    const typing = document.activeElement && document.activeElement.closest('#content') && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
+    if ((first || fresh.length) && !typing && !document.getElementById('dialog-root').innerHTML && /^#\/?(\?|$)/.test(location.hash || '#/')) render();
+  }
   async function checkReminders() {
+    checkInquiries(false);
     if (!window.LeaveApp || Store.s.apps.leave === false || !Store.appOk('leave')) return;
     if (document.hidden) return;
     try { await Store.refresh('leave'); } catch (e) { return; }
@@ -55,6 +81,7 @@
     remindSeen = new Set((window.LeaveApp ? LeaveApp.forMe() : []).map((x) => x.id + ':' + x.status));
     leaveSig = leaveSigNow();
     leaveBadge();
+    checkInquiries(true);
     clearInterval(remindTimer);
     remindTimer = setInterval(checkReminders, 60000);
     if (!startReminders.on) { startReminders.on = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) checkReminders(); }); }

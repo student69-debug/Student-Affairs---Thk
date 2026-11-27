@@ -16,3 +16,6 @@ node_modules/
 # Google OAuth client secrets / any downloaded credentials
 client_secret*.json
 *credentials*.json
+
+# school forms (ปค.xx) are reference only, never published
+*.pdf

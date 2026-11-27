@@ -20,7 +20,7 @@ const storage = { getItem: () => null, setItem() {}, removeItem() {} };
 const ctx = vm.createContext({ console, setTimeout, clearTimeout, setInterval: () => 0, localStorage: storage, sessionStorage: storage, location: { hash: '', pathname: '/', origin: '' }, URLSearchParams, Date, Math, JSON, Map, Set, crypto,
   document: { addEventListener() {}, getElementById: () => null, querySelector: () => null }, addEventListener() {}, MutationObserver: class { observe() {} } });
 ctx.window = ctx; ctx.supabase = { createClient: () => sb };
-for (const f of ['config.js', 'store.js', 'ui.js', 'charts.js', 'counsel.js', 'apps.js', 'drugs.js', 'nurse.js', 'discipline.js', 'leave.js', 'pages.js', 'parent.js', 'help.js']) vm.runInContext(read(f), ctx, { filename: f });
+for (const f of ['config.js', 'store.js', 'ui.js', 'charts.js', 'counsel.js', 'apps.js', 'drugs.js', 'nurse.js', 'discipline.js', 'leave.js', 'inquiry.js', 'pages.js', 'parent.js', 'help.js']) vm.runInContext(read(f), ctx, { filename: f });
 const { Store, Pages } = ctx;
 
 const fresh = () => {
@@ -202,6 +202,15 @@ const tests = {
     Store.profile = { id: 'i', role: 'inspector', name: 'z' }; Store.data.teacherRooms = []; Store.data.teacherGrades = [];
     const h = L.table(Store.data.leave);
     assert.doesNotMatch(h, /data-act="approve1"/); assert.match(h, /อนุญาต \(แทนหัวหน้าระดับ\)/); assert.match(h, />สารวัตร \(แทนหัวหน้าระดับ\)</);
+  },
+  'ปค.03: form ticks follow the opinion, text is escaped, the parents copy has no signature pictures': () => {
+    const I = ctx.Inquiry; Store.data.behavior.rules = [{ id: 'r1', code: '50.1.1', name: 'ทะเลาะวิวาท', points: -20, level: 'กลาง' }];
+    const x = { student_id: '30001', topic: '<b>t</b>', statement: 'ข้าพเจ้า <script>', statement_sign: 'data:image/jpeg;base64,AAAA', verdict: 'guilty', rule_id: 'r1',
+      actions: ['deduct', 'probation'], investigator_name: 'ครู ก', investigator_sign: 'data:image/jpeg;base64,BBBB', status: 'head', at: '2026-11-27T03:00:00Z' };
+    const h = I.pk03(x, { id: '30001', prefix: 'ด.ช.', first: 'ก', last: 'ข', grade: 3, room: 1 });
+    assert.doesNotMatch(h, /<b>t<\/b>|<script>/); assert.match(h, /ทะเลาะวิวาท/); assert.match(h, /data:image\/jpeg;base64,BBBB/);
+    assert.equal((h.match(/pk-box">✓/g) || []).length, 3); // guilty + deduct + probation
+    assert.doesNotMatch(I.pk03(x, { id: '30001', first: 'ก', last: 'ข' }, { noSign: true }), /data:image/);
   },
   'leave: both signatures show under the status, a stand-in is marked': () => {
     Store.data.leave = [{ id: 'r', studentId: '30001', status: 'approved', at: '1', advisorSign: 'r/sign1-a.jpg', advisorName: '<b>x</b>', approveSign: 'r/sign2-b.jpg', approveName: 'y', log: [{ action: 'approve1', note: 'แทนครูที่ปรึกษา: ลาป่วย' }] }];
