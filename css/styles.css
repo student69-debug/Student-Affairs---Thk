@@ -795,6 +795,9 @@ img.avatar.lg[data-photo]{cursor:zoom-in}
 .lv-signs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .lv-sign{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--ink-500)}
 .lv-sign img{width:84px;height:34px;object-fit:contain;background:#fff;border:1px solid var(--ink-200);border-radius:4px}
+/* help answers in the floating box */
+.help-answer{border:1px solid var(--ink-200);border-radius:var(--radius-md);padding:10px;display:flex;flex-direction:column;gap:6px;background:#fff}
+.help-text{white-space:pre-wrap;line-height:1.6}
 .photo-preview{display:block;width:120px;height:160px;object-fit:cover;border-radius:var(--radius-md);border:1px solid var(--ink-200);margin-top:4px}
 
 /* counselling appointment outcomes (23 Nov 2026) */

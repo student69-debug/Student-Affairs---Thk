@@ -20,7 +20,7 @@ const storage = { getItem: () => null, setItem() {}, removeItem() {} };
 const ctx = vm.createContext({ console, setTimeout, clearTimeout, setInterval: () => 0, localStorage: storage, sessionStorage: storage, location: { hash: '', pathname: '/', origin: '' }, URLSearchParams, Date, Math, JSON, Map, Set, crypto,
   document: { addEventListener() {}, getElementById: () => null, querySelector: () => null }, addEventListener() {}, MutationObserver: class { observe() {} } });
 ctx.window = ctx; ctx.supabase = { createClient: () => sb };
-for (const f of ['config.js', 'store.js', 'ui.js', 'charts.js', 'counsel.js', 'apps.js', 'drugs.js', 'nurse.js', 'discipline.js', 'leave.js', 'pages.js', 'parent.js']) vm.runInContext(read(f), ctx, { filename: f });
+for (const f of ['config.js', 'store.js', 'ui.js', 'charts.js', 'counsel.js', 'apps.js', 'drugs.js', 'nurse.js', 'discipline.js', 'leave.js', 'pages.js', 'parent.js', 'help.js']) vm.runInContext(read(f), ctx, { filename: f });
 const { Store, Pages } = ctx;
 
 const fresh = () => {
@@ -190,6 +190,12 @@ const tests = {
     const care = ctx.Apps.get('care');
     care.tables(undefined, { grade: '1', room: '2' }); assert.equal(care._n.visit, 1);
     care.tables(undefined, { grade: '1' }); assert.equal(care._n.visit, 2);
+  },
+  'help: answers are escaped, a weak match says "อาจหมายถึง", a new question says it went to the admin': () => {
+    const H = ctx.Help;
+    const h = H.answerHtml({ question: '<b>q</b>', answer: '<img src=x onerror=1>', maybe: true }, '"><x>');
+    assert.doesNotMatch(h, /<img|<b>q|"><x>/); assert.match(h, /อาจหมายถึง/); assert.match(h, /data-help="force"/);
+    assert.match(H.answerHtml({ queued: 5 }, 'x'), /ส่งคำถามให้แอดมินแล้ว/);
   },
   'settings: only the changed value is sent': async () => {
     await Store.saveSettings({ apps: { care: false } });

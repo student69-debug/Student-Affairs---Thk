@@ -3,6 +3,8 @@
    และเปลี่ยนสถานะด้วย feedback_set() */
 (function () {
   const { esc, fmtDate, icon, empty, toast } = UI;
+  // 'ask' is not stored as feedback: it goes to the help bank (js/help.js, 27 Nov 2026)
+  const ASK = ['ถามวิธีใช้', 'circle-help'];
   const KINDS = { want: ['อยากได้เพิ่ม', 'sparkles'], improve: ['อยากให้ปรับปรุง', 'wrench'], bug: ['แจ้งปัญหา', 'bug'], other: ['อื่น ๆ', 'message-circle'] };
   const STATUS = { new: ['ใหม่', 'b-warning'], planned: ['กำลังพัฒนา', 'b-info'], done: ['ทำแล้ว', 'b-success'], declined: ['ยังไม่ทำ', 'b-neutral'] };
   const sb = () => Store.sb;
@@ -18,7 +20,7 @@
 
   let openBox = () => {};
   let mine = null; // my recent messages (loaded when the box opens)
-  let kind = 'want';
+  let kind = 'ask';
   const isStaff = () => { const r = Store.profile && Store.profile.role; return ['teacher', 'inspector', 'grade_head', 'counselor', 'admin'].includes(r); };
 
   /* ---------- floating button + box ---------- */
@@ -28,14 +30,14 @@
     wrap.className = 'fb no-print';
     wrap.innerHTML = `
       <div class="fb-panel card" id="fb-panel" role="dialog" aria-modal="false" aria-labelledby="fb-title" hidden>
-        <div class="fb-head"><div><b id="fb-title">อยากได้อะไร หรืออยากให้ปรับตรงไหน?</b><span class="muted small">บอกทีมพัฒนาได้เลย ทุกข้อความถูกเก็บไว้เพื่อพัฒนาระบบ</span></div>
+        <div class="fb-head"><div><b id="fb-title">ถามวิธีใช้ หรือบอกสิ่งที่อยากได้</b><span class="muted small">คำถามที่เคยตอบแล้ว ตอบทันที · คำถามใหม่ส่งถึงแอดมิน · ข้อเสนอแนะเก็บไว้พัฒนาระบบ</span></div>
           <button class="icon-btn" type="button" data-fb="close" aria-label="ปิด">${icon('x', 'i16')}</button></div>
         <form id="fb-form" class="fb-body">
-          <div class="chips fb-kinds" role="radiogroup" aria-label="ประเภท">${Object.entries(KINDS).map(([k, [l, ic]]) => `<button type="button" role="radio" class="chip${k === kind ? ' on' : ''}" aria-checked="${k === kind}" data-fb-kind="${k}">${icon(ic, 'i16')}${l}</button>`).join('')}</div>
-          <textarea class="input" id="fb-msg" rows="4" maxlength="5000" required placeholder="เช่น อยากให้มีปุ่มพิมพ์ใบเตือนผู้ปกครองในหน้าพฤติกรรม" aria-label="ข้อความ"></textarea>
+          <div class="chips fb-kinds" role="radiogroup" aria-label="ประเภท">${[['ask', ASK]].concat(Object.entries(KINDS)).map(([k, [l, ic]]) => `<button type="button" role="radio" class="chip${k === kind ? ' on' : ''}" aria-checked="${k === kind}" data-fb-kind="${k}">${icon(ic, 'i16')}${l}</button>`).join('')}</div>
+          <textarea class="input" id="fb-msg" rows="4" maxlength="5000" required placeholder="เช่น ครูที่ปรึกษาลาป่วย ใครอนุญาตออกนอกโรงเรียนแทน" aria-label="ข้อความ"></textarea>
           <div class="fb-meta muted small"><span id="fb-page"></span><span id="fb-count">0/5,000</span></div>
           <div class="muted small">${icon('shield', 'i16')} ไม่ต้องใส่ชื่อหรือเลขประจำตัวนักเรียน</div>
-          <button class="btn primary" type="submit" id="fb-send">${icon('send', 'i16')}ส่งข้อความ</button>
+          <button class="btn primary" type="submit" id="fb-send">${icon('send', 'i16')}<span>ถาม</span></button>
         </form>
         <div class="fb-mine" id="fb-mine"></div>
       </div>
@@ -71,8 +73,19 @@
       const k = e.target.closest('[data-fb-kind]');
       if (k) {
         kind = k.dataset.fbKind;
+        msg.placeholder = kind === 'ask' ? 'เช่น ครูที่ปรึกษาลาป่วย ใครอนุญาตออกนอกโรงเรียนแทน' : 'เช่น อยากให้มีปุ่มพิมพ์ใบเตือนผู้ปกครองในหน้าพฤติกรรม';
+        wrap.querySelector('#fb-send span').textContent = kind === 'ask' ? 'ถาม' : 'ส่งข้อความ';
+        loadMine();
         wrap.querySelectorAll('[data-fb-kind]').forEach((x) => { const on = x === k; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); });
       }
+    });
+    // answers in the help box: "ตรงแล้ว" or send the question to the admin after all
+    wrap.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-help]');
+      if (!b) return;
+      if (b.dataset.help === 'ok') { msg.value = ''; toast('ยินดีครับ/ค่ะ'); loadMine(); return; }
+      try { const r = await Help.ask(b.dataset.q, true); wrap.querySelector('#fb-mine').innerHTML = Help.answerHtml(r, b.dataset.q); msg.value = ''; UI.refreshIcons(); }
+      catch (err) { toast('ส่งไม่สำเร็จ: ' + err.message); }
     });
     hint.addEventListener('click', (e) => { if (!e.target.closest('[data-fb]')) { markSeen(); open(true); } });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !panel.hidden) { open(false); fab.focus(); } });
@@ -85,6 +98,11 @@
       if (!text) { msg.focus(); return; }
       const btn = wrap.querySelector('#fb-send');
       btn.disabled = true;
+      if (kind === 'ask' && window.Help) {
+        try { const r = await Help.ask(text); wrap.querySelector('#fb-mine').innerHTML = Help.answerHtml(r, text); if (r.queued) msg.value = ''; UI.refreshIcons(); }
+        catch (err) { toast('ถามไม่สำเร็จ: ' + err.message); } finally { btn.disabled = false; }
+        return;
+      }
       try {
         await send(kind, text, pageNow());
         msg.value = '';
@@ -104,6 +122,10 @@
   async function loadMine() {
     const box = document.getElementById('fb-mine');
     if (!box) return;
+    if (kind === 'ask' && window.Help) {
+      try { box.innerHTML = Help.mineHtml(await Help.mine()); UI.refreshIcons(); } catch (e) { box.innerHTML = ''; }
+      return;
+    }
     try {
       if (!mine) mine = Store.demo ? (Store.data.feedback || []).filter((f) => f.by_user === Store.profile.id).slice(0, 3)
         : check(await sb().from('feedback').select('id,at,kind,message,status,admin_note').eq('by_user', Store.profile.id).order('at', { ascending: false }).limit(3)) || [];

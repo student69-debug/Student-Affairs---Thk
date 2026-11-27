@@ -980,7 +980,7 @@
 
   function settings(q) {
     const tab = q.tab || 'users';
-    const tabs = `<div class="tabs">${[['users', 'ผู้ใช้และสิทธิ์']].concat(Store.isAdmin() ? [['feedback', 'ข้อเสนอแนะ']] : [], [['term', 'ปีการศึกษา / ภาคเรียน'], ['apps', 'จัดการแอป'], ['parents', 'ผู้ปกครอง']]).concat(Store.isAdmin() ? [['subjects', 'ครูประจำวิชา'], ['api', 'การเชื่อมต่อ API']] : [], [['data', 'ข้อมูลระบบ']]).map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/settings?tab=${k}">${l}</button>`).join('')}</div>`;
+    const tabs = `<div class="tabs">${[['users', 'ผู้ใช้และสิทธิ์']].concat(Store.isAdmin() ? [['feedback', 'ข้อเสนอแนะ'], ['help', 'ถาม-ตอบ / LINE']] : [], [['term', 'ปีการศึกษา / ภาคเรียน'], ['apps', 'จัดการแอป'], ['parents', 'ผู้ปกครอง']]).concat(Store.isAdmin() ? [['subjects', 'ครูประจำวิชา'], ['api', 'การเชื่อมต่อ API']] : [], [['data', 'ข้อมูลระบบ']]).map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/settings?tab=${k}">${l}</button>`).join('')}</div>`;
     const admin = Store.isAdmin();
     const lock = admin ? '' : `<div class="notice warn">${icon('lock', 'i16')}<span>เฉพาะผู้ดูแลระบบที่แก้ไขการตั้งค่าได้ </span></div>`;
     let body = '';
@@ -996,6 +996,8 @@
         ${admin ? '<div class="dialog-foot"><button class="btn primary" type="submit">บันทึก</button></div>' : ''}</form>` + termDatesHtml(admin);
     } else if (tab === 'subjects' && admin) {
       return { title: 'ตั้งค่า', html: tabs + subjectsHtml(), after: bindSubjects };
+    } else if (tab === 'help' && admin && window.Help) {
+      return { title: 'ตั้งค่า', html: tabs + Help.html(), after: Help.after };
     } else if (tab === 'feedback' && admin) {
       return { title: 'ตั้งค่า', html: tabs + Feedback.html(q), after: Feedback.after };
     } else if (tab === 'api' && admin) {
