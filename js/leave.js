@@ -22,7 +22,7 @@
   // step 2 = a grade head / deputy of ANY grade (they may be teaching) or the head of student affairs, never the person who gave step 1;
   // the gate = ฝ่ายปกครอง or any grade head / deputy (user, 27 Nov 2026)
   const role = () => Store.user().role;
-  const headOf = () => Store.isAdmin() || role() === 'grade_head';
+  const headOf = () => Store.isAdmin() || ['grade_head', 'inspector'].includes(role()); // + สารวัตรนักเรียน standing in for any grade (27 Nov 2026)
   const ownHead = (s) => !!s && role() === 'grade_head' && Store.myGrades().includes(Number(s.grade));
   const step1 = (x) => { const s = Store.student(x.studentId); return !!s && (Store.homeroomOf(s) || ownHead(s)); };
   const standIn = (x) => { const s = Store.student(x.studentId); return !!s && !Store.homeroomOf(s) && ownHead(s); };
@@ -46,7 +46,8 @@
   function signsHtml(x) {
     const sub = (x.log || []).some((l) => l.action === 'approve1' && /^แทนครูที่ปรึกษา/.test(l.note || ''));
     const one = (path, name, who) => (path ? `<div class="lv-sign" title="${esc(who + ' · ' + (name || ''))}"><img data-lv-sign="${esc(path)}" alt="ลายมือชื่อ ${esc(name || '')}"><span>${esc(who)}</span></div>` : '');
-    const h = one(x.advisorSign, x.advisorName, sub ? 'แทนครูที่ปรึกษา' : 'ครูที่ปรึกษา') + one(x.approveSign, x.approveName, 'หัวหน้าระดับ');
+    const ins = (x.log || []).some((l) => l.action === 'approve2' && l.role === 'inspector');
+    const h = one(x.advisorSign, x.advisorName, sub ? 'แทนครูที่ปรึกษา' : 'ครูที่ปรึกษา') + one(x.approveSign, x.approveName, ins ? 'สารวัตร (แทนหัวหน้าระดับ)' : 'หัวหน้าระดับ');
     return h ? `<div class="lv-signs">${h}</div>` : '';
   }
   /* signature pad (finger, stylus or mouse): white JPEG so it prints and fits the photo bucket */
@@ -71,7 +72,7 @@
     const b = (a, l, cls = 'secondary', ic = 'check') => `<button class="btn ${cls} sm" data-action="leave-act" data-act="${a}" data-id="${esc(x.id)}">${icon(ic, 'i16')}${l}</button>`;
     const out = [];
     if (x.status === 'pending' && step1(x)) out.push(b('approve1', standIn(x) ? 'เห็นควรอนุญาต (แทนครูที่ปรึกษา)' : 'เห็นควรอนุญาต', 'primary'));
-    if (x.status === 'advisor_ok' && head2(x)) out.push(b('approve2', 'อนุญาต (หัวหน้าระดับ)', 'primary'));
+    if (x.status === 'advisor_ok' && head2(x)) out.push(b('approve2', role() === 'inspector' ? 'อนุญาต (แทนหัวหน้าระดับ)' : 'อนุญาต (หัวหน้าระดับ)', 'primary'));
     if ((x.status === 'pending' && step1(x)) || (x.status === 'advisor_ok' && head2(x))) out.push(b('reject', 'ไม่อนุญาต', 'ghost', 'x'));
     if (x.status === 'approved' && step2()) out.push(b('out', 'บันทึกออก', 'accent', 'log-out'));
     if (x.status === 'out' && step2() && x.returns !== false) out.push(b('back', 'บันทึกกลับ', 'secondary', 'log-in'));
@@ -252,7 +253,7 @@
       if (tab === 'guide') return out(`<div class="card"><div class="card-body"><ol style="margin:0;padding-left:20px;line-height:2">
         <li><b>ยื่นคำขอ</b> — นักเรียน / ผู้ปกครองยื่นจากหน้าผู้ปกครองเท่านั้น · ครูไม่ต้องยื่น รอแจ้งเตือนเพื่ออนุมัติ</li>
         <li><b>ความเห็นของครูที่ปรึกษา</b> — ครูที่ปรึกษาเข้าระบบแล้วกด "เห็นควรอนุญาต" หรือ "ไม่อนุญาต" · ครูที่ปรึกษาลา / ป่วย หรือไม่อยู่ หัวหน้าระดับ / รองหัวหน้าระดับของระดับนั้นให้ความเห็นแทนได้ (ใส่เหตุผล) · ต้องลงลายมือชื่อบนจอก่อนอนุญาต</li>
-        <li><b>ความเห็นของหัวหน้าระดับ / รองหัวหน้าระดับ (ระดับใดก็ได้) / หัวหน้ากลุ่มบริหารกิจการนักเรียน</b> — ต้องเป็นคนละคนกับขั้นที่ 1 · ถ่ายรูปผู้มารับและลงลายมือชื่อบนจอก่อนอนุญาต</li>
+        <li><b>ความเห็นของหัวหน้าระดับ / รองหัวหน้าระดับ (ระดับใดก็ได้) / สารวัตรนักเรียน (แทนได้ทุกระดับ) / หัวหน้ากลุ่มบริหารกิจการนักเรียน</b> — ต้องเป็นคนละคนกับขั้นที่ 1 · ถ่ายรูปผู้มารับและลงลายมือชื่อบนจอก่อนอนุญาต</li>
         <li><b>ประตู (ฝ่ายปกครอง หรือหัวหน้าระดับ / รองหัวหน้าระดับระดับใดก็ได้): บันทึกออก</b> แล้ว <b>บันทึกกลับ</b> ถ้านักเรียนกลับมาเรียนต่อ</li>
         <li>พิมพ์ใบตามแบบ <b>ปค.22</b> (A4 แนวนอน 2 ส่วน: ให้เจ้าหน้าที่รักษาความปลอดภัย / ให้ผู้ปกครอง) จากปุ่มเครื่องพิมพ์</li></ol>
         <p class="muted small" style="margin:12px 0 0">ไม่อนุญาตต้องใส่เหตุผล · ทุกขั้นตอนเก็บชื่อผู้ทำและเวลา · พิมพ์ใบขออนุญาตได้จากปุ่มเครื่องพิมพ์ · รูปถ่ายเก็บสำเนาใน Google Drive โฟลเดอร์ "ขออนุญาตออกนอกโรงเรียน" แยกปีการศึกษาและห้อง</p></div></div>`);
