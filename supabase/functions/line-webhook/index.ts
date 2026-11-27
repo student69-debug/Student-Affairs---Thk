@@ -1,6 +1,7 @@
 // LINE Official Account webhook (27 Nov 2026): answers "how do I use the system" questions from the help bank.
 // Called by LINE only: every request must carry LINE's HMAC signature (channel secret, set in Supabase secrets).
-// 1:1 chat = every text message; group / room = only messages that start with "ถาม", "?" or mention the bot.
+// 1:1 chat = every text message. Group / room: "ถาม…" / "?…" / "บอท…" / a mention = like 1:1 (new questions go to the admin);
+// any other message is answered only when it clearly matches the bank (help_line_match), otherwise ignored (user, 27 Nov 2026).
 // The bot never answers about a student: help_line_ask() refuses ids / phones and the bank holds only how-to answers.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -30,7 +31,7 @@ async function reply(token: string, text: string) {
   if (!r.ok) console.log('reply failed', r.status, (await r.text()).slice(0, 300));
 }
 
-const HELLO = 'สวัสดีครับ บอทช่วยตอบวิธีใช้ระบบกิจการนักเรียน\nพิมพ์คำถามได้เลย เช่น "ครูที่ปรึกษาลาป่วย ใครอนุญาตแทน"\nในกลุ่ม ให้ขึ้นต้นด้วย "ถาม" หรือแท็กบอท\n(บอทไม่ตอบข้อมูลของนักเรียนรายคน)';
+const HELLO = 'สวัสดีครับ บอทช่วยตอบวิธีใช้ระบบกิจการนักเรียน\nพิมพ์คำถามได้เลย เช่น "ครูที่ปรึกษาลาป่วย ใครอนุญาตแทน"\nในกลุ่ม บอทตอบเมื่อคำถามตรงกับคลังคำตอบ ถ้าจะส่งคำถามใหม่ถึงแอดมิน พิมพ์ "ถาม" นำหน้าหรือแท็กบอท\n(บอทไม่ตอบข้อมูลของนักเรียนรายคน)';
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('ok');
@@ -55,7 +56,13 @@ Deno.serve(async (req) => {
         const self = mentions.filter((m) => m.isSelf);
         for (const m of [...self].sort((a, b) => b.index - a.index)) text = text.slice(0, m.index) + text.slice(m.index + m.length);
         const asked = /^\s*(ถาม|\?|？|บอท)/.test(text);
-        if (!self.length && !asked) { console.log('group message ignored (no ถาม / ? / บอท / mention)'); continue; }
+        if (!self.length && !asked) {
+          // no ถาม / mention: answer only a clear match from the bank, never queue, so ordinary group chat gets no reply
+          const { data: hit } = await sb.rpc('help_line_match', { p_text: text.trim().slice(0, 1000) });
+          console.log('group message', hit && hit.answer ? 'matched' : 'no clear match, quiet');
+          if (hit && hit.answer) await reply(ev.replyToken, `${hit.answer}\n\n— ตอบอัตโนมัติจากระบบกิจการนักเรียน · คำถามอื่นพิมพ์ "ถาม" นำหน้า`);
+          continue;
+        }
         text = text.replace(/^\s*(ถาม|\?|？|บอท)\s*[:：]?/, '');
       }
       text = text.trim();
