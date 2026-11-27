@@ -217,11 +217,13 @@
   // fill <img data-photo="path"> with signed links from the private photo bucket
   async function hydratePhotos(root = document) {
     const imgs = [...root.querySelectorAll('img[data-photo]:not([src])')];
-    if (!imgs.length) return;
-    try {
-      const urls = await Store.photoUrls(imgs.map((i) => i.dataset.photo));
-      imgs.forEach((i) => { const u = urls.get(i.dataset.photo); if (u) i.src = u; });
-    } catch (e) { /* photo stays as a blank circle */ }
+    // no early return here: a page with signatures but no student photo (the leave list) must still get its signatures
+    if (imgs.length) {
+      try {
+        const urls = await Store.photoUrls(imgs.map((i) => i.dataset.photo));
+        imgs.forEach((i) => { const u = urls.get(i.dataset.photo); if (u) i.src = u; });
+      } catch (e) { /* photo stays as a blank circle */ }
+    }
     // leave-pass signatures (private leave-photos bucket): <img data-lv-sign="path">
     const signs = [...root.querySelectorAll('img[data-lv-sign]:not([src])')];
     if (signs.length && Store.leaveUrls) {
