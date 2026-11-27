@@ -742,9 +742,12 @@
     if (u.role === 'admin') return '<span class="muted small">ทุกแอป</span>';
     if (u.role === 'pending') return '<span class="muted small">—</span>';
     const blocked = Apps.all.filter((a) => u.apps && u.apps[a.id] === false);
-    return `<div class="chips">${blocked.length ? Apps.all.filter((a) => !blocked.includes(a)).map((a) => `<span class="badge b-info">${esc(a.short)}</span>`).join('') || '<span class="badge b-danger">ไม่มีแอป</span>' : '<span class="badge b-success">ทุกแอป</span>'}${u.role === 'teacher' && u.apps && u.apps.nurse_staff === true ? '<span class="badge b-navy">ครูห้องพยาบาล</span>' : ''}${u.role === 'teacher' && u.apps && u.apps.counsel_staff === true ? '<span class="badge b-navy">ครูให้คำปรึกษา</span>' : ''}
+    return `<div class="chips">${blocked.length ? Apps.all.filter((a) => !blocked.includes(a)).map((a) => `<span class="badge b-info">${esc(a.short)}</span>`).join('') || '<span class="badge b-danger">ไม่มีแอป</span>' : '<span class="badge b-success">ทุกแอป</span>'}${u.role === 'teacher' && u.apps && u.apps.nurse_staff === true ? '<span class="badge b-navy">ครูห้องพยาบาล</span>' : ''}${u.role === 'teacher' && u.apps && u.apps.counsel_staff === true ? `<span class="badge b-navy">ครูให้คำปรึกษา ${esc(counselGradesText(u.apps))}</span>` : ''}
       ${admin ? `<button class="icon-btn" title="กำหนดแอปที่ใช้ได้" data-action="apps-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>`;
   }
+  // grades a counselling teacher handles (user, 27 Nov 2026); none = every grade
+  const counselGradesOf = (apps) => (Array.isArray(apps && apps.counsel_grades) ? apps.counsel_grades.map(Number).filter((g) => g >= 1 && g <= 6) : []);
+  const counselGradesText = (apps) => { const g = counselGradesOf(apps); return g.length ? g.map((x) => 'ม.' + x).join(', ') : 'ทุกระดับชั้น'; };
   function appsDialog(userId) {
     const u = D().users.find((x) => x.id === userId);
     const cur = u.apps || {};
@@ -756,14 +759,16 @@
           <span class="switch"><input type="checkbox" name="app_${a.id}" ${cur[a.id] === false ? '' : 'checked'}><span></span></span></label>`).join('')}
           ${u.role === 'teacher' ? `<label class="list-row" style="cursor:pointer"><span class="app-ic">${icon('stethoscope')}</span><div class="grow"><div class="t">ครูห้องพยาบาล</div><div class="s">บันทึกห้องพยาบาลให้นักเรียนทุกห้อง เห็นชื่อ ชั้น และห้องของนักเรียนทั้งโรงเรียนในแอปนี้ (ต้องเปิดแอปห้องพยาบาล)</div></div>
           <span class="switch"><input type="checkbox" name="nurse_staff" ${cur.nurse_staff === true ? 'checked' : ''}><span></span></span></label>
-          <label class="list-row" style="cursor:pointer"><span class="app-ic">${icon('messages-square')}</span><div class="grow"><div class="t">ครูให้คำปรึกษา</div><div class="s">เปิด บันทึก และดูเคสให้คำปรึกษาของนักเรียนทุกระดับชั้น รวมรายละเอียดลับ เหมือนครูแนะแนว (ต้องเปิดแอปให้คำปรึกษา) · แอปอื่นยังเห็นเฉพาะห้องตัวเอง</div></div>
-          <span class="switch"><input type="checkbox" name="counsel_staff" ${cur.counsel_staff === true ? 'checked' : ''}><span></span></span></label>` : ''}</div>
+          <label class="list-row" style="cursor:pointer"><span class="app-ic">${icon('messages-square')}</span><div class="grow"><div class="t">ครูให้คำปรึกษา</div><div class="s">เปิด บันทึก และดูเคสให้คำปรึกษาของนักเรียนในระดับชั้นที่เลือกด้านล่าง รวมรายละเอียดลับ เหมือนครูแนะแนว (ต้องเปิดแอปให้คำปรึกษา) · แอปอื่นยังเห็นเฉพาะห้องตัวเอง</div></div>
+          <span class="switch"><input type="checkbox" name="counsel_staff" ${cur.counsel_staff === true ? 'checked' : ''}><span></span></span></label>
+          <div class="list-row" style="display:block"><div class="t" style="margin-bottom:6px">ระดับชั้นที่ให้คำปรึกษา</div><div class="chips">${[1, 2, 3, 4, 5, 6].map((g) => `<label class="chip-check"><input type="checkbox" name="cg_${g}" ${counselGradesOf(cur).includes(g) ? 'checked' : ''}> ม.${g}</label>`).join('')}</div>
+          <div class="s muted small" style="margin-top:6px">ไม่เลือกเลย = ทุกระดับชั้น · ไม่ขึ้นกับห้องที่เป็นครูประจำชั้น</div></div>` : ''}</div>
         <div class="notice">${icon('shield', 'i16')}<span>ปิดแล้ว แอปนั้นจะหายจากเมนูและหน้านักเรียนของคนนี้ และฐานข้อมูลจะไม่ให้อ่านหรือบันทึกข้อมูลของแอปนั้น — ผู้ดูแลระบบใช้ได้ทุกแอปเสมอ</span></div>`,
       onSubmit: async (v) => {
         const apps = {};
         Apps.all.forEach((a) => { if (!v['app_' + a.id]) apps[a.id] = false; });
         if (v.nurse_staff) apps.nurse_staff = true;
-        if (v.counsel_staff) apps.counsel_staff = true;
+        if (v.counsel_staff) { apps.counsel_staff = true; const g = [1, 2, 3, 4, 5, 6].filter((x) => v['cg_' + x]); if (g.length) apps.counsel_grades = g; }
         await Store.update('users', userId, { apps });
         UI.toast('บันทึกแอปที่ใช้ได้แล้ว · ' + u.name); App.render();
       } });

@@ -199,6 +199,14 @@ const tests = {
     const h = ctx.LeaveApp.table(Store.data.leave);
     assert.match(h, /data-lv-sign="r\/sign1-a.jpg"/); assert.match(h, /data-lv-sign="r\/sign2-b.jpg"/); assert.match(h, />แทนครูที่ปรึกษา</); assert.doesNotMatch(h, /<b>x<\/b>/);
   },
+  'counselling teacher: grades chosen by the admin limit the student picker, none = every grade': () => {
+    Store.directory = [{ id: '60001', grade: 1, room: 1, status: 'studying' }, { id: '60002', grade: 3, room: 1, status: 'studying' }, { id: '60003', grade: 4, room: 2, status: 'studying' }];
+    Store.profile = { id: 't', role: 'teacher', name: 'x', apps: { counsel_staff: true, counsel_grades: [3, 4, 'x', 9] } };
+    assert.deepEqual(Store.counselGrades(), [3, 4]);
+    assert.deepEqual(Store.counselStudents().map((s) => s.id), ['60002', '60003']);
+    Store.profile = { id: 't', role: 'teacher', name: 'x', apps: { counsel_staff: true } };
+    assert.equal(Store.counselStudents().length, 3);
+  },
   'counselling teacher: only a teacher with the switch, and the room filter of the care lists': () => {
     Store.profile = { id: 't', role: 'teacher', name: 'x', apps: { counsel_staff: true } }; assert.equal(Store.counselStaff(), true);
     Store.profile = { id: 'g', role: 'grade_head', name: 'x', apps: { counsel_staff: true } }; assert.equal(Store.counselStaff(), false);

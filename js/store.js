@@ -577,7 +577,9 @@
     nurseStaff() { return !!(this.profile.apps && this.profile.apps.nurse_staff === true); },
     // ครูให้คำปรึกษา (user, 27 Nov 2026): a teacher the admin chose works the counselling app for every grade (database: private.counsel_staff)
     counselStaff() { return this.profile.role === 'teacher' && !!(this.profile.apps && this.profile.apps.counsel_staff === true) && this.appOk('counsel'); },
-    counselStudents() { return this.counselStaff() ? this.directory.filter((s) => s.status === 'studying') : this.activeStudents(); },
+    // grades chosen by the admin (empty = every grade); the database applies the same rule (private.counsel_student_ok)
+    counselGrades() { const g = this.profile.apps && this.profile.apps.counsel_grades; return Array.isArray(g) ? g.map(Number).filter((x) => x >= 1 && x <= 6) : []; },
+    counselStudents() { if (!this.counselStaff()) return this.activeStudents(); const g = this.counselGrades(); return this.directory.filter((s) => s.status === 'studying' && (!g.length || g.includes(Number(s.grade)))); },
     // whose allergies / chronic illness this person may read, and may edit (both enforced in the database)
     healthStudents() { return this.seesAll() || this.nurseStaff() ? this.nurseStudents() : this.myStudents(); },
     canHealth(s) { return this.isAdmin() || this.nurseStaff() || this.homeroomOf(s); },

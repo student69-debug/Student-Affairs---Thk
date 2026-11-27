@@ -811,3 +811,7 @@ img.avatar.lg[data-photo]{cursor:zoom-in}
 @media (max-width:640px){.appt-row{flex-wrap:wrap}.appt-side{align-items:flex-start;width:100%}.appt-btns{justify-content:flex-start}}
 
 .input.static-val{display:flex;align-items:center;background:var(--ink-50,#f5f6fa);color:var(--navy-800,#111770);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:120px}
+/* grade tick boxes (counselling teacher grades, 27 Nov 2026) */
+.chip-check{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--ink-200);border-radius:999px;cursor:pointer;font-size:14px;background:#fff}
+.chip-check:has(input:checked){border-color:var(--navy-600,#111770);background:var(--navy-50,#eef0fb);color:var(--navy-700,#111770);font-weight:600}
+.chip-check input{margin:0}
