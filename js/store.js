@@ -321,6 +321,7 @@
       this.data.appTrash = {};
       this.data.caseTrash = [];
       this.binLoaded = {};
+      this.insLoaded = false; this.insurance = new Map(); // accident insurance: ensureInsurance() when the nurse app opens
       if (this.isAdmin()) this.purgePhotos().catch(() => {});
     },
     // put rows just written (as returned by the database) into the list, newest first / drop a deleted one
@@ -459,7 +460,20 @@
     async nurseFollowUp(id, p) { check(await sb.rpc('nurse_follow', { p_id: id, p })); await this.pull('nurse', id); await this.refresh('nurseFollow'); },
     // allergies / chronic illness: the database checks who may write and refuses to overwrite a newer version (seen)
     async saveHealth(p) { const r = check(await sb.rpc('nurse_health_save', { p })); if (r) this.merge('nurseHealth', [r]); else this.drop('nurseHealth', p.student_id); },
-    async nurseAlert(id) { const r = check(await sb.rpc('nurse_alert', { p_student: id })); return { health: r.health ? fromRow('nurseHealth', r.health) : null, given: r.given || [], guardian: r.guardian || null }; },
+    async nurseAlert(id) { const r = check(await sb.rpc('nurse_alert', { p_student: id })); return { health: r.health ? fromRow('nurseHealth', r.health) : null, given: r.given || [], guardian: r.guardian || null, insurance: r.insurance || null, insuranceYear: r.insurance_year }; },
+    /* ---- accident insurance (nurse app): one row per paid student for the current academic year; loaded when the nurse app opens ---- */
+    insurance: new Map(),
+    ensureInsurance(fresh) {
+      if (!this.appOk('nurse') || (this.insLoaded && !fresh)) return null;
+      const y = this.data.settings.year;
+      return paged((a, b) => sb.from('student_insurance').select('student_id,year,insurer,source,by_name,updated_at').eq('year', y).order('student_id').range(a, b))
+        .then((rows) => { this.insurance = new Map(rows.map((r) => [r.student_id, { insurer: r.insurer, source: r.source, by: r.by_name, updatedAt: r.updated_at }])); })
+        .catch((e) => { if (window.UI) UI.toast('โหลดข้อมูลประกันไม่สำเร็จ: ' + e.message); })
+        .finally(() => { this.insLoaded = true; });
+    },
+    canInsurance() { return this.isAdmin() || this.nurseStaff(); },
+    async insuranceImport(cids, insurer, replace) { const r = check(await sb.rpc('insurance_import', { p_year: this.data.settings.year, p_insurer: insurer, p_cids: cids, p_replace: replace })); await this.ensureInsurance(true); return r; },
+    async insuranceSet(id, paid) { const r = check(await sb.rpc('insurance_set', { p_student: id, p_year: this.data.settings.year, p_paid: paid })); await this.ensureInsurance(true); return r; },
     async restoreCase(id) {
       const r = check(await sb.rpc('restore_case', { p_id: id }));
       if (r === 'ok') await this.refresh('cases', 'progress', ...(this.isAdmin() ? ['history'] : []));
@@ -559,7 +573,7 @@
     async backup() {
       const tables = { students: 'id', profiles: 'id', app_settings: 'id', teacher_rooms: 'user_id,grade,room', teacher_grades: 'user_id,grade', grade_staff: 'grade,name', teacher_subjects: 'id', parent_links: 'user_id,student_id',
         registry_history: 'id', behavior_rules: 'id', behavior_incidents: 'id', behavior_records: 'id', care_screenings: 'id', care_visits: 'id', care_visit_rooms: 'id', care_needs: 'id', care_referrals: 'id', health_logs: 'id',
-        counsel_cases: 'id', counsel_case_sessions: 'case_id,session_no', counsel_appt_log: 'id', drug_cases: 'id', discipline_checks: 'id', leave_requests: 'id', survey_rounds: 'id', survey_responses: 'id', nurse_visits: 'id', nurse_health: 'student_id', feedback: 'id' };
+        counsel_cases: 'id', counsel_case_sessions: 'case_id,session_no', counsel_appt_log: 'id', drug_cases: 'id', discipline_checks: 'id', leave_requests: 'id', survey_rounds: 'id', survey_responses: 'id', nurse_visits: 'id', nurse_health: 'student_id', student_insurance: 'student_id,year', feedback: 'id' };
       const out = { at: new Date().toISOString(), tables: {} };
       for (const [t, key] of Object.entries(tables)) out.tables[t] = await paged((a, b) => key.split(',').reduce((q, k) => q.order(k), sb.from(t).select('*')).range(a, b));
       return out;

@@ -211,11 +211,13 @@
     });
     return xlsxLoading;
   }
-  async function readSheet(file) {
+  // raw = true: cell values instead of their display text (a 13-digit national ID stored as a number displays as 1.1E+12)
+  async function readSheet(file, raw = false) {
     if (/\.csv$/i.test(file.name)) return parseCSV(await file.text());
     const X = await loadXlsx();
     const wb = X.read(await file.arrayBuffer(), { type: 'array' });
-    return X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: false });
+    const rows = X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw });
+    return raw ? rows.map((r) => r.map((c) => (c == null ? '' : String(c)))) : rows;
   }
 
   // fill <img data-photo="path"> with signed links from the private photo bucket

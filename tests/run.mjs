@@ -396,6 +396,20 @@ const tests = {
     assert.ok(!/<img>|<script>/.test(bad)); assert.match(bad, /href="tel:0812345678"/);
     assert.ok(!g({ name: '', phone: '12<b>' }).includes('<b>1')); assert.ok(!g({ name: '', phone: '12<i x>' }).includes('<i x>'));
   },
+  'nurse insurance: header found below the title rows, staff skipped, IDs cleaned, short IDs kept aside, notice escaped': () => {
+    const t = ctx.NurseApp._test;
+    const rows = [['ชื่อผู้ถือกรมธรรม์'], [''], ['ที่อยู่'], ['ID ', 'ลำดับ', 'ชื่อ', 'ชั้นเรียน'],
+      ['1100000000001', '1', 'ก', 'ม.1/1'], ['1-1000-00000-00-2', '2', 'ข', 'ม.6/10'], ['a1234567890bc', '3', 'ค', 'ม.4/2'],
+      ['3100000000009', '4', 'ครู', 'บุคลากร'], ['12345', '5', 'ง', 'ม.2/1'], ['1100000000001', '6', 'ซ้ำ', 'ม.1/1'], ['', '', '', '']];
+    const r = t.insuranceRows(rows);
+    assert.deepEqual([...r.cids], ['1100000000001', '1100000000002', 'A1234567890BC']);
+    assert.equal(r.staff, 1); assert.equal(r.bad.length, 1); assert.equal(r.rows.get('1100000000002')[2], 'ข');
+    assert.equal(t.insuranceRows([['a'], ['b']]), null);
+    assert.match(t.insuranceHtml({ insurance: null, insuranceYear: 2569 }), /ยังไม่จ่าย/);
+    const h = t.insuranceHtml({ insurance: { year: 2569, insurer: '<b>x' }, insuranceYear: 2569 });
+    assert.match(h, /จ่ายแล้ว/); assert.ok(!h.includes('<b>x'));
+    assert.equal(t.insuranceHtml(null), '');
+  },
   'nurse vitals: limits, old visits keep their temperature, values are escaped': () => {
     const t = ctx.NurseApp._test;
     for (const [k, v, f] of [['temp', 37.4, ''], ['temp', 37.5, '↑'], ['pulse', 100, ''], ['pulse', 101, '↑'], ['pulse', 59, '↓'], ['sys', 130, '↑'], ['dia', 59, '↓'], ['spo2', 94, '↓'], ['spo2', 100, '']]) assert.equal(t.flag(k, v), f, k + v);

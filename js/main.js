@@ -112,7 +112,7 @@
     return { title: 'ไม่พบหน้า', html: `<div class="card">${UI.empty('ไม่พบหน้าที่ต้องการ', 'map-pin-off')}</div>` };
   }
 
-  let lastPath = null, lastBin = null;
+  let lastPath = null, lastBin = null, insIn = false;
   function render() {
     if (!Store.data) return;
     const { path, q } = parse();
@@ -128,6 +128,13 @@
         return;
       }
     } else lastBin = null;
+    // accident insurance list: fetched when the nurse app is entered (fresh each time it is entered, not on redraws)
+    if (path !== 'apps/nurse') insIn = false;
+    else {
+      const wait = Store.ensureInsurance(!insIn);
+      insIn = true;
+      if (wait) { document.getElementById('content').innerHTML = `<div class="card card-body muted">${UI.icon('loader', 'i16')} กำลังโหลด…</div>`; UI.refreshIcons(); wait.then(render); return; }
+    }
     const samePage = path === lastPath;
     window.__keepScroll = samePage ? window.scrollY : 0;
     lastPath = path;
@@ -203,6 +210,8 @@
     'nurse-record': (el) => Apps.get('nurse').openRecord(S(el)),
     'nurse-out': (el) => Apps.get('nurse').openOut(el.dataset.id),
     'nurse-health': (el) => Apps.get('nurse').openHealth(el.dataset.id),
+    'nurse-ins-import': () => Apps.get('nurse').openInsuranceImport(),
+    'nurse-ins-set': (el) => Apps.get('nurse').setInsurance(el.dataset.id, el.dataset.paid === '1'),
     'nurse-vital': (el) => Apps.get('nurse').openVital(el.dataset.id),
     'nurse-follow': (el) => Apps.get('nurse').openFollow(el.dataset.id, el.dataset.act || 'set'),
     'nurse-edit': (el) => Apps.get('nurse').openEdit(el.dataset.id),

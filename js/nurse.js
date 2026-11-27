@@ -108,6 +108,29 @@
     const btns = people.flatMap((p) => nums(p.phone).map((t) => `<a class="btn primary sm" href="tel:${t.replace(/[^\d+]/g, '')}"${p.name ? ` title="${esc(p.name)}"` : ''}>${icon('phone-call', 'i16')}โทร${p === people[0] ? '' : esc(p.who)} ${esc(t)}</a>`));
     return `<div class="notice nh-call">${icon('phone', 'i16')}<span><b>ผู้ปกครอง:</b> ${esc(g.name) || ''} ${btns.length ? '' : `<span class="muted">${g.phone ? esc(g.phone) : 'ยังไม่มีเบอร์โทรในทะเบียน'}</span>`}</span>${btns.join('')}</div>`;
   }
+  // accident insurance of this academic year, from nurse_alert: a.insurance = {year, insurer} when paid, null when not
+  function insuranceHtml(a) {
+    if (!a || !a.insuranceYear) return '';
+    return a.insurance ? `<div class="notice ok">${icon('shield-check', 'i16')}<span><b>ประกันอุบัติเหตุ:</b> จ่ายแล้ว · ปีการศึกษา ${esc(a.insurance.year)}${a.insurance.insurer ? ' · ' + esc(a.insurance.insurer) : ''}</span></div>`
+      : `<div class="notice mute">${icon('shield-off', 'i16')}<span><b>ประกันอุบัติเหตุ:</b> ยังไม่จ่าย · ปีการศึกษา ${esc(a.insuranceYear)}</span></div>`;
+  }
+  // the insurer's file (first sheet): finds the header row with the national ID column, skips staff rows (class not "ม.x"),
+  // returns the IDs (13 letters / digits, cleaned) and the rows that could not be used
+  function insuranceRows(rows) {
+    const isId = (c) => /^(id|เลขบัตร|เลขประจำตัวประชาชน|เลขประชาชน|บัตรประชาชน|เลขที่บัตร)/i.test(String(c).trim());
+    const h = rows.slice(0, 15).findIndex((r) => r.some(isId));
+    if (h < 0) return null;
+    const idCol = rows[h].findIndex(isId), classCol = rows[h].findIndex((c) => /ชั้น/.test(String(c)));
+    const out = { cids: [], staff: 0, bad: [], rows: new Map(), header: rows[h] };
+    rows.slice(h + 1).forEach((r) => {
+      if (!r.some((c) => String(c).trim())) return;
+      if (classCol >= 0 && !/^ม\.?\s*\d/.test(String(r[classCol]).trim())) { out.staff++; return; }
+      const id = String(r[idCol] ?? '').toUpperCase().replace(/[^0-9A-Z]/g, '');
+      if (id.length !== 13) { out.bad.push(r); return; }
+      if (!out.rows.has(id)) { out.rows.set(id, r); out.cids.push(id); }
+    });
+    return out;
+  }
   // medicines given in the last 24 hours that are being given again (visitId = the visit being edited, not counted)
   const repeats = (given, meds, visitId) => given.filter((g) => g.visit !== visitId).flatMap((g) => splitMeds(g.medicine).filter((m) => meds.includes(m) && !NOT_DRUG.includes(m)).map((m) => `${m} ให้ไปแล้วเมื่อ ${fmtDate(g.at)} ${timeOf(g.at)}`));
   const newDrugs = (meds, before) => meds.filter((m) => !NOT_DRUG.includes(m) && !before.includes(m));
@@ -121,7 +144,7 @@
       if (cur && cur.id === id) return cur;
       const me = cur = { id, data: null };
       box.innerHTML = '<div class="muted small">กำลังตรวจประวัติแพ้ยา…</div>'; rep.innerHTML = '';
-      me.p = Store.nurseAlert(id).then((a) => { me.data = a; if (cur === me) { box.innerHTML = healthNotices(a.health) + guardianHtml(a.guardian); drawRep(a); } },
+      me.p = Store.nurseAlert(id).then((a) => { me.data = a; if (cur === me) { box.innerHTML = healthNotices(a.health) + insuranceHtml(a) + guardianHtml(a.guardian); drawRep(a); } },
         () => { if (cur === me) { box.innerHTML = `<div class="notice danger">${icon('circle-alert', 'i16')}<span>โหลดประวัติแพ้ยาไม่ได้ — ถามนักเรียนก่อนให้ยา</span></div>`; UI.refreshIcons(); cur = null; } });
       return me;
     };
@@ -344,7 +367,8 @@
     page(q) {
       const tab = q.tab || 'overview', base = '#/apps/nurse';
       const hs = Store.healthStudents(), hm = healthMap(), states = hs.map((s) => healthState(hm.get(s.id))), due = follows().filter(isDue);
-      const tabs = Apps.tabsBar([['overview', 'ภาพรวม'], ['records', 'รายการบันทึก'], ['follow', 'นัดติดตาม'], ...(hs.length ? [['health', 'แพ้ยา / โรคประจำตัว']] : []), ['report', 'รายงาน']], tab, base);
+      const tabs = Apps.tabsBar([['overview', 'ภาพรวม'], ['records', 'รายการบันทึก'], ['follow', 'นัดติดตาม'], ...(hs.length ? [['health', 'แพ้ยา / โรคประจำตัว']] : []), ['insurance', 'ประกันอุบัติเหตุ'], ['report', 'รายงาน']], tab, base);
+      const iy = D().settings.year, ist = Store.nurseStudents(), paid = ist.filter((s) => Store.insurance.has(s.id)).length;
       const actions = `<button class="btn accent" data-action="nurse-record">${icon('plus')}บันทึกเข้าห้องพยาบาล</button>`;
       // summary cards stay on top of every tab (app standard, like the care app); each opens its list below
       const t = Store.termKey(), cur = all().filter((x) => x.term === t), td = all().filter((x) => dayOf(x.at) === today());
@@ -356,7 +380,9 @@
           ${Apps.stat('ambulance', 'กลับบ้าน / ส่ง รพ.', sent.length, 'ครั้ง', 'red', `กลับบ้าน ${sent.filter((x) => x.outcome === 'home').length} · ส่ง รพ. ${sent.filter((x) => x.outcome === 'hospital').length}`, '#/apps/nurse?tab=records&outcome=home,hospital')}
           ${Apps.stat('calendar-clock', 'ถึงวันนัดติดตาม', due.length, 'คน', due.length ? 'amber' : '', `เลยนัด ${due.filter((f) => f.status === 'scheduled' && f.at < today()).length} · ไม่มา ${due.filter((f) => f.status === 'missed').length} · ที่จะถึง ${follows().length - due.length}`, '#/apps/nurse?tab=follow&fs=due')}
           ${hs.length ? Apps.stat('triangle-alert', 'มีประวัติแพ้', states.filter((x) => x.allergy).length, 'คน', 'red', 'แพ้ยา อาหาร หรืออื่น ๆ', '#/apps/nurse?tab=health&hs=allergy')
-            + Apps.stat('circle-help', 'ยังไม่มีข้อมูลสุขภาพ', states.filter((x) => x.missing).length, 'คน', 'amber', `จาก ${hs.length.toLocaleString()} คนที่คุณดูแล`, '#/apps/nurse?tab=health&hs=missing') : ''}</div>`;
+            + Apps.stat('circle-help', 'ยังไม่มีข้อมูลสุขภาพ', states.filter((x) => x.missing).length, 'คน', 'amber', `จาก ${hs.length.toLocaleString()} คนที่คุณดูแล`, '#/apps/nurse?tab=health&hs=missing') : ''}
+          ${Apps.stat('shield-check', 'จ่ายประกันแล้ว', paid, 'คน', '', `ประกันอุบัติเหตุ ปีการศึกษา ${esc(iy)}`, '#/apps/nurse?tab=insurance&ins=paid')}
+          ${Apps.stat('shield-off', 'ยังไม่จ่ายประกัน', ist.length - paid, 'คน', ist.length - paid ? 'amber' : '', `จาก ${ist.length.toLocaleString()} คนที่กำลังศึกษา`, '#/apps/nurse?tab=insurance&ins=unpaid')}</div>`;
       // app standard: search → summary cards → tabs → content, on every tab
       const search = Apps.searchCard({ id: 'nurse', title: 'ค้นหาบันทึกห้องพยาบาล', typeLabel: 'อาการ', typeHtml: '<option value="">ทุกอาการ</option>' + Apps.optList(Object.entries(GROUPS), q.group), q });
       const bindS = () => Apps.bindSearch('nurse', (v) => Apps.hashOf('#/apps/nurse', { tab: 'records', term: v.from || v.to ? 'all' : '', grade: v.grade, group: v.type, from: v.from, to: v.to }));
@@ -365,6 +391,7 @@
       if (tab === 'records') return out(this.recordsHtml(q), () => this.bindRecords());
       if (tab === 'follow') return out(this.followHtml(q), () => document.getElementById('nf-state').addEventListener('input', (e) => { location.hash = Apps.hashOf('#/apps/nurse', { tab: 'follow', fs: e.target.value }); }));
       if (tab === 'health' && hs.length) return out(this.healthHtml(q, hs), () => this.bindHealth());
+      if (tab === 'insurance') return out(this.insuranceHtml(q, ist), () => this.bindInsurance(ist));
       if (tab === 'report') return out(this.reportHtml(q), () => this.bindReport());
       return out(this.boardHtml() + `
         ${this.dashHtml(cur, t)}
@@ -420,6 +447,91 @@
       const keep = () => { draw(); Apps.markStats(Apps.hashOf('#/apps/nurse', { tab: 'health', hs: $('nh-state').value, room: $('nh-room').value, q: $('nh-q').value.trim() })); }; // the filter stays after saving one student
       ['nh-q', 'nh-room', 'nh-state'].forEach((i) => $(i).addEventListener('input', keep));
       draw();
+    },
+    /* ---- แท็บ ประกันอุบัติเหตุ: who has paid this academic year (the insurer's list, matched by national ID in the database) ---- */
+    insuranceHtml(q, ist) {
+      const rooms = [...new Map(ist.map((s) => [s.grade + '/' + s.room, s])).entries()].sort(([, a], [, b]) => a.grade - b.grade || a.room - b.room).map(([k]) => [k, 'ม.' + k]);
+      return `<div class="card"><div class="card-head"><h3>${icon('shield-check', 'i16')} ประกันอุบัติเหตุ ปีการศึกษา ${esc(D().settings.year)}</h3>
+          ${Store.isAdmin() ? `<button class="btn primary sm" data-action="nurse-ins-import">${icon('upload', 'i16')}นำเข้ารายชื่อที่จ่ายแล้ว</button>` : ''}</div>
+        <div class="toolbar no-print">
+          <input class="input grow" id="ni-q" placeholder="ค้นหาชื่อ / รหัสนักเรียน" value="${esc(q.q || '')}">
+          <select class="select" id="ni-room" aria-label="ห้อง">${rooms.length > 1 ? '<option value="">ทุกห้อง</option>' : ''}${opt(rooms, q.iroom)}</select>
+          <select class="select" id="ni-state" aria-label="สถานะ">${opt([['', 'ทุกคน'], ['paid', 'จ่ายแล้ว'], ['unpaid', 'ยังไม่จ่าย']], q.ins)}</select></div><div id="ni-list"></div></div>
+        <div class="notice">${icon('info', 'i16')}<span>รายชื่อมาจากไฟล์ของบริษัทประกัน เทียบกับทะเบียนด้วยเลขบัตรประชาชน · ไม่มีชื่อในไฟล์ = ยังไม่จ่าย
+          ${Store.canInsurance() ? '· จ่ายภายหลังหรือข้อมูลผิด กดปุ่มในแถวของนักเรียนเพื่อเปลี่ยนได้ (บันทึกในประวัติ)' : '· แก้ไขได้เฉพาะผู้ดูแลระบบและครูห้องพยาบาล'}</span></div>`;
+    },
+    bindInsurance(ist) {
+      const $ = (i) => document.getElementById(i);
+      if (!$('ni-list')) return;
+      const list0 = ist.slice().sort((a, b) => a.grade - b.grade || a.room - b.room || a.no - b.no);
+      const draw = () => {
+        const t = $('ni-q').value.trim().toLowerCase(), room = $('ni-room').value, f = $('ni-state').value;
+        const list = list0.filter((s) => { const p = Store.insurance.has(s.id); return (!room || s.grade + '/' + s.room === room) && (!f || (f === 'paid') === p) && (!t || s.id.includes(t) || fullName(s).toLowerCase().includes(t)); });
+        const n = list.filter((s) => Store.insurance.has(s.id)).length;
+        $('ni-list').innerHTML = `<div class="card-body bf-sum"><b>${list.length.toLocaleString()}</b> คน · จ่ายแล้ว ${n.toLocaleString()} · ยังไม่จ่าย ${(list.length - n).toLocaleString()}</div>` + (list.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>นักเรียน</th><th>ชั้น</th><th>ประกันอุบัติเหตุ</th><th>ที่มา</th><th></th></tr></thead><tbody>
+          ${list.slice(0, 300).map((s) => { const i = Store.insurance.get(s.id); return `<tr><td>${sLink(s.id)}<div class="muted small mono">${esc(s.id)}</div></td><td>${esc(klass(s))}</td>
+            <td>${i ? `<span class="badge b-success">จ่ายแล้ว</span> <span class="small">${esc(i.insurer)}</span>` : '<span class="badge b-warning">ยังไม่จ่าย</span>'}</td>
+            <td class="small">${i ? `${i.source === 'manual' ? 'บันทึกเอง' : 'ไฟล์บริษัทประกัน'} · ${esc(i.by)}<div class="muted">${fmtDate(i.updatedAt)}</div>` : '—'}</td>
+            <td style="text-align:right">${Store.canInsurance() ? `<button class="btn ${i ? 'ghost' : 'secondary'} sm" data-action="nurse-ins-set" data-id="${esc(s.id)}" data-paid="${i ? 0 : 1}">${i ? 'เปลี่ยนเป็นยังไม่จ่าย' : 'ทำเครื่องหมายจ่ายแล้ว'}</button>` : ''}</td></tr>`; }).join('')}</tbody></table></div>${list.length > 300 ? '<div class="card-body muted small">แสดง 300 คนแรก เลือกห้องหรือค้นหาเพื่อดูให้แคบลง</div>' : ''}` : empty('ไม่พบนักเรียนตามเงื่อนไข', 'search-x'));
+        UI.refreshIcons();
+      };
+      const keep = () => { draw(); Apps.markStats(Apps.hashOf('#/apps/nurse', { tab: 'insurance', ins: $('ni-state').value, iroom: $('ni-room').value, q: $('ni-q').value.trim() })); };
+      ['ni-q', 'ni-room', 'ni-state'].forEach((i) => $(i).addEventListener('input', keep));
+      draw();
+    },
+    async setInsurance(sid, paid) {
+      const s = Store.student(sid);
+      if (!s || !Store.canInsurance()) return;
+      if (!confirm(`${fullName(s)} ${klass(s)}\nเปลี่ยนเป็น "${paid ? 'จ่ายประกันแล้ว' : 'ยังไม่จ่ายประกัน'}" ปีการศึกษา ${D().settings.year}?`)) return;
+      const r = await Store.insuranceSet(sid, paid);
+      toast(r === 'ok' ? `บันทึกแล้ว · ${fullName(s)}` : 'ไม่พบนักเรียนคนนี้ในทะเบียน');
+      App.render();
+    },
+    openInsuranceImport() {
+      if (!Store.isAdmin()) return;
+      let parsed = null;
+      const d = dialog({ title: 'นำเข้ารายชื่อนักเรียนที่จ่ายประกันแล้ว', submitLabel: 'นำเข้า',
+        body: `<div class="form-grid">
+          <div class="field full"><label>ไฟล์จากบริษัทประกัน (.xlsx / .csv) <span class="req">*</span></label><input class="input" type="file" name="file" accept=".xlsx,.xls,.csv">
+            <span class="help">ใช้คอลัมน์เลขบัตรประชาชน (หัวคอลัมน์ ID / เลขบัตรประชาชน) · แถวบุคลากร (ชั้นเรียนไม่ใช่ ม.) ข้ามให้อัตโนมัติ</span></div>
+          <div class="field"><label>บริษัทประกัน</label><input class="input" name="insurer" maxlength="100" value="ชับบ์"></div>
+          <div class="field"><label>ปีการศึกษา</label><input class="input" value="${esc(D().settings.year)}" disabled></div>
+          <div class="field full"><label><input type="checkbox" name="replace"> ไฟล์นี้คือรายชื่อทั้งหมดล่าสุด: นักเรียนที่เคยนำเข้าจากไฟล์ก่อนหน้าแต่ไม่อยู่ในไฟล์นี้ ให้เปลี่ยนเป็นยังไม่จ่าย</label>
+            <span class="help">ไม่ติ๊ก = เพิ่มอย่างเดียว · คนที่ครูทำเครื่องหมายเองไม่เปลี่ยนทั้งสองแบบ</span></div></div>
+          <div data-ins-preview></div>
+          <div class="notice">${icon('shield-check', 'i16')}<span>เลขบัตรประชาชนส่งไปเทียบในฐานข้อมูลเท่านั้น ไม่เก็บไฟล์ไว้ในระบบ</span></div>`,
+        onSubmit: async (v) => {
+          if (!parsed || !parsed.cids.length) { toast('เลือกไฟล์ที่มีเลขบัตรประชาชนก่อน'); return false; }
+          if (!confirm(`นำเข้า ${parsed.cids.length.toLocaleString()} คนว่าจ่ายประกันแล้ว ปีการศึกษา ${D().settings.year}${v.replace ? '\nและเปลี่ยนคนที่ไม่อยู่ในไฟล์นี้เป็นยังไม่จ่าย' : ''}?`)) return false;
+          const r = await Store.insuranceImport(parsed.cids, v.insurer.trim(), !!v.replace);
+          d.close();
+          this.showInsuranceResult(r, parsed);
+          App.render();
+          return false;
+        } });
+      const prev = d.form.querySelector('[data-ins-preview]');
+      d.form.file.addEventListener('change', async () => {
+        parsed = null; prev.innerHTML = '<div class="muted small">กำลังอ่านไฟล์…</div>';
+        const f = d.form.file.files[0];
+        if (!f) { prev.innerHTML = ''; return; }
+        try { parsed = insuranceRows(await UI.readSheet(f, true)); } catch (e) { prev.innerHTML = `<div class="notice danger">${icon('circle-alert', 'i16')}<span>อ่านไฟล์ไม่ได้: ${esc(e.message)}</span></div>`; UI.refreshIcons(); return; }
+        prev.innerHTML = !parsed ? `<div class="notice danger">${icon('circle-alert', 'i16')}<span>ไม่พบคอลัมน์เลขบัตรประชาชน (หัวคอลัมน์ ID หรือ เลขบัตรประชาชน) ใน 15 แถวแรก</span></div>`
+          : `<div class="notice ${parsed.cids.length ? 'ok' : 'warn'}">${icon('file-check', 'i16')}<span>พบนักเรียน <b>${parsed.cids.length.toLocaleString()}</b> คน · ข้ามแถวบุคลากร ${parsed.staff.toLocaleString()} แถว${parsed.bad.length ? ` · เลขบัตรไม่ครบ 13 ตัว ${parsed.bad.length} แถว (ข้าม)` : ''}</span></div>`;
+        UI.refreshIcons();
+      });
+    },
+    showInsuranceResult(r, parsed) {
+      const nf = (r.not_found || []).map((c) => parsed.rows.get(c)).filter(Boolean);
+      dialog({ title: 'นำเข้าข้อมูลประกันแล้ว', cancelLabel: 'ปิด',
+        body: `<div class="notice ok">${icon('circle-check', 'i16')}<span>ตรงกับทะเบียน <b>${Number(r.matched).toLocaleString()}</b> คน · เพิ่มใหม่ ${Number(r.added).toLocaleString()}${r.removed ? ` · เปลี่ยนเป็นยังไม่จ่าย ${Number(r.removed).toLocaleString()}` : ''}</span></div>
+          ${nf.length || parsed.bad.length ? `<div class="notice warn">${icon('triangle-alert', 'i16')}<span>ไม่พบในทะเบียน ${nf.length.toLocaleString()} แถว${parsed.bad.length ? ` · เลขบัตรไม่ครบ ${parsed.bad.length} แถว` : ''} — ดาวน์โหลดไปตรวจสอบได้ (เช่น ย้ายออกแล้ว หรือเลขบัตรในทะเบียนผิด)</span></div>
+          <button type="button" class="btn secondary sm" data-ins-dl>${icon('download', 'i16')}ดาวน์โหลดแถวที่ไม่ได้นำเข้า (.csv)</button>` : ''}` });
+      const b = document.querySelector('[data-ins-dl]');
+      if (b) b.addEventListener('click', () => {
+        const cell = (c) => `"${String(c ?? '').replace(/"/g, '""')}"`;
+        UI.download(`ประกัน-ไม่ได้นำเข้า-${today()}.csv`, [parsed.header, ...nf.map((r2) => r2), ...parsed.bad].map((r2) => r2.map(cell).join(',')).join('\r\n'));
+      });
+      UI.refreshIcons();
     },
     healthCard(s) {
       const h = healthMap().get(s.id);
@@ -554,6 +666,6 @@
   };
 
   Apps.all.push(app);
-  app._test = { guardianHtml, healthNotices, healthState, repeats, newDrugs, flag, measures, vitalChips, dayAdd, followVals, isDue, badBp };
+  app._test = { insuranceRows, insuranceHtml, guardianHtml,healthNotices, healthState, repeats, newDrugs, flag, measures, vitalChips, dayAdd, followVals, isDue, badBp };
   window.NurseApp = app;
 })();
