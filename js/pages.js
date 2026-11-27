@@ -121,19 +121,37 @@
     return { title: 'ค้นหานักเรียน', html: `
       <div class="card rule search-hero"><h2 style="font-size:20px">ค้นหานักเรียน</h2>
         <div class="big-input">${icon('search')}<input class="input" id="search-input" value="${esc(q.q || '')}" placeholder="รหัสนักเรียน ชื่อ นามสกุล หรือชื่อเล่น" autocomplete="off"></div>
+        <div class="toolbar" style="margin:10px 0 6px">
+          <select class="select" id="search-grade" aria-label="ระดับชั้น" style="width:auto"><option value="">ทุกระดับชั้น</option>${[...new Set(D().students.map((s) => Number(s.grade)))].sort((a, b) => a - b).map((g) => `<option value="${g}" ${String(q.grade) === String(g) ? 'selected' : ''}>ม.${g}</option>`).join('')}</select>
+          <select class="select" id="search-room" aria-label="ห้อง" style="width:auto"></select>
+          <span class="muted small">ไม่รู้ชื่อ เลือกชั้นและห้อง แล้วดูรายชื่อพร้อมรูปได้</span></div>
         <div class="muted small">ค้นด้วยรหัส → เปิดหน้านักเรียนรายคนที่รวมผลจากทุกแอป${Store.user().role === 'teacher' ? ` · ${icon('lock', 'i16')} ค้นหาได้เฉพาะ${Store.myScopeText() ? esc(Store.myScopeText()) : 'ห้องที่ปรึกษา'}${(D().subjects || []).length ? ' และห้องที่สอน' : ''}` : ''}</div></div>
       <div class="card" id="search-results"></div>`,
       after() {
         const inp = document.getElementById('search-input');
         const out = document.getElementById('search-results');
+        const gSel = document.getElementById('search-grade'), rSel = document.getElementById('search-room');
+        // rooms of the chosen grade, only from the students this person may see
+        const fillRooms = (keep) => {
+          const g = gSel.value, rooms = [...new Set(D().students.filter((s) => String(s.grade) === g).map((s) => Number(s.room)))].sort((a, b) => a - b);
+          rSel.innerHTML = `<option value="">${g ? 'ทุกห้อง' : 'เลือกระดับชั้นก่อน'}</option>` + rooms.map((r) => `<option value="${r}" ${String(keep) === String(r) ? 'selected' : ''}>ม.${g}/${r}</option>`).join('');
+          rSel.disabled = !g;
+        };
+        fillRooms(q.room);
         const run = () => {
-          const t = inp.value.trim().toLowerCase();
-          const list = D().students.filter((s) => !t || [s.id, s.first, s.last, s.nick, fullName(s), klass(s)].some((x) => String(x).toLowerCase().includes(t)));
-          out.innerHTML = `<div class="card-head"><h3>ผลการค้นหา</h3><span class="muted small">${list.length} คน</span></div>` + (list.length ? `<div class="list">${list.slice(0, 60).map((s) => `<a class="list-row" href="#/student/${esc(s.id)}">${avatar(s)}<div class="grow"><div class="t">${esc(fullName(s))} <span class="muted small">(${esc(s.nick)})</span></div><div class="s"><span class="mono">${esc(s.id)}</span> · ${klass(s)} เลขที่ ${s.no} · ${esc(s.advisor)}</div></div>${s.status !== 'studying' ? statusBadge(s.status) : ''}${on('behavior') && s.status === 'studying' && s.mine ? meter(B().score(s.id)) : ''}</a>`).join('')}</div>` : empty('ไม่พบนักเรียนที่ตรงกับคำค้น', 'search-x'));
+          const t = inp.value.trim().toLowerCase(), g = gSel.value, r = rSel.value;
+          history.replaceState(null, '', Apps.hashOf('#/search', { q: inp.value.trim(), grade: g, room: r }));
+          const list = D().students.filter((s) => (!g || String(s.grade) === g) && (!r || String(s.room) === r)
+            && (!t || [s.id, s.first, s.last, s.nick, fullName(s), klass(s)].some((x) => String(x).toLowerCase().includes(t))))
+            .sort((a, b) => a.grade - b.grade || a.room - b.room || (a.no || 0) - (b.no || 0));
+          const max = r ? 200 : 60;
+          out.innerHTML = `<div class="card-head"><h3>${r ? `รายชื่อนักเรียน ม.${esc(g)}/${esc(r)}` : 'ผลการค้นหา'}</h3><span class="muted small">${list.length} คน${list.length > max ? ` · แสดง ${max} คนแรก เลือกห้องหรือพิมพ์ชื่อเพื่อแคบลง` : ''}</span></div>` + (list.length ? `<div class="list">${list.slice(0, max).map((s) => `<a class="list-row" href="#/student/${esc(s.id)}">${avatar(s)}<div class="grow"><div class="t">${esc(fullName(s))} <span class="muted small">(${esc(s.nick)})</span></div><div class="s"><span class="mono">${esc(s.id)}</span> · ${klass(s)} เลขที่ ${s.no} · ${esc(s.advisor)}</div></div>${s.status !== 'studying' ? statusBadge(s.status) : ''}${on('behavior') && s.status === 'studying' && s.mine ? meter(B().score(s.id)) : ''}</a>`).join('')}</div>` : empty('ไม่พบนักเรียนที่ตรงกับคำค้น', 'search-x'));
           UI.refreshIcons();
           UI.hydratePhotos(out);
         };
         inp.addEventListener('input', run);
+        gSel.addEventListener('change', () => { fillRooms(''); run(); });
+        rSel.addEventListener('change', run);
         inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const f = out.querySelector('a.list-row'); if (f) location.hash = f.getAttribute('href'); } });
         run();
         inp.focus();
