@@ -151,6 +151,14 @@ const tests = {
       assert.doesNotMatch(JSON.stringify(L.page({ tab: 'list' })), /leave-new|ยื่นขออนุญาตออก</);
     }
   },
+  'leave: finished requests (home, returned, rejected, cancelled) move to the เสร็จสิ้นแล้ว tab': () => {
+    const L = ctx.LeaveApp; Store.profile = { id: 'u', role: 'admin', name: 'x' };
+    Store.data.leave = [{ id: 'p1', studentId: '30001', status: 'pending', at: '1' }, { id: 'o1', studentId: '30001', status: 'out', returns: true, at: '2' },
+      { id: 'o2', studentId: '30001', status: 'out', returns: false, at: '3' }, { id: 'r1', studentId: '30001', status: 'returned', at: '4' }, { id: 'x1', studentId: '30001', status: 'rejected', at: '5' }];
+    const count = (tab) => Number(JSON.stringify(L.page({ tab }).html).match(/(\d+) รายการ/)[1]);
+    assert.equal(count('list'), 2);
+    assert.equal(count('done'), 3);
+  },
   'home visit summary: counts each student once (latest visit of the year), totals from the registry': () => {
     const care = ctx.Apps.get('care');
     Store.data.students = [{ id: '40001', prefix: 'ด.ช.', first: 'ก', last: 'ข', grade: 1, room: 9, status: 'studying' }, { id: '40002', prefix: 'ด.ญ.', first: 'ค', last: 'ง', grade: 1, room: 9, status: 'studying' },

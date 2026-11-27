@@ -38,6 +38,8 @@
     return false;
   }
   const OPEN = ['pending', 'advisor_ok', 'approved', 'out'];
+  // still in progress; left school for home, returned, rejected, cancelled = finished (own tab, user 27 Nov 2026)
+  const active = (x) => OPEN.includes(x.status) && !(x.status === 'out' && x.returns === false);
   // the hand signatures of both steps under the status (user, 27 Nov 2026); "แทน" when a grade head stood in
   function signsHtml(x) {
     const sub = (x.log || []).some((l) => l.action === 'approve1' && /^แทนครูที่ปรึกษา/.test(l.note || ''));
@@ -88,7 +90,7 @@
     id: 'leave', name: 'ขออนุญาตออกนอกโรงเรียน', short: 'ขอออกนอกโรงเรียน', icon: 'door-open', rule: 'rule',
     list(sid) { return all().filter((x) => !sid || x.studentId === sid).sort(byDate); },
     summary(sid) {
-      const l = this.list(sid).filter((x) => x.term === Store.termKey()), o = l.find((x) => OPEN.includes(x.status));
+      const l = this.list(sid).filter((x) => x.term === Store.termKey()), o = l.find(active);
       return { big: `${l.filter((x) => ['out', 'returned'].includes(x.status)).length}<small> ครั้ง</small>`, label: 'ออกนอกโรงเรียน ภาคเรียนนี้', badge: o ? badge(o.status) : '',
         rows: [['ล่าสุด', l[0] ? fmtDate(l[0].leaveDate) + ' · ' + esc(REASONS[l[0].reason] || '') : '—']] };
     },
@@ -233,16 +235,16 @@
 
     page(q) {
       const tab = q.tab || 'list', base = '#/apps/leave';
-      const t = Store.termKey(), cur = all().filter((x) => x.term === t), open = all().filter((x) => OPEN.includes(x.status)).sort(byDate);
+      const t = Store.termKey(), cur = all().filter((x) => x.term === t), open = all().filter(active).sort(byDate);
       const mine = open.filter(waitsOnMe);
       const cards = `<div class="grid g4">
         ${Apps.stat('inbox', 'รอฉันดำเนินการ', mine.length, 'รายการ', 'amber', step2() ? 'บันทึกออก-กลับ' : 'รอความเห็น / การอนุญาตจากคุณ', base + '?tab=list&who=me')}
-        ${Apps.stat('hourglass', 'ยังไม่จบ', open.length, 'รายการ', '', 'รออนุมัติ / รอออก / ออกไปแล้ว', base + '?tab=list&status=open')}
-        ${Apps.stat('door-open', 'ออกวันนี้', all().filter((x) => x.outAt && x.outAt.slice(0, 10) === new Date().toISOString().slice(0, 10)).length, 'คน', 'green', '', base + '?tab=list&day=today')}
-        ${Apps.stat('calendar', 'ภาคเรียนนี้', cur.filter((x) => ['out', 'returned'].includes(x.status)).length, 'ครั้ง', '', `ภาคเรียน ${t}`, base + '?tab=list&status=done')}</div>`;
+        ${Apps.stat('hourglass', 'ยังไม่จบ', open.length, 'รายการ', '', 'รออนุมัติ / รอออก / รอกลับ', base + '?tab=list&status=open')}
+        ${Apps.stat('door-open', 'ออกวันนี้', all().filter((x) => x.outAt && x.outAt.slice(0, 10) === new Date().toISOString().slice(0, 10)).length, 'คน', 'green', '', base + '?tab=done&day=today')}
+        ${Apps.stat('calendar', 'ภาคเรียนนี้', cur.filter((x) => ['out', 'returned'].includes(x.status)).length, 'ครั้ง', '', `ภาคเรียน ${t}`, base + '?tab=done&status=done')}</div>`;
       const search = Apps.searchCard({ id: 'leave', title: 'ค้นหาคำขอออกนอกโรงเรียน', typeLabel: 'เหตุผล', typeHtml: '<option value="">ทุกเหตุผล</option>' + Apps.optList(Object.entries(REASONS), q.type), q });
       const bindS = () => Apps.bindSearch('leave', (v) => Apps.hashOf(base, { tab: 'list', grade: v.grade, type: v.type, from: v.from, to: v.to }));
-      const tabs = Apps.tabsBar([['list', 'รายการคำขอ'], ['overview', 'ภาพรวม'], ['guide', 'ขั้นตอน']], tab, base);
+      const tabs = Apps.tabsBar([['list', 'รายการคำขอ'], ['done', 'เสร็จสิ้นแล้ว'], ['overview', 'ภาพรวม'], ['guide', 'ขั้นตอน']], tab, base);
       const out = (html) => ({ title: this.name, html: search + cards + tabs + html, after: bindS });
       if (tab === 'trash') return out(Apps.trashView('leave', 'คำขอออกนอกโรงเรียน'));
       if (tab === 'guide') return out(`<div class="card"><div class="card-body"><ol style="margin:0;padding-left:20px;line-height:2">
@@ -252,13 +254,15 @@
         <li><b>ประตู (ฝ่ายปกครอง): บันทึกออก</b> แล้ว <b>บันทึกกลับ</b> ถ้านักเรียนกลับมาเรียนต่อ</li>
         <li>พิมพ์ใบตามแบบ <b>ปค.22</b> (A4 แนวนอน 2 ส่วน: ให้เจ้าหน้าที่รักษาความปลอดภัย / ให้ผู้ปกครอง) จากปุ่มเครื่องพิมพ์</li></ol>
         <p class="muted small" style="margin:12px 0 0">ไม่อนุญาตต้องใส่เหตุผล · ทุกขั้นตอนเก็บชื่อผู้ทำและเวลา · พิมพ์ใบขออนุญาตได้จากปุ่มเครื่องพิมพ์ · รูปถ่ายเก็บสำเนาใน Google Drive โฟลเดอร์ "ขออนุญาตออกนอกโรงเรียน" แยกปีการศึกษาและห้อง</p></div></div>`);
-      if (tab === 'list') {
+      if (tab === 'list' || tab === 'done') {
         const inDate = (d) => (!q.from || d >= q.from) && (!q.to || d <= q.to);
         const tday = new Date().toISOString().slice(0, 10);
-        const list = (q.who === 'me' ? mine : all()).filter((x) => (!q.status || (q.status === 'open' ? OPEN.includes(x.status) : q.status === 'done' ? ['out', 'returned'].includes(x.status) && x.term === t : x.status === q.status))
+        const found = (q.who === 'me' ? mine : all()).filter((x) => (!q.status || (q.status === 'open' ? active(x) : q.status === 'done' ? ['out', 'returned'].includes(x.status) && x.term === t : x.status === q.status))
           && (q.day !== 'today' || (x.outAt && x.outAt.slice(0, 10) === tday)) && (!q.type || x.reason === q.type) && inDate(x.leaveDate)
           && (!q.grade || String((Store.student(x.studentId) || {}).grade) === String(q.grade)) && (!q.grade || !q.room || String((Store.student(x.studentId) || {}).room) === String(q.room))).sort(byDate);
-        return out(`<div class="card" id="lv-list"><div class="card-head"><h3>รายการคำขอ</h3><span class="muted small">${list.length} รายการ</span></div>${this.table(list)}</div>`);
+        const done = tab === 'done', list = found.filter((x) => active(x) !== done), other = found.length - list.length;
+        const hint = other ? `<div class="card-body" style="padding-top:0"><a class="small" href="${Apps.hashOf(base, { ...q, tab: done ? 'list' : 'done' })}">${done ? 'ยังไม่เสร็จ' : 'เสร็จสิ้นแล้ว'}อีก ${other} รายการ ดูในแท็บ "${done ? 'รายการคำขอ' : 'เสร็จสิ้นแล้ว'}"</a></div>` : '';
+        return out(`<div class="card" id="lv-list"><div class="card-head"><h3>${done ? 'เสร็จสิ้นแล้ว' : 'รายการคำขอที่ยังไม่เสร็จ'}</h3><span class="muted small">${list.length} รายการ${done ? ' · ออกไปแล้วไม่กลับ / กลับแล้ว / ไม่อนุญาต / ยกเลิก' : ''}</span></div>${this.table(list)}${hint}</div>`);
       }
       return out(`<div class="card"><div class="card-head"><h3>รอดำเนินการ</h3><span class="muted small">${mine.length ? 'รายการที่คุณอนุมัติหรือบันทึกได้' : 'ไม่มีรายการที่รอคุณ'}</span></div>${this.table(mine.length ? mine : open.slice(0, 20))}</div>
         <div class="notice">${icon('shield-check', 'i16')}<span>ขั้นที่ 1 ครูที่ปรึกษา · ขั้นที่ 2 หัวหน้าระดับ / หัวหน้ากลุ่มบริหารกิจการนักเรียน (คนละคน) · ฝ่ายปกครองบันทึกออก-กลับ · ตรวจสิทธิ์ในฐานข้อมูลทุกขั้นตอน</span></div>`);
