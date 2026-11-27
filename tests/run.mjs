@@ -162,6 +162,18 @@ const tests = {
     assert.deepEqual([n.total, n.m, n.f, n.visited], [3, 1, 2, 1]);
     assert.deepEqual(Object.fromEntries(Object.entries(n.who).map(([k, v]) => [k, v.length])), { broken: 1, divorced: 1, urgent: 1 });
   },
+  'leave: step 1 button for the homeroom teacher, grade head stands in, admin never; step 2 never the same person': () => {
+    const L = ctx.LeaveApp;
+    Store.data.students = [{ id: '30001', first: 'ก', last: 'ข', grade: 4, room: 1, advisor: 'ครู ก, ครู ข', status: 'studying', mine: true }];
+    Store.data.leave = [{ id: 'p', studentId: '30001', status: 'pending', at: '1' }, { id: 'q', studentId: '30001', status: 'advisor_ok', advisorBy: 'g', advisorName: 'x', at: '2' }];
+    const btns = () => L.table(Store.data.leave);
+    Store.profile = { id: 'a', role: 'admin', name: 'x' }; Store.data.teacherRooms = []; Store.data.teacherGrades = [];
+    assert.doesNotMatch(btns(), /data-act="approve1"/); assert.match(btns(), /data-act="approve2"/);
+    Store.profile = { id: 't', role: 'teacher', name: 'y' }; Store.data.teacherRooms = [{ userId: 't', grade: 4, room: 1 }];
+    assert.match(btns(), /data-act="approve1"/); assert.doesNotMatch(btns(), /แทนครูที่ปรึกษา/);
+    Store.profile = { id: 'g', role: 'grade_head', name: 'z' }; Store.data.teacherRooms = []; Store.data.teacherGrades = [{ userId: 'g', grade: 4 }];
+    assert.match(btns(), /เห็นควรอนุญาต \(แทนครูที่ปรึกษา\)/); assert.doesNotMatch(btns(), /data-act="approve2"/);
+  },
   'settings: only the changed value is sent': async () => {
     await Store.saveSettings({ apps: { care: false } });
     assert.deepEqual(Object.keys(op(calls[0], 'update')[1]), ['apps']);

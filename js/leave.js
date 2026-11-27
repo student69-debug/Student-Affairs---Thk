@@ -17,11 +17,14 @@
   const hhmm = (t) => (t ? String(t).slice(0, 5) + ' น.' : '');
   const today = () => new Date(Date.now() + 7 * 36e5).toISOString().slice(0, 10);
   // mirrors the database (private.leave_step1 / leave_head / leave_step2); buttons only — the database decides
-  // step 1 = homeroom teacher (a grade head only for a room with one homeroom teacher: the database says so if not),
+  // step 1 = homeroom teacher; the grade head / deputy of the grade may stand in (with a reason when the room has its own
+  // homeroom teachers signed up); admins do not give step 1 (user, 27 Nov 2026).
   // step 2 = grade head of the grade or the head of student affairs, never the person who gave step 1; the gate = ฝ่ายปกครอง
   const role = () => Store.user().role;
   const headOf = (x) => { const s = Store.student(x.studentId); return Store.isAdmin() || (s && role() === 'grade_head' && Store.myGrades().includes(Number(s.grade))); };
-  const step1 = (x) => { const s = Store.student(x.studentId); return Store.isAdmin() || (s && Store.homeroomOf(s)) || headOf(x); };
+  const ownHead = (s) => !!s && role() === 'grade_head' && Store.myGrades().includes(Number(s.grade));
+  const step1 = (x) => { const s = Store.student(x.studentId); return !!s && (Store.homeroomOf(s) || ownHead(s)); };
+  const standIn = (x) => { const s = Store.student(x.studentId); return !!s && !Store.homeroomOf(s) && ownHead(s); };
   const head2 = (x) => headOf(x) && x.advisorBy !== Store.user().id;
   const step2 = () => Store.isAdmin() || role() === 'inspector';
   // who is waited on (for the reminder): the homeroom teacher (or the grade head when the room has one listed advisor),
@@ -56,7 +59,7 @@
   function actions(x) {
     const b = (a, l, cls = 'secondary', ic = 'check') => `<button class="btn ${cls} sm" data-action="leave-act" data-act="${a}" data-id="${esc(x.id)}">${icon(ic, 'i16')}${l}</button>`;
     const out = [];
-    if (x.status === 'pending' && step1(x)) out.push(b('approve1', 'เห็นควรอนุญาต', 'primary'));
+    if (x.status === 'pending' && step1(x)) out.push(b('approve1', standIn(x) ? 'เห็นควรอนุญาต (แทนครูที่ปรึกษา)' : 'เห็นควรอนุญาต', 'primary'));
     if (x.status === 'advisor_ok' && head2(x)) out.push(b('approve2', 'อนุญาต (หัวหน้าระดับ)', 'primary'));
     if ((x.status === 'pending' && step1(x)) || (x.status === 'advisor_ok' && head2(x))) out.push(b('reject', 'ไม่อนุญาต', 'ghost', 'x'));
     if (x.status === 'approved' && step2()) out.push(b('out', 'บันทึกออก', 'accent', 'log-out'));
@@ -171,27 +174,31 @@
     approveWithSign(x) {
       const s = Store.student(x.studentId);
       let pad;
-      const d = dialog({ title: 'ความเห็นครูที่ปรึกษา · เห็นควรอนุญาต', submitLabel: 'เห็นควรอนุญาต', submitClass: 'primary',
+      const sub = standIn(x), many = sub && advisorsOf(s) >= 2;
+      const d = dialog({ title: sub ? 'เห็นควรอนุญาต แทนครูที่ปรึกษา' : 'ความเห็นครูที่ปรึกษา · เห็นควรอนุญาต', submitLabel: 'เห็นควรอนุญาต', submitClass: 'primary',
         body: `<div>${esc(s ? fullName(s) + ' ' + klass(s) : x.studentId)} · ${esc(REASONS[x.reason] || '')}${x.detail ? ' · ' + esc(x.detail) : ''}</div>
-          ${x.pickupName ? `<div class="muted small">ผู้มารับ ${esc(x.pickupName)}${x.pickupRelation ? ' (' + esc(x.pickupRelation) + ')' : ''}</div>` : ''}${signField('ครูที่ปรึกษา')}`,
-        onSubmit: async () => {
+          ${x.pickupName ? `<div class="muted small">ผู้มารับ ${esc(x.pickupName)}${x.pickupRelation ? ' (' + esc(x.pickupRelation) + ')' : ''}</div>` : ''}
+          ${sub ? `<div class="field full"><label>เหตุผลที่อนุญาตแทน ${many ? '<span class="req">*</span>' : ''}</label><input class="input" name="why" maxlength="200" ${many ? 'required' : ''} placeholder="เช่น ครูที่ปรึกษาลาป่วย / ไปราชการ"></div>` : ''}${signField(sub ? 'ผู้อนุญาตแทนครูที่ปรึกษา' : 'ครูที่ปรึกษา')}`,
+        onSubmit: async (v) => {
           if (pad.empty()) { toast('ลงลายมือชื่อก่อน'); return false; }
-          await Store.leaveAction(x.id, 'approve1', '', null, await upSign(x, pad, 1));
+          await Store.leaveAction(x.id, 'approve1', sub && v.why ? 'แทนครูที่ปรึกษา: ' + v.why.trim() : '', null, await upSign(x, pad, 1));
           toast('เห็นควรอนุญาตแล้ว · ส่งต่อหัวหน้าระดับ'); App.render();
         } });
       pad = signPad(d.form);
     },
     approveWithPhoto(x) {
       const s = Store.student(x.studentId);
-      const d = dialog({ title: 'อนุญาต (หัวหน้าระดับ) · ถ่ายรูปผู้มารับ', submitLabel: 'อนุญาต', submitClass: 'primary',
+      const d = dialog({ title: 'อนุญาต (หัวหน้าระดับ) · เซ็นชื่อ แล้วถ่ายรูปผู้มารับ', submitLabel: 'อนุญาต', submitClass: 'primary',
         body: `<div>${esc(s ? fullName(s) + ' ' + klass(s) : x.studentId)} · ${esc(REASONS[x.reason] || '')}${x.pickupName ? ` · ผู้มารับ ${esc(x.pickupName)}${x.pickupRelation ? ' (' + esc(x.pickupRelation) + ')' : ''}` : ''}</div>
-          <div class="notice warn">${icon('camera', 'i16')}<span>ถ่ายรูปผู้ปกครองที่มารับคู่กับนักเรียน เพื่อเป็นหลักฐาน แล้วจึงกดอนุญาต · รูปเก็บในระบบและ Google Drive</span></div>
+          ${x.advisorName ? `<div class="muted small">ขั้นที่ 1 โดย ${esc(x.advisorName)} · ขั้นที่ 2 ต้องเป็นคนละคน</div>` : ''}
+          <div class="small"><b>1.</b> ลงลายมือชื่อ</div>${signField('หัวหน้าระดับ / ผู้อนุญาต')}
+          <div class="small"><b>2.</b> ถ่ายรูปผู้ปกครองที่มารับคู่กับนักเรียน · รูปเก็บในระบบและ Google Drive · ครบทั้ง 2 อย่างจึงอนุญาตสมบูรณ์</div>
           <div class="field"><label>รูปผู้มารับ <span class="req">*</span></label><input class="input" type="file" name="photo" accept="image/*" capture="environment" required style="padding-top:6px"></div>
-          <img class="photo-preview" alt="ตัวอย่างรูปผู้มารับ" hidden style="max-width:100%;max-height:320px;object-fit:contain;border-radius:8px">${signField('หัวหน้าระดับ / ผู้อนุญาต')}`,
+          <img class="photo-preview" alt="ตัวอย่างรูปผู้มารับ" hidden style="max-width:100%;max-height:320px;object-fit:contain;border-radius:8px">`,
         onSubmit: async (v, form) => {
           const f = form.photo.files[0];
-          if (!f) { toast('ถ่ายรูปผู้มารับก่อน'); return false; }
           if (pad.empty()) { toast('ลงลายมือชื่อก่อน'); return false; }
+          if (!f) { toast('ถ่ายรูปผู้มารับก่อน'); return false; }
           const path = await Store.leavePhotoUpload(x.id, await UI.shrinkImage(f, 1280, 0.82));
           await Store.leaveAction(x.id, 'approve2', '', [path], await upSign(x, pad, 2));
           toast('อนุญาตแล้ว · บันทึกรูปผู้มารับแล้ว'); App.render();
@@ -233,7 +240,7 @@
       if (tab === 'trash') return out(Apps.trashView('leave', 'คำขอออกนอกโรงเรียน'));
       if (tab === 'guide') return out(`<div class="card"><div class="card-body"><ol style="margin:0;padding-left:20px;line-height:2">
         <li><b>ยื่นคำขอ</b> — นักเรียน / ผู้ปกครองยื่นจากหน้าผู้ปกครองเท่านั้น · ครูไม่ต้องยื่น รอแจ้งเตือนเพื่ออนุมัติ</li>
-        <li><b>ความเห็นของครูที่ปรึกษา</b> — ครูที่ปรึกษาเข้าระบบแล้วกด "เห็นควรอนุญาต" หรือ "ไม่อนุญาต" · ห้องที่มีครูที่ปรึกษาคนเดียว (หรือครูที่ปรึกษายังไม่มีบัญชี) หัวหน้าระดับ / รองหัวหน้าระดับให้ความเห็นแทนได้ · ต้องลงลายมือชื่อบนจอก่อนอนุญาต</li>
+        <li><b>ความเห็นของครูที่ปรึกษา</b> — ครูที่ปรึกษาเข้าระบบแล้วกด "เห็นควรอนุญาต" หรือ "ไม่อนุญาต" · ครูที่ปรึกษาลา / ป่วย หรือไม่อยู่ หัวหน้าระดับ / รองหัวหน้าระดับของระดับนั้นให้ความเห็นแทนได้ (ใส่เหตุผล) · ต้องลงลายมือชื่อบนจอก่อนอนุญาต</li>
         <li><b>ความเห็นของหัวหน้าระดับ / รองหัวหน้าระดับ / หัวหน้ากลุ่มบริหารกิจการนักเรียน</b> — ต้องเป็นคนละคนกับขั้นที่ 1 · ถ่ายรูปผู้มารับและลงลายมือชื่อบนจอก่อนอนุญาต</li>
         <li><b>ประตู (ฝ่ายปกครอง): บันทึกออก</b> แล้ว <b>บันทึกกลับ</b> ถ้านักเรียนกลับมาเรียนต่อ</li>
         <li>พิมพ์ใบตามแบบ <b>ปค.22</b> (A4 แนวนอน 2 ส่วน: ให้เจ้าหน้าที่รักษาความปลอดภัย / ให้ผู้ปกครอง) จากปุ่มเครื่องพิมพ์</li></ol>
