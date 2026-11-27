@@ -21,7 +21,9 @@
   }
 
   /* ---- reminders: leave requests waiting on this person (badge on the menu, a line on the home page, a toast when a new one arrives) ---- */
-  let remindSeen = null, remindTimer = null;
+  let remindSeen = null, remindTimer = null, leaveSig = '';
+  // any change in the leave list (new request, status, out / back time): the open leave page redraws (user, 27 Nov 2026)
+  const leaveSigNow = () => ((Store.data && Store.data.leave) || []).map((x) => [x.id, x.status, x.outAt, x.backAt, (x.photos || []).length].join(':')).join('|');
   function leaveBadge() {
     const a = document.querySelector('#nav a[href="#/apps/leave"]');
     if (!a || !window.LeaveApp) return;
@@ -42,14 +44,16 @@
     const fresh = remindSeen ? ids.filter((k) => !remindSeen.has(k)) : [];
     remindSeen = new Set(ids);
     leaveBadge();
-    if (fresh.length) {
-      UI.toast(`มีคำขอออกนอกโรงเรียนรอคุณ ${fresh.length} รายการใหม่ · เปิดเมนู "ขออนุญาตออกนอกโรงเรียน"`, 'info');
-      // refresh the page only when nothing is being typed (no dialog open)
-      if (!document.getElementById('dialog-root').innerHTML && /^#\/(apps\/leave)?(\?|$)/.test(location.hash || '#/')) render();
-    }
+    const sig = leaveSigNow(), changed = sig !== leaveSig;
+    leaveSig = sig;
+    if (fresh.length) UI.toast(`มีคำขอออกนอกโรงเรียนรอคุณ ${fresh.length} รายการใหม่ · เปิดเมนู "ขออนุญาตออกนอกโรงเรียน"`, 'info');
+    // redraw the home / leave page only when nothing is being typed (no dialog open, no field of the page in use)
+    const typing = document.activeElement && document.activeElement.closest('#content') && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
+    if ((fresh.length || changed) && !typing && !document.getElementById('dialog-root').innerHTML && /^#\/(apps\/leave)?(\?|$)/.test(location.hash || '#/')) render();
   }
   function startReminders() {
     remindSeen = new Set((window.LeaveApp ? LeaveApp.forMe() : []).map((x) => x.id + ':' + x.status));
+    leaveSig = leaveSigNow();
     leaveBadge();
     clearInterval(remindTimer);
     remindTimer = setInterval(checkReminders, 60000);
