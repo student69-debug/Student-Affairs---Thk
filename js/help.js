@@ -23,13 +23,16 @@
   const mineHtml = (rows) => (rows.length ? `<div class="fb-mine-h muted small">คำถามของฉัน</div>${rows.map((h) => `<div class="fb-mine-row"><div class="fb-mine-top"><span class="badge ${h.status === 'answered' ? 'b-success' : h.status === 'closed' ? 'b-neutral' : 'b-warning'}">${h.status === 'answered' ? 'ตอบแล้ว' : h.status === 'closed' ? 'ปิดแล้ว' : 'รอแอดมิน'}</span><span class="muted small">${esc(fmtDate(h.at))}</span></div><div class="fb-mine-msg">${esc(h.question)}</div>${h.answer ? `<div class="small">ตอบ: ${esc(h.answer)}</div>` : ''}</div>`).join('')}` : '');
 
   /* ---------- admin: Settings → ถาม-ตอบ / LINE ---------- */
-  let qs = [], faq = [], show = 'open';
+  let qs = [], faq = [], show = 'open', log = [], logShow = 'all';
+  const OUT = { answered: ['ตอบแล้ว', 'b-success'], maybe: ['อาจหมายถึง', 'b-info'], queued: ['ส่งถึงแอดมิน', 'b-warning'], uncertain: ['บอทไม่แน่ใจ', 'b-danger'] };
   const html = () => `<div id="help-admin"><div class="card"><div class="card-body">${icon('loader', 'i16')} กำลังโหลด…</div></div></div>`;
   async function after() {
     try {
-      [qs, faq] = await Promise.all([
+      [qs, faq, log] = await Promise.all([
         sb().from('help_questions').select('*').order('at', { ascending: false }).limit(500).then(check),
-        sb().from('help_faq').select('*').order('hits', { ascending: false }).then(check)]);
+        sb().from('help_faq').select('*').order('hits', { ascending: false }).then(check),
+        // every question the bot handled, last 90 days (the database purges older rows); question text only, no asker
+        sb().from('help_log').select('id,at,channel,source,question,faq_id,score,outcome,reviewed').order('at', { ascending: false }).limit(2000).then(check)]);
     } catch (e) { const el = document.getElementById('help-admin'); if (el) el.innerHTML = `<div class="notice warn">${esc(e.message)}</div>`; return; }
     draw();
   }
@@ -38,7 +41,15 @@
     if (!el) return;
     const open = qs.filter((h) => h.status === 'open'), list = show === 'open' ? open : qs;
     const ch = (h) => (h.channel === 'line' ? `<span class="badge b-success">LINE${h.line_source && h.line_source !== 'user' ? ' (กลุ่ม)' : ''}</span>` : '<span class="badge b-navy">เว็บ</span>');
+    const chL = (h) => (h.channel === 'line' ? `<span class="badge b-success">LINE${h.source === 'group' || h.source === 'room' ? ' (กลุ่ม)' : ''}</span>` : '<span class="badge b-navy">เว็บ</span>');
+    const faqQ = (id) => { const f = faq.find((x) => x.id === id); return f ? f.question : ''; };
+    const unsure = log.filter((x) => x.outcome === 'uncertain' && !x.reviewed);
+    const counts = Object.keys(OUT).reduce((o, k) => ({ ...o, [k]: log.filter((x) => x.outcome === k).length }), {});
+    const top = Object.entries(log.filter((x) => x.faq_id && x.outcome === 'answered').reduce((m, x) => ({ ...m, [x.faq_id]: (m[x.faq_id] || 0) + 1 }), {}))
+      .sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const logList = (logShow === 'all' ? log : log.filter((x) => x.outcome === logShow)).slice(0, 200);
     el.innerHTML = `
+
       <div class="card"><div class="card-head"><h3>คำถามรอตอบ</h3><div class="chips">
         <button type="button" class="chip${show === 'open' ? ' on' : ''}" data-help-show="open">รอตอบ <b>${open.length}</b></button>
         <button type="button" class="chip${show === 'all' ? ' on' : ''}" data-help-show="all">ทั้งหมด <b>${qs.length}</b></button></div></div>
@@ -49,6 +60,21 @@
             <td style="white-space:nowrap">${h.status === 'open' ? `<button class="btn primary sm" data-help-answer="${h.id}">${icon('reply', 'i16')}ตอบ</button> <button class="btn ghost sm" data-help-close="${h.id}">ปิด</button>` : ''}
               ${h.channel === 'line' && h.status === 'answered' && !h.notified ? `<button class="btn secondary sm" data-help-push="${h.id}">ส่งทาง LINE</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`
           : empty(show === 'open' ? 'ไม่มีคำถามรอตอบ' : 'ยังไม่มีคำถาม', 'message-circle-question')}</div>
+      <div class="card"><div class="card-head"><h3>บอทไม่แน่ใจ (กลุ่ม LINE)</h3><span class="muted small">ข้อความในกลุ่มที่ดูเหมือนถามเรื่องระบบ แต่บอทไม่มีคำตอบที่ชัด บอทเงียบในกลุ่ม · เก็บเฉพาะข้อความ ไม่เก็บชื่อผู้ถาม</span></div>
+        ${unsure.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>เวลา</th><th>ข้อความ</th><th>ใกล้เคียงที่สุดในคลัง</th><th></th></tr></thead><tbody>
+          ${unsure.map((x) => `<tr><td class="small" style="white-space:nowrap">${esc(fmtDate(x.at, true))}</td><td>${esc(x.question)}</td>
+            <td class="small">${x.faq_id ? `${esc(faqQ(x.faq_id))} <span class="muted">(${Number(x.score || 0).toFixed(2)})</span>` : '<span class="muted">—</span>'}</td>
+            <td style="white-space:nowrap"><button class="btn primary sm" data-help-addlog="${esc(x.id)}">${icon('plus', 'i16')}เพิ่มเข้าคลัง</button> <button class="btn ghost sm" data-help-seen="${esc(x.id)}">ไม่ใช่คำถาม</button></td></tr>`).join('')}</tbody></table></div>`
+          : empty('ไม่มีข้อความที่บอทไม่แน่ใจ', 'circle-check')}</div>
+      <div class="card"><div class="card-head"><h3>ประวัติคำถาม 90 วัน</h3><div class="chips">
+        <button type="button" class="chip${logShow === 'all' ? ' on' : ''}" data-help-log="all">ทั้งหมด <b>${log.length}</b></button>
+        ${Object.entries(OUT).map(([k, [l]]) => `<button type="button" class="chip${logShow === k ? ' on' : ''}" data-help-log="${k}">${l} <b>${counts[k]}</b></button>`).join('')}</div></div>
+        ${top.length ? `<div class="card-body small"><b>คำตอบที่ใช้บ่อย:</b> ${top.map(([id, n]) => `${esc(faqQ(Number(id)) || 'ข้อที่ลบแล้ว')} <span class="badge b-neutral">${n}</span>`).join(' · ')}</div>` : ''}
+        ${logList.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>เวลา</th><th>จาก</th><th>คำถามที่พิมพ์</th><th>ผล</th><th>ตอบด้วยข้อ</th><th class="num">คะแนน</th></tr></thead><tbody>
+          ${logList.map((x) => `<tr><td class="small" style="white-space:nowrap">${esc(fmtDate(x.at, true))}</td><td>${chL(x)}</td><td>${esc(x.question)}</td>
+            <td><span class="badge ${OUT[x.outcome][1]}">${OUT[x.outcome][0]}</span></td><td class="small">${x.faq_id ? esc(faqQ(x.faq_id)) : '—'}</td><td class="num small">${x.score == null ? '—' : Number(x.score).toFixed(2)}</td></tr>`).join('')}</tbody></table></div>
+          ${logList.length === 200 ? '<div class="card-body muted small">แสดง 200 รายการล่าสุด</div>' : ''}` : empty('ยังไม่มีคำถามในช่วงนี้', 'history')}
+        <div class="card-body muted small">ดูว่าครูพิมพ์ถามแบบไหน บอทตอบด้วยข้อไหน · "อาจหมายถึง" และคะแนนต่ำ = ควรเพิ่มคำค้นหรือคำตอบใหม่ · ลบอัตโนมัติเมื่อครบ 90 วัน · คำถามที่มีรหัสนักเรียนหรือเบอร์โทรไม่ถูกเก็บ</div></div>
       <div class="card"><div class="card-head"><h3>คลังคำถาม-คำตอบ</h3><span class="muted small">${faq.length} ข้อ · บอทตอบจากคลังนี้ทั้งในเว็บและ LINE</span>
         <button class="btn primary sm" data-help-faq="new">${icon('plus', 'i16')}เพิ่มคำตอบ</button></div>
         <div class="tbl-wrap"><table class="tbl"><thead><tr><th>คำถาม</th><th>คำตอบ</th><th>คำค้น</th><th class="num">ใช้</th><th></th></tr></thead><tbody>
@@ -61,7 +87,7 @@
           <li>Supabase → Edge Functions → Secrets เพิ่ม <code>LINE_CHANNEL_SECRET</code> และ <code>LINE_CHANNEL_ACCESS_TOKEN</code> (ห้ามส่งในแชทหรือใส่ในโค้ด)</li>
           <li>ที่ LINE Developers → Messaging API → Webhook URL ใส่ <code>${esc(WEBHOOK)}</code> กด Verify แล้วเปิด Use webhook</li>
           <li>ที่ LINE Official Account Manager → ตอบกลับ: ปิด "ข้อความตอบกลับอัตโนมัติ" เปิด "Webhook" · ถ้าจะใช้ในกลุ่ม เปิด "อนุญาตให้เข้าร่วมแชทกลุ่ม"</li></ol>
-        <div class="notice" style="margin-top:8px">${icon('shield', 'i16')}<span>บอทตอบเฉพาะวิธีใช้ระบบ ถ้าคำถามมีรหัสนักเรียนหรือเบอร์โทร บอทไม่ตอบและให้ไปดูในระบบ · ในกลุ่ม บอทตอบเมื่อข้อความขึ้นต้นด้วย "ถาม" หรือแท็กบอท · ตอบกลับอัตโนมัติไม่เสียโควตา ส่วน "ส่งคำตอบทาง LINE" ใช้โควตาข้อความฟรี (~300 ต่อเดือน)</span></div></div></div>`;
+        <div class="notice" style="margin-top:8px">${icon('shield', 'i16')}<span>บอทตอบเฉพาะวิธีใช้ระบบ ถ้าคำถามมีรหัสนักเรียนหรือเบอร์โทร บอทไม่ตอบและให้ไปดูในระบบ · ในกลุ่ม บอทตอบเมื่อคำถามตรงกับคลังชัดเจน (ไม่ต้องพิมพ์ "ถาม") ข้อความคุยทั่วไปบอทเงียบ · พิมพ์ "ถาม" นำหน้าหรือแท็กบอทเพื่อส่งคำถามใหม่ถึงแอดมิน · ตอบกลับอัตโนมัติไม่เสียโควตา ส่วน "ส่งคำตอบทาง LINE" ใช้โควตาข้อความฟรี (~300 ต่อเดือน)</span></div></div></div>`;
     UI.refreshIcons();
     el.onclick = onClick;
   }
@@ -69,6 +95,12 @@
     const b = e.target.closest('button');
     if (!b) return;
     if (b.dataset.helpShow) { show = b.dataset.helpShow; draw(); return; }
+    if (b.dataset.helpLog) { logShow = b.dataset.helpLog; draw(); return; }
+    if (b.dataset.helpSeen) { check(await sb().from('help_log').update({ reviewed: true }).eq('id', Number(b.dataset.helpSeen))); toast('ซ่อนแล้ว'); return after(); }
+    if (b.dataset.helpAddlog) {
+      const x = log.find((r) => String(r.id) === b.dataset.helpAddlog);
+      return faqDialog(null, x.question, async () => { await sb().from('help_log').update({ reviewed: true }).eq('id', x.id); });
+    }
     if (b.dataset.helpAnswer) return answerDialog(qs.find((h) => String(h.id) === b.dataset.helpAnswer));
     if (b.dataset.helpClose) { check(await sb().rpc('help_close', { p_id: Number(b.dataset.helpClose) })); toast('ปิดคำถามแล้ว'); return after(); }
     if (b.dataset.helpPush) return push(Number(b.dataset.helpPush));
@@ -98,15 +130,16 @@
         if (h.channel === 'line') await push(h.id); else after();
       } });
   }
-  function faqDialog(f) {
+  function faqDialog(f, preset = '', done = null) {
     UI.dialog({ title: f ? 'แก้ไขคำตอบในคลัง' : 'เพิ่มคำตอบในคลัง', submitLabel: 'บันทึก',
-      body: `<div class="field"><label>คำถาม <span class="req">*</span></label><input class="input" name="q" maxlength="300" required value="${esc(f ? f.question : '')}"></div>
+      body: `<div class="field"><label>คำถาม <span class="req">*</span></label><input class="input" name="q" maxlength="300" required value="${esc(f ? f.question : preset.slice(0, 300))}"></div>
         <div class="field"><label>คำตอบ <span class="req">*</span></label><textarea class="textarea" name="a" maxlength="3000" required style="min-height:120px">${esc(f ? f.answer : '')}</textarea></div>
         <div class="field"><label>คำค้น (คั่นด้วยจุลภาค)</label><input class="input" name="kw" maxlength="300" value="${esc(f ? (f.keywords || []).join(', ') : '')}"></div>
         <label class="check"><input type="checkbox" name="active" ${!f || f.active ? 'checked' : ''}> ใช้ตอบ</label>`,
       onSubmit: async (v) => {
         const row = { question: v.q.trim(), answer: v.a.trim(), keywords: v.kw.split(/[,，]/).map((k) => k.trim()).filter(Boolean), active: !!v.active, updated_at: new Date().toISOString() };
         check(f ? await sb().from('help_faq').update(row).eq('id', f.id) : await sb().from('help_faq').insert(row));
+        if (done) await done();
         toast('บันทึกแล้ว'); after();
       } });
   }
