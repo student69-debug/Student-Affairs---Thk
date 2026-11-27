@@ -182,6 +182,18 @@ const tests = {
     Store.profile = { id: 'g', role: 'grade_head', name: 'z' }; Store.data.teacherRooms = []; Store.data.teacherGrades = [{ userId: 'g', grade: 4 }];
     assert.match(btns(), /เห็นควรอนุญาต \(แทนครูที่ปรึกษา\)/); assert.doesNotMatch(btns(), /data-act="approve2"/);
   },
+  'leave: a grade head of another grade gives step 2 and records out / back, never step 1, reminded only for own grade': () => {
+    const L = ctx.LeaveApp;
+    Store.data.students = [{ id: '30001', first: 'ก', last: 'ข', grade: 4, room: 1, advisor: 'ครู ก', status: 'studying', mine: true }];
+    Store.data.leave = [{ id: 'p', studentId: '30001', status: 'pending', at: '1' }, { id: 'q', studentId: '30001', status: 'advisor_ok', advisorBy: 't', advisorName: 'x', at: '2' },
+      { id: 'r', studentId: '30001', status: 'approved', at: '3' }];
+    Store.profile = { id: 'h', role: 'grade_head', name: 'z' }; Store.data.teacherRooms = []; Store.data.teacherGrades = [{ userId: 'h', grade: 1 }];
+    const h = L.table(Store.data.leave);
+    assert.doesNotMatch(h, /data-act="approve1"/); assert.match(h, /data-act="approve2"/); assert.match(h, /data-act="out"/);
+    assert.equal(L.forMe().length, 0);
+    Store.data.teacherGrades = [{ userId: 'h', grade: 4 }];
+    assert.deepEqual(L.forMe().map((x) => x.id).sort(), ['p', 'q']);
+  },
   'leave: both signatures show under the status, a stand-in is marked': () => {
     Store.data.leave = [{ id: 'r', studentId: '30001', status: 'approved', at: '1', advisorSign: 'r/sign1-a.jpg', advisorName: '<b>x</b>', approveSign: 'r/sign2-b.jpg', approveName: 'y', log: [{ action: 'approve1', note: 'แทนครูที่ปรึกษา: ลาป่วย' }] }];
     const h = ctx.LeaveApp.table(Store.data.leave);

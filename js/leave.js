@@ -19,21 +19,23 @@
   // mirrors the database (private.leave_step1 / leave_head / leave_step2); buttons only — the database decides
   // step 1 = homeroom teacher; the grade head / deputy of the grade may stand in (with a reason when the room has its own
   // homeroom teachers signed up); admins do not give step 1 (user, 27 Nov 2026).
-  // step 2 = grade head of the grade or the head of student affairs, never the person who gave step 1; the gate = ฝ่ายปกครอง
+  // step 2 = a grade head / deputy of ANY grade (they may be teaching) or the head of student affairs, never the person who gave step 1;
+  // the gate = ฝ่ายปกครอง or any grade head / deputy (user, 27 Nov 2026)
   const role = () => Store.user().role;
-  const headOf = (x) => { const s = Store.student(x.studentId); return Store.isAdmin() || (s && role() === 'grade_head' && Store.myGrades().includes(Number(s.grade))); };
+  const headOf = () => Store.isAdmin() || role() === 'grade_head';
   const ownHead = (s) => !!s && role() === 'grade_head' && Store.myGrades().includes(Number(s.grade));
   const step1 = (x) => { const s = Store.student(x.studentId); return !!s && (Store.homeroomOf(s) || ownHead(s)); };
   const standIn = (x) => { const s = Store.student(x.studentId); return !!s && !Store.homeroomOf(s) && ownHead(s); };
   const head2 = (x) => headOf(x) && x.advisorBy !== Store.user().id;
-  const step2 = () => Store.isAdmin() || role() === 'inspector';
+  const step2 = () => Store.isAdmin() || ['inspector', 'grade_head'].includes(role());
   // who is waited on (for the reminder): the homeroom teacher (or the grade head when the room has one listed advisor),
   // then the grade head / head of student affairs, then the gate for approved passes
   const advisorsOf = (s) => new Set(String((s && s.advisor) || '').split(/\s*[,/]\s*/).map((t) => t.trim()).filter(Boolean)).size;
   function waitsOnMe(x) {
     const s = Store.student(x.studentId);
-    if (x.status === 'pending') return !!s && (Store.homeroomOf(s) || (headOf(x) && !Store.isAdmin() && advisorsOf(s) <= 1));
-    if (x.status === 'advisor_ok') return head2(x);
+    if (x.status === 'pending') return !!s && (Store.homeroomOf(s) || (ownHead(s) && advisorsOf(s) <= 1));
+    // any grade head may give step 2, but the reminder goes to the heads of the student's own grade (and admins)
+    if (x.status === 'advisor_ok') return head2(x) && (ownHead(s) || Store.isAdmin());
     if (x.status === 'approved' || (x.status === 'out' && x.returns !== false)) return role() === 'inspector';
     return false;
   }
@@ -238,7 +240,7 @@
       const t = Store.termKey(), cur = all().filter((x) => x.term === t), open = all().filter(active).sort(byDate);
       const mine = open.filter(waitsOnMe);
       const cards = `<div class="grid g4">
-        ${Apps.stat('inbox', 'รอฉันดำเนินการ', mine.length, 'รายการ', 'amber', step2() ? 'บันทึกออก-กลับ' : 'รอความเห็น / การอนุญาตจากคุณ', base + '?tab=list&who=me')}
+        ${Apps.stat('inbox', 'รอฉันดำเนินการ', mine.length, 'รายการ', 'amber', role() === 'inspector' ? 'บันทึกออก-กลับ' : 'รอความเห็น / การอนุญาตจากคุณ', base + '?tab=list&who=me')}
         ${Apps.stat('hourglass', 'ยังไม่จบ', open.length, 'รายการ', '', 'รออนุมัติ / รอออก / รอกลับ', base + '?tab=list&status=open')}
         ${Apps.stat('door-open', 'ออกวันนี้', all().filter((x) => x.outAt && x.outAt.slice(0, 10) === new Date().toISOString().slice(0, 10)).length, 'คน', 'green', '', base + '?tab=done&day=today')}
         ${Apps.stat('calendar', 'ภาคเรียนนี้', cur.filter((x) => ['out', 'returned'].includes(x.status)).length, 'ครั้ง', '', `ภาคเรียน ${t}`, base + '?tab=done&status=done')}</div>`;
@@ -250,8 +252,8 @@
       if (tab === 'guide') return out(`<div class="card"><div class="card-body"><ol style="margin:0;padding-left:20px;line-height:2">
         <li><b>ยื่นคำขอ</b> — นักเรียน / ผู้ปกครองยื่นจากหน้าผู้ปกครองเท่านั้น · ครูไม่ต้องยื่น รอแจ้งเตือนเพื่ออนุมัติ</li>
         <li><b>ความเห็นของครูที่ปรึกษา</b> — ครูที่ปรึกษาเข้าระบบแล้วกด "เห็นควรอนุญาต" หรือ "ไม่อนุญาต" · ครูที่ปรึกษาลา / ป่วย หรือไม่อยู่ หัวหน้าระดับ / รองหัวหน้าระดับของระดับนั้นให้ความเห็นแทนได้ (ใส่เหตุผล) · ต้องลงลายมือชื่อบนจอก่อนอนุญาต</li>
-        <li><b>ความเห็นของหัวหน้าระดับ / รองหัวหน้าระดับ / หัวหน้ากลุ่มบริหารกิจการนักเรียน</b> — ต้องเป็นคนละคนกับขั้นที่ 1 · ถ่ายรูปผู้มารับและลงลายมือชื่อบนจอก่อนอนุญาต</li>
-        <li><b>ประตู (ฝ่ายปกครอง): บันทึกออก</b> แล้ว <b>บันทึกกลับ</b> ถ้านักเรียนกลับมาเรียนต่อ</li>
+        <li><b>ความเห็นของหัวหน้าระดับ / รองหัวหน้าระดับ (ระดับใดก็ได้) / หัวหน้ากลุ่มบริหารกิจการนักเรียน</b> — ต้องเป็นคนละคนกับขั้นที่ 1 · ถ่ายรูปผู้มารับและลงลายมือชื่อบนจอก่อนอนุญาต</li>
+        <li><b>ประตู (ฝ่ายปกครอง หรือหัวหน้าระดับ / รองหัวหน้าระดับระดับใดก็ได้): บันทึกออก</b> แล้ว <b>บันทึกกลับ</b> ถ้านักเรียนกลับมาเรียนต่อ</li>
         <li>พิมพ์ใบตามแบบ <b>ปค.22</b> (A4 แนวนอน 2 ส่วน: ให้เจ้าหน้าที่รักษาความปลอดภัย / ให้ผู้ปกครอง) จากปุ่มเครื่องพิมพ์</li></ol>
         <p class="muted small" style="margin:12px 0 0">ไม่อนุญาตต้องใส่เหตุผล · ทุกขั้นตอนเก็บชื่อผู้ทำและเวลา · พิมพ์ใบขออนุญาตได้จากปุ่มเครื่องพิมพ์ · รูปถ่ายเก็บสำเนาใน Google Drive โฟลเดอร์ "ขออนุญาตออกนอกโรงเรียน" แยกปีการศึกษาและห้อง</p></div></div>`);
       if (tab === 'list' || tab === 'done') {
