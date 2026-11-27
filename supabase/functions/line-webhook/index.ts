@@ -21,11 +21,13 @@ async function validSignature(body: string, sig: string | null): Promise<boolean
 }
 
 async function reply(token: string, text: string) {
-  await fetch('https://api.line.me/v2/bot/message/reply', {
+  const r = await fetch('https://api.line.me/v2/bot/message/reply', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}` },
     body: JSON.stringify({ replyToken: token, messages: [{ type: 'text', text: text.slice(0, 4900) }] }),
   });
+  // LINE's own error text only (no message content, no user ids) so a silent bot can be diagnosed in the function logs
+  if (!r.ok) console.log('reply failed', r.status, (await r.text()).slice(0, 300));
 }
 
 const HELLO = 'สวัสดีครับ บอทช่วยตอบวิธีใช้ระบบกิจการนักเรียน\nพิมพ์คำถามได้เลย เช่น "ครูที่ปรึกษาลาป่วย ใครอนุญาตแทน"\nในกลุ่ม ให้ขึ้นต้นด้วย "ถาม" หรือแท็กบอท\n(บอทไม่ตอบข้อมูลของนักเรียนรายคน)';
@@ -43,7 +45,9 @@ Deno.serve(async (req) => {
     try {
       if ((ev.type === 'follow' || ev.type === 'join') && ev.replyToken) { await reply(ev.replyToken, HELLO); continue; }
       if (ev.type !== 'message' || ev.message?.type !== 'text' || !ev.replyToken) continue;
-      const src: string = ev.source?.type ?? 'user', user: string | undefined = ev.source?.userId;
+      const src: string = ev.source?.type ?? 'user';
+      // a group member who never added the account may come without userId: fall back to the group / room id
+      const user: string | undefined = ev.source?.userId ?? ev.source?.groupId ?? ev.source?.roomId;
       let text: string = String(ev.message.text ?? '');
       if (src !== 'user') {
         // in a group the bot speaks only when asked
@@ -51,18 +55,20 @@ Deno.serve(async (req) => {
         const self = mentions.filter((m) => m.isSelf);
         for (const m of [...self].sort((a, b) => b.index - a.index)) text = text.slice(0, m.index) + text.slice(m.index + m.length);
         const asked = /^\s*(ถาม|\?|？|บอท)/.test(text);
-        if (!self.length && !asked) continue;
+        if (!self.length && !asked) { console.log('group message ignored (no ถาม / ? / บอท / mention)'); continue; }
         text = text.replace(/^\s*(ถาม|\?|？|บอท)\s*[:：]?/, '');
       }
       text = text.trim();
-      if (!user || text.length < 2) continue;
+      if (!user || text.length < 2) { console.log('skipped', src, user ? 'short text' : 'no user id'); continue; }
       const { data: r, error } = await sb.rpc('help_line_ask', { p_user: user, p_source: src, p_text: text.slice(0, 1000) });
+      console.log('asked', src, error ? 'error ' + error.message : r ? Object.keys(r).join(',') : 'empty');
       if (error || !r) { await reply(ev.replyToken, 'ขออภัย ระบบตอบคำถามขัดข้องชั่วคราว ลองใหม่อีกครั้งภายหลัง'); continue; }
       if (r.answer) await reply(ev.replyToken, `${r.answer}\n\n— ตอบอัตโนมัติจากระบบกิจการนักเรียน · ถ้าไม่ตรง พิมพ์คำถามให้ละเอียดขึ้น`);
       else if (r.queued) await reply(ev.replyToken, 'รับคำถามแล้ว ยังไม่มีคำตอบในระบบ แอดมินจะตอบกลับทางแชทนี้ (ต้องเพิ่มบัญชีนี้เป็นเพื่อนไว้)');
       else if (r.personal) await reply(ev.replyToken, `บอทตอบเฉพาะวิธีใช้ระบบ ไม่ตอบข้อมูลของนักเรียนรายคน (รหัส เบอร์โทร คะแนน เคส) กรุณาดูในระบบ: ${SITE}`);
       else if (r.limit) await reply(ev.replyToken, 'วันนี้ถามครบ 30 คำถามแล้ว ถามต่อได้พรุ่งนี้ หรือถามในเว็บ');
-    } catch (_e) { /* one bad event must not stop the others; LINE retries are not needed */ }
+      else await reply(ev.replyToken, 'ขออภัย อ่านคำถามไม่สำเร็จ ลองพิมพ์ใหม่อีกครั้ง');
+    } catch (e) { console.log('event failed', String(e).slice(0, 200)); /* one bad event must not stop the others */ }
   }
   return new Response('ok');
 });
