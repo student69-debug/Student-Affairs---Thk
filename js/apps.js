@@ -158,15 +158,21 @@
     },
     openRecord(sid, restoreOnly = false) {
       const past = Store.pastTerms();
-      const rules = activeRules().filter((r) => (restoreOnly ? r.restore : true));
+      // deductions and merits are chosen apart (user, 27 Nov 2026), points are the rule's own (locked; only the discretion rule is typed)
+      const all = activeRules().filter((r) => (restoreOnly ? r.restore : true));
+      const ofKind = (k) => all.filter((r) => (k === 'plus' ? r.points > 0 : r.points < 0));
+      const rules = restoreOnly ? all : ofKind('minus');
       const opt = (list) => list.map((r) => `<option value="${esc(r.id)}" data-p="${r.points}" data-info="${esc(ruleInfo(r))}">${esc(ruleLabel(r))}</option>`).join('');
+      const options = (list) => ruleGroups(list).map(([cat, l]) => `<optgroup label="${esc(cat)}">${opt(l)}</optgroup>`).join('');
       const d = dialog({
         title: restoreOnly ? 'บันทึกกิจกรรมคืนคะแนน' : 'บันทึกพฤติกรรม', accent: true, submitLabel: 'ยืนยันการบันทึก', submitClass: 'accent',
         body: `<div class="form-grid">${studentField('student', sid)}
-          <div class="field full"><label>พฤติกรรม <span class="req">*</span></label><select class="select" name="rule" required>
-            ${ruleGroups(rules).map(([cat, list]) => `<optgroup label="${esc(cat)}">${opt(list)}</optgroup>`).join('')}</select>
+          ${restoreOnly ? '' : `<div class="field full"><label>ประเภท <span class="req">*</span></label><div class="kind-pick" role="radiogroup" aria-label="ประเภทพฤติกรรม">
+            <label class="kind minus"><input type="radio" name="kind" value="minus" checked>${icon('minus-circle', 'i16')}ตัดคะแนน <small>(${ofKind('minus').length} ข้อ)</small></label>
+            <label class="kind plus"><input type="radio" name="kind" value="plus">${icon('plus-circle', 'i16')}เพิ่มคะแนน / ความดี <small>(${ofKind('plus').length} ข้อ)</small></label></div></div>`}
+          <div class="field full"><label>พฤติกรรม <span class="req">*</span></label><select class="select" name="rule" required>${options(rules)}</select>
             <span class="help" data-rule-info>${esc(ruleInfo(rules[0]))}</span></div>
-          <div class="field"><label>คะแนน <span class="req">*</span></label><input class="input mono" type="number" name="points" required value="${rules[0] ? rules[0].points : 0}"><span class="help">ติดลบ = ตัดคะแนน · ลดได้ แต่ไม่เกินที่ระเบียบกำหนด</span></div>
+          <div class="field"><label>คะแนน <span class="req">*</span></label><input class="input mono" type="number" name="points" required value="${rules[0] ? rules[0].points : 0}"><span class="help" data-pts-help></span></div>
           <div class="field"><label>วันที่ / เวลาที่เกิดเหตุ</label><input class="input" type="datetime-local" name="at" required value="${localInput()}"></div>
           ${past.length ? `<div class="field full"><label>ภาคเรียน</label><select class="select" name="term">${optList([[Store.termKey(), Store.termKey() + ' (ปัจจุบัน)']].concat(past.map((k) => [k, k + ' (ย้อนหลัง)'])), Store.termKey())}</select><span class="help" data-term-info></span></div>` : ''}
           ${restoreOnly ? '' : `<label class="full inc-toggle"><input type="checkbox" name="multi"> <span><b>เหตุการณ์ที่มีนักเรียนหลายคน</b> (เช่น ทะเลาะวิวาท) — ลงผู้ก่อเหตุและผู้ร่วมกระทำพร้อมกัน</span></label>
@@ -222,8 +228,13 @@
         });
       }
       // same limits as the database: keep the rule's sign, may reduce but not exceed it (discretion rules up to 100)
-      const limits = () => { const r = D().behavior.rules.find((x) => x.id === sel.value); if (!r) return [-100, 100]; const cap = r.level === 'ดุลยพินิจ' ? 100 : Math.abs(r.points); return r.points < 0 ? [-cap, -1] : [1, cap]; };
-      const applyLimits = (inp) => { const [mn, mx] = limits(); inp.min = mn; inp.max = mx; inp.title = `คะแนน ${mn} ถึง ${mx}`; };
+      // database: points = the rule's points; the discretion rule (committee) keeps its sign, up to 100
+      const curRule = () => D().behavior.rules.find((x) => x.id === sel.value);
+      const free = () => { const r = curRule(); return !!r && r.level === 'ดุลยพินิจ'; };
+      const limits = () => { const r = curRule(); if (!r) return [-100, 100]; if (!free()) return [r.points, r.points]; return r.points < 0 ? [-100, -1] : [1, 100]; };
+      const applyLimits = (inp) => { const [mn, mx] = limits(); inp.min = mn; inp.max = mx; inp.readOnly = !free(); inp.classList.toggle('locked', !free());
+        inp.title = free() ? `คะแนน ${mn} ถึง ${mx}` : 'คะแนนตามระเบียบ แก้ไม่ได้';
+        const h = inp.parentElement.querySelector('[data-pts-help]'); if (h) h.textContent = free() ? 'ดุลยพินิจของคณะกรรมการ · ใส่ได้ไม่เกิน 100 คะแนน' : 'คะแนนตามระเบียบ (ล็อกไว้ แก้ไม่ได้)'; };
       applyLimits(pts);
       const multi = d.form.multi, box = d.form.querySelector('.inc-box'), list = d.form.querySelector('.inc-people');
       const addRow = () => {
@@ -231,9 +242,10 @@
         row.className = 'inc-row';
         row.innerHTML = `<input class="input" data-f="sid" list="dl-students" placeholder="พิมพ์รหัสหรือชื่อนักเรียน" autocomplete="off">
           <select class="select" data-f="role"><option>ผู้ก่อเหตุ</option><option>ผู้ร่วมกระทำ</option></select>
-          <input class="input mono" type="number" data-f="pts" value="${pts.value}" min="${pts.min}" max="${pts.max}" title="คะแนน ${pts.min} ถึง ${pts.max}">
+          <input class="input mono" type="number" data-f="pts" value="${pts.value}" min="${pts.min}" max="${pts.max}">
           <button type="button" class="icon-btn" data-inc="del" title="เอาออก">${icon('x', 'i16')}</button>`;
         list.appendChild(row);
+        applyLimits(row.querySelector('[data-f=pts]'));
         UI.refreshIcons();
         row.querySelector('[data-f=sid]').focus();
       };
@@ -245,6 +257,11 @@
         list && list.querySelectorAll('[data-f=pts]').forEach((x) => { x.value = pts.value; applyLimits(x); });
         if (/ทะเลาะ|วิวาท/.test(sel.selectedOptions[0].textContent)) setMulti(true); // fights usually involve more than one student
       });
+      // switching ตัดคะแนน / เพิ่มคะแนน refills the rule list with that kind only
+      d.form.querySelectorAll('input[name=kind]').forEach((k) => k.addEventListener('change', () => {
+        sel.innerHTML = options(ofKind(k.value)); sel.dispatchEvent(new Event('change'));
+        d.form.classList.toggle('kind-plus', k.value === 'plus');
+      }));
       if (multi) {
         multi.addEventListener('change', () => setMulti(multi.checked));
         d.form.addEventListener('click', (e) => {

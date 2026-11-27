@@ -815,3 +815,13 @@ img.avatar.lg[data-photo]{cursor:zoom-in}
 .chip-check{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--ink-200);border-radius:999px;cursor:pointer;font-size:14px;background:#fff}
 .chip-check:has(input:checked){border-color:var(--navy-600,#111770);background:var(--navy-50,#eef0fb);color:var(--navy-700,#111770);font-weight:600}
 .chip-check input{margin:0}
+/* behaviour form: deduct / merit chosen first (27 Nov 2026) */
+.kind-pick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kind-pick .kind{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:2px solid var(--ink-200);border-radius:var(--radius-md,10px);cursor:pointer;font-weight:600;background:#fff;text-align:center}
+.kind-pick .kind input{position:absolute;opacity:0;pointer-events:none}
+.kind-pick .kind small{font-weight:400;color:var(--ink-500,#6b7280)}
+.kind-pick .kind.minus:has(input:checked){border-color:var(--red-700,#b91c1c);background:#fdecec;color:var(--red-700,#b91c1c)}
+.kind-pick .kind.plus:has(input:checked){border-color:var(--green-600,#16a34a);background:#e9f8ef;color:var(--green-700,#15803d)}
+.kind-pick .kind:has(input:focus-visible){outline:2px solid var(--navy-600,#111770);outline-offset:2px}
+.input.locked{background:var(--ink-100,#eef0f4);color:var(--ink-700,#374151);cursor:not-allowed}
+@media (max-width:640px){.kind-pick{grid-template-columns:1fr}}
