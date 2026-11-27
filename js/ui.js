@@ -65,10 +65,14 @@
   }
   // who is this? photo, class and parents' numbers under every student picker; only what this person may already see
   // (photo and numbers come masked from students_list outside the teacher's own students)
+  // the numbers in a stored phone field ("081-234-5678", several split by , / ;), each ≥ 9 digits
+  const telNums = (p) => String(p || '').split(/[,/;]|\s{2,}/).map((t) => t.trim()).filter((t) => t.replace(/\D/g, '').length >= 9);
+  // a phone field as tap-to-call links (user, 27 Nov 2026); text that holds no number stays plain text
+  const telLinks = (p) => { const n = telNums(p); return n.length ? n.map((t) => `<a class="tel-link mono" href="tel:${t.replace(/[^\d+]/g, '')}">${icon('phone', 'i16')}${esc(t)}</a>`).join(' ') : `<span class="mono">${esc(p)}</span>`; };
   function studentCard(s) {
     if (!s) return '';
     const pic = s.photoPath ? `<img class="avatar lg" data-photo="${esc(s.photoPath)}" alt="${esc('รูปถ่าย ' + fullName(s))}" role="button" tabindex="0" title="แตะเพื่อดูรูปเต็ม" style="object-fit:cover">` : `<div class="avatar lg">${esc(initials(s))}</div>`;
-    const tel = (p) => String(p || '').split(/[,/;]|\s{2,}/).map((t) => t.trim()).filter((t) => t.replace(/\D/g, '').length >= 9);
+    const tel = telNums;
     const nums = [['ผู้ปกครอง', s.guardian, s.guardianPhone], ['บิดา', s.father, s.fatherPhone], ['มารดา', s.mother, s.motherPhone], ['นักเรียน', '', s.studentPhone]]
       .flatMap(([who, n, p]) => tel(p).map((t) => `<a class="btn secondary sm" href="tel:${t.replace(/[^\d+]/g, '')}">${icon('phone', 'i16')}${esc(who)}${n ? ' ' + esc(n) : ''} · ${esc(t)}</a>`));
     const telHtml = !s.mine ? '<span class="muted small">เบอร์โทรและรูปถ่ายเห็นได้เฉพาะครูที่ดูแลนักเรียนคนนี้</span>'
@@ -312,5 +316,5 @@
   new MutationObserver(queueA11y).observe(document.body, { childList: true, subtree: true });
   window.addEventListener('resize', queueA11y);
 
-  window.UI = { a11y, esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, studentCard, studentCards, numAttrs, numValue, NUM, parseStudent, parseMyStudent, dialog, confirmDialog, deleteDialog, toast, refreshIcons, hydratePhotos, shrinkImage, readSheet, download, parseCSV };
+  window.UI = { a11y, esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, studentCard, studentCards, telLinks, numAttrs, numValue, NUM, parseStudent, parseMyStudent, dialog, confirmDialog, deleteDialog, toast, refreshIcons, hydratePhotos, shrinkImage, readSheet, download, parseCSV };
 })();

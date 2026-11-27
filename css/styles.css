@@ -825,3 +825,6 @@ img.avatar.lg[data-photo]{cursor:zoom-in}
 .kind-pick .kind:has(input:focus-visible){outline:2px solid var(--navy-600,#111770);outline-offset:2px}
 .input.locked{background:var(--ink-100,#eef0f4);color:var(--ink-700,#374151);cursor:not-allowed}
 @media (max-width:640px){.kind-pick{grid-template-columns:1fr}}
+/* tap-to-call phone numbers on the student page (27 Nov 2026) */
+.tel-link{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:6px 10px;margin:2px 0;border:1px solid var(--ink-200);border-radius:999px;color:var(--navy-700,#111770);text-decoration:none;font-weight:600;min-height:36px;background:#fff}
+.tel-link:hover,.tel-link:focus-visible{background:var(--navy-50,#eef0fb);border-color:var(--navy-600,#111770)}

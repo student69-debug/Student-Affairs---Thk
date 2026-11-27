@@ -192,8 +192,8 @@
     const info = `<div class="card-body"><div class="form-grid">${[
       ['รหัสนักเรียน', `<span class="mono">${esc(s.id)}</span>`], ['เลขประจำตัวประชาชน', `<span class="mono">${Store.isAdmin() ? esc(s.cid) : esc(s.cid).slice(0, 1) + '-XXXX-XXXXX-' + s.cid.slice(-3)}</span>`],
       ['ชื่อ – นามสกุล', esc(fullName(s))], ['ชื่อเล่น', esc(s.nick)], ['ชั้น / ห้อง / เลขที่', `${klass(s)} เลขที่ ${s.no}`], ['ครูที่ปรึกษา', esc(s.advisor)],
-      ['ผู้ปกครอง', esc(s.guardian)], ['เบอร์โทรผู้ปกครอง', `<span class="mono">${esc(s.guardianPhone)}</span>`], ['เบอร์โทรนักเรียน', `<span class="mono">${esc(s.studentPhone)}</span>`], ['', ''],
-      ['ชื่อบิดา', esc(s.father)], ['เบอร์โทรบิดา', `<span class="mono">${esc(s.fatherPhone)}</span>`], ['ชื่อมารดา', esc(s.mother)], ['เบอร์โทรมารดา', `<span class="mono">${esc(s.motherPhone)}</span>`],
+      ['ผู้ปกครอง', esc(s.guardian)], ['เบอร์โทรผู้ปกครอง', UI.telLinks(s.guardianPhone)], ['เบอร์โทรนักเรียน', UI.telLinks(s.studentPhone)], ['', ''],
+      ['ชื่อบิดา', esc(s.father)], ['เบอร์โทรบิดา', UI.telLinks(s.fatherPhone)], ['ชื่อมารดา', esc(s.mother)], ['เบอร์โทรมารดา', UI.telLinks(s.motherPhone)],
       ['ที่อยู่', esc(s.address)], ['สถานะ', statusBadge(s.status)],
     ].map(([k, v]) => `<div class="field"><label class="muted" style="font-weight:500;color:var(--ink-500)">${k}</label><div>${v}</div></div>`).join('')}</div>
       <p class="muted small" style="margin:16px 0 0">${icon('database', 'i16')} ข้อมูลจากฐานข้อมูลกลาง — แอปย่อยอ่านได้อย่างเดียว ${Store.isAdmin() ? `· <a href="#" data-action="registry-edit" data-id="${esc(s.id)}">แก้ไขในทะเบียน</a>` : ''}</p></div>`;

@@ -199,6 +199,12 @@ const tests = {
     const h = ctx.LeaveApp.table(Store.data.leave);
     assert.match(h, /data-lv-sign="r\/sign1-a.jpg"/); assert.match(h, /data-lv-sign="r\/sign2-b.jpg"/); assert.match(h, />แทนครูที่ปรึกษา</); assert.doesNotMatch(h, /<b>x<\/b>/);
   },
+  'student page: phone numbers are tap-to-call links, other text stays escaped text': () => {
+    const h = ctx.UI.telLinks('092-193-8989, 081-111-2222');
+    assert.match(h, /href="tel:0921938989"/); assert.match(h, /href="tel:0811112222"/);
+    assert.doesNotMatch(ctx.UI.telLinks('<b>x</b>'), /href=|<b>/);
+    assert.equal((ctx.UI.telLinks('') .match(/href=/g) || []).length, 0);
+  },
   'counselling teacher: grades chosen by the admin limit the student picker, none = every grade': () => {
     Store.directory = [{ id: '60001', grade: 1, room: 1, status: 'studying' }, { id: '60002', grade: 3, room: 1, status: 'studying' }, { id: '60003', grade: 4, room: 2, status: 'studying' }];
     Store.profile = { id: 't', role: 'teacher', name: 'x', apps: { counsel_staff: true, counsel_grades: [3, 4, 'x', 9] } };
