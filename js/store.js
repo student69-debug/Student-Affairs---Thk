@@ -105,10 +105,11 @@
     if (CUSTOM[kind]) return CUSTOM[kind]();
     const m = MAPS[kind];
     // students come through students_list(): everyone sees the directory, personal fields only for own scope
-    const rows = await paged((a, b) => {
-      let q = kind === 'students' ? sb.rpc('students_list').range(a, b) : sb.from(m.table).select(m.cols.map((c) => c[1]).join(',')).range(a, b);
-      if (m.order && kind !== 'students') q = q.order(m.order, { ascending: !m.desc });
-      if (kind !== 'students' && m.order !== 'id' && m.cols.some((c) => c[1] === 'id')) q = q.order('id');
+    // students: one call (students_list_json) so the list is computed once, not once per 1000-row page
+    const rows = kind === 'students' ? (check(await sb.rpc('students_list_json')) || []) : await paged((a, b) => {
+      let q = sb.from(m.table).select(m.cols.map((c) => c[1]).join(',')).range(a, b);
+      if (m.order) q = q.order(m.order, { ascending: !m.desc });
+      if (m.order !== 'id' && m.cols.some((c) => c[1] === 'id')) q = q.order('id');
       if (kind === 'users') q = q.neq('role', 'parent'); // parent accounts are counted separately, not listed
       return q;
     });
@@ -316,15 +317,17 @@
       const lists = await Promise.all(kinds.map(fetchAll));
       kinds.forEach((k, i) => setSlot(k, lists[i]));
       this.data.trash = [];
-      // 30-day bins: one per app (+ the student registry); who may use each is set per role in Settings
-      if (this.binOk('registry')) { try { await this.loadTrash(); } catch (e) { /* bin not available */ } }
       this.data.appTrash = {};
+      this.data.caseTrash = [];
+      // 30-day bins: one per app (+ the student registry); who may use each is set per role in Settings — loaded together, not one after another
+      const bins = [];
+      if (this.binOk('registry')) bins.push(this.loadTrash());
       for (const app of Object.keys(this.s.restoreRoles || {})) {
         if (app === 'registry' || app === 'counsel' || !this.binOk(app)) continue;
-        try { await this.loadAppTrash(app); } catch (e) { /* bin not available */ }
+        bins.push(this.loadAppTrash(app));
       }
-      this.data.caseTrash = [];
-      if (this.binOk('counsel')) { try { await this.loadCaseTrash(); } catch (e) { /* bin not available */ } }
+      if (this.binOk('counsel')) bins.push(this.loadCaseTrash());
+      await Promise.allSettled(bins); // a bin that fails stays empty, as before
       if (this.isAdmin()) this.purgePhotos().catch(() => {});
     },
     // put rows just written (as returned by the database) into the list, newest first / drop a deleted one
