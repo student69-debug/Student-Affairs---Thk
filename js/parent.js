@@ -110,18 +110,34 @@
   let leaves = [], students = [];
   const L = () => window.LeaveApp;
   const STEP = { pending: 'รอครูที่ปรึกษาให้ความเห็น', advisor_ok: 'รอหัวหน้าระดับอนุญาต', approved: 'อนุญาตแล้ว · แสดงที่ป้อมยามเมื่อออก', out: 'ออกจากโรงเรียนแล้ว', returned: 'กลับเข้าโรงเรียนแล้ว', rejected: 'ไม่อนุญาต', cancelled: 'ยกเลิกแล้ว' };
+  // who decided and why, in words a parent understands (user, 27 Nov 2026: "ต้องมีการแจ้งเตือนว่าอนุญาตหรือไม่อนุญาต ตามเหตุผล")
+  function decision(x) {
+    if (x.status === 'rejected') {
+      const step2 = (x.log || []).some((l) => l.action === 'reject' && String(l.step) === '2');
+      const who = step2 ? `หัวหน้าระดับ / รองหัวหน้าระดับ${x.approve_name ? ' (' + esc(x.approve_name) + ')' : ''}` : `ครูที่ปรึกษา${x.advisor_name ? ' (' + esc(x.advisor_name) + ')' : ''}`;
+      return { tone: 'danger', icon: 'circle-x', text: `<b>ไม่อนุญาตให้ออกนอกโรงเรียน</b> · คำขอวันที่ ${fmtDate(x.leave_date)}<br>โดย ${who}<br>เหตุผล: ${esc(x.reject_note || '—')}` };
+    }
+    if (['approved', 'out', 'returned'].includes(x.status)) {
+      return { tone: 'success', icon: 'circle-check', text: `<b>อนุญาตให้ออกนอกโรงเรียนแล้ว</b> · คำขอวันที่ ${fmtDate(x.leave_date)}<br>ครูที่ปรึกษา${x.advisor_name ? ' ' + esc(x.advisor_name) : ''} เห็นควรอนุญาต · หัวหน้าระดับ${x.approve_name ? ' ' + esc(x.approve_name) : ''} อนุญาต<br>กด "ดูใบอนุญาต" แล้วแสดงที่ป้อมยาม` };
+    }
+    if (x.status === 'advisor_ok') return { tone: 'info', icon: 'hourglass', text: `ครูที่ปรึกษา${x.advisor_name ? ' ' + esc(x.advisor_name) : ''} เห็นควรอนุญาตแล้ว · <b>รอหัวหน้าระดับ / รองหัวหน้าระดับอนุญาต</b>` };
+    if (x.status === 'pending') return { tone: 'info', icon: 'hourglass', text: '<b>รอครูที่ปรึกษาให้ความเห็น</b>' };
+    return null;
+  }
   function leaveCard(c) {
     if (!L()) return ''; // parents do not load the settings; the database refuses when the app is switched off
     const mine = leaves.filter((x) => x.student_id === c.id);
     const tone = (st) => (st === 'rejected' ? 'b-danger' : st === 'approved' || st === 'out' || st === 'returned' ? 'b-success' : st === 'cancelled' ? 'b-neutral' : 'b-warning');
     return `<div class="card pv-leave"><div class="card-head"><h3>${icon('door-open', 'i16')} ขออนุญาตออกนอกโรงเรียน</h3>
       <button class="btn primary sm" data-pv-leave="${esc(c.id)}">${icon('plus', 'i16')}ยื่นขออนุญาตออก</button></div>
+      ${(() => { const wk = new Date(Date.now() + 7 * 36e5 - 7 * 864e5).toISOString().slice(0, 10), last = mine.find((x) => ['rejected', 'approved', 'out', 'returned'].includes(x.status) && x.leave_date >= wk), d = last && decision(last);
+        return d ? `<div class="card-body" style="padding-bottom:0"><div class="notice ${d.tone === 'danger' ? 'danger' : 'success'}" role="status">${icon(d.icon, 'i16')}<span>${d.text}</span></div></div>` : ''; })()}
       <div class="card-body muted small">ยื่นแล้ว ครูที่ปรึกษาให้ความเห็นก่อน แล้วหัวหน้าระดับ / รองหัวหน้าระดับอนุญาต · เมื่ออนุญาตแล้วผู้ปกครองมารับและแจ้งที่ป้อมยาม</div>
       ${mine.length ? `<div class="list">${mine.map((x) => `<div class="list-row"><div class="grow">
           <div><b>${fmtDate(x.leave_date)}</b>${x.out_plan ? ' · ออก ' + esc(String(x.out_plan).slice(0, 5)) + ' น.' : ''} · ${esc(L().REASONS[x.reason] || x.reason)}${x.doc ? ` <span class="muted small">ที่ ${esc(x.doc)}</span>` : ''}</div>
           <div class="small"><span class="badge ${tone(x.status)}">${esc(STEP[x.status] || x.status)}</span>
-            ${x.advisor_name ? ` ครูที่ปรึกษา: ${esc(x.advisor_name)}` : ''}${x.approve_name ? ` · หัวหน้าระดับ: ${esc(x.approve_name)}` : ''}</div>
-          ${x.reject_note ? `<div class="small" style="color:var(--red-700)">เหตุผล: ${esc(x.reject_note)}</div>` : ''}</div>
+</div>
+          ${(() => { const d = decision(x); return d ? `<div class="small" style="margin-top:4px;color:${d.tone === 'danger' ? 'var(--red-700)' : d.tone === 'success' ? 'var(--green-700, #1a7f37)' : 'var(--ink-600)'}">${d.text}</div>` : ''; })()}</div>
           <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">${['approved', 'out', 'returned'].includes(x.status) ? `<button class="btn primary sm" data-pv-doc="${esc(x.id)}">${icon('file-text', 'i16')}ดูใบอนุญาต</button>` : ''}
           ${x.mine && ['pending', 'advisor_ok', 'approved'].includes(x.status) ? `<button class="btn ghost sm" data-pv-cancel="${esc(x.id)}">ยกเลิก</button>` : ''}</div></div>`).join('')}</div>` : ''}</div>`;
   }
@@ -174,8 +190,13 @@
     });
   }
 
-  async function render(gate) {
-    gate(`<div class="login" style="align-items:center">${icon('loader', 'i28')}<div class="muted">กำลังโหลดข้อมูล…</div></div>`);
+  // the answer may arrive while the page is open: reload when the parent comes back to the tab, and every 2 minutes while visible
+  let lastGate = null, timer = null;
+  const refreshIfIdle = () => { if (lastGate && !document.hidden && !document.getElementById('dialog-root').innerHTML) render(lastGate, true); };
+  async function render(gate, quiet) {
+    lastGate = gate;
+    if (!timer) { timer = setInterval(refreshIfIdle, 120000); document.addEventListener('visibilitychange', refreshIfIdle); }
+    if (!quiet) gate(`<div class="login" style="align-items:center">${icon('loader', 'i28')}<div class="muted">กำลังโหลดข้อมูล…</div></div>`);
     let v;
     try { v = await Store.parentView(); } catch (e) { v = { error: e.message }; }
     try { leaves = await Store.parentLeaves(); } catch (e) { leaves = []; }
