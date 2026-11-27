@@ -222,6 +222,11 @@
       const urls = await Store.photoUrls(imgs.map((i) => i.dataset.photo));
       imgs.forEach((i) => { const u = urls.get(i.dataset.photo); if (u) i.src = u; });
     } catch (e) { /* photo stays as a blank circle */ }
+    // leave-pass signatures (private leave-photos bucket): <img data-lv-sign="path">
+    const signs = [...root.querySelectorAll('img[data-lv-sign]:not([src])')];
+    if (signs.length && Store.leaveUrls) {
+      try { const m = await Store.leaveUrls(signs.map((i) => i.dataset.lvSign)); signs.forEach((i) => { const u = m.get(i.dataset.lvSign); if (u) i.src = u; }); } catch (e) { /* the name stays */ }
+    }
   }
   // tap a large student photo (profile, picker card) → full-size view with ✕ (user, 26 Nov 2026, for phones)
   function openPhoto(img) {

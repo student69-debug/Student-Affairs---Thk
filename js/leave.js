@@ -38,6 +38,13 @@
     return false;
   }
   const OPEN = ['pending', 'advisor_ok', 'approved', 'out'];
+  // the hand signatures of both steps under the status (user, 27 Nov 2026); "แทน" when a grade head stood in
+  function signsHtml(x) {
+    const sub = (x.log || []).some((l) => l.action === 'approve1' && /^แทนครูที่ปรึกษา/.test(l.note || ''));
+    const one = (path, name, who) => (path ? `<div class="lv-sign" title="${esc(who + ' · ' + (name || ''))}"><img data-lv-sign="${esc(path)}" alt="ลายมือชื่อ ${esc(name || '')}"><span>${esc(who)}</span></div>` : '');
+    const h = one(x.advisorSign, x.advisorName, sub ? 'แทนครูที่ปรึกษา' : 'ครูที่ปรึกษา') + one(x.approveSign, x.approveName, 'หัวหน้าระดับ');
+    return h ? `<div class="lv-signs">${h}</div>` : '';
+  }
   /* signature pad (finger, stylus or mouse): white JPEG so it prints and fits the photo bucket */
   function signPad(root) {
     const c = root.querySelector('canvas.sign-pad'), g = c.getContext('2d');
@@ -98,7 +105,7 @@
         ${list.slice(0, 300).map((x) => `<tr><td>${fmtDate(x.leaveDate)}${x.outPlan ? `<div class="muted small">ขอออก ${hhmm(x.outPlan)}</div>` : ''}</td>${withStudent ? `<td>${Apps.sLink(x.studentId)}</td>` : ''}
           <td>${esc(REASONS[x.reason] || x.reason)}${x.detail ? `<div class="muted small">${esc(x.detail)}</div>` : ''}</td>
           <td class="small">${esc(PICKUP[x.pickup] || '')}${x.pickupName ? `<div class="muted">${esc(x.pickupName)}${x.pickupRelation ? ' (' + esc(x.pickupRelation) + ')' : ''}</div>` : ''}</td>
-          <td>${badge(x.status)}${(x.photos || []).length ? ` <span class="muted small">${icon('camera', 'i16')}${x.photos.length}</span>` : ''}</td>
+          <td>${badge(x.status)}${(x.photos || []).length ? ` <span class="muted small">${icon('camera', 'i16')}${x.photos.length}</span>` : ''}${signsHtml(x)}</td>
           <td class="small">${x.outAt ? 'ออก ' + time(x.outAt) : '—'}${x.backAt ? '<br>กลับ ' + time(x.backAt) : x.status === 'out' && x.returns === false ? '<br><span class="muted">กลับบ้าน</span>' : ''}</td>
           <td class="no-print" style="text-align:right;white-space:nowrap"><div class="actions" style="justify-content:flex-end">${actions(x)}<button class="icon-btn" title="ดูรายละเอียด / รูปถ่าย" data-action="leave-view" data-id="${esc(x.id)}">${icon('eye', 'i16')}</button>${Apps.reportBtn('leave', 'pass', x.id)}${(Store.isAdmin() || x.byUser === Store.user().id) ? `<button class="icon-btn" title="ลบ (เก็บไว้ 30 วัน)" data-action="leave-del" data-id="${esc(x.id)}">${icon('trash-2', 'i16')}</button>` : ''}</div></td></tr>`).join('')}
         </tbody></table></div>`;

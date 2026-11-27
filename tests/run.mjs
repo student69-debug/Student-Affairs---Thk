@@ -174,6 +174,11 @@ const tests = {
     Store.profile = { id: 'g', role: 'grade_head', name: 'z' }; Store.data.teacherRooms = []; Store.data.teacherGrades = [{ userId: 'g', grade: 4 }];
     assert.match(btns(), /เห็นควรอนุญาต \(แทนครูที่ปรึกษา\)/); assert.doesNotMatch(btns(), /data-act="approve2"/);
   },
+  'leave: both signatures show under the status, a stand-in is marked': () => {
+    Store.data.leave = [{ id: 'r', studentId: '30001', status: 'approved', at: '1', advisorSign: 'r/sign1-a.jpg', advisorName: '<b>x</b>', approveSign: 'r/sign2-b.jpg', approveName: 'y', log: [{ action: 'approve1', note: 'แทนครูที่ปรึกษา: ลาป่วย' }] }];
+    const h = ctx.LeaveApp.table(Store.data.leave);
+    assert.match(h, /data-lv-sign="r\/sign1-a.jpg"/); assert.match(h, /data-lv-sign="r\/sign2-b.jpg"/); assert.match(h, />แทนครูที่ปรึกษา</); assert.doesNotMatch(h, /<b>x<\/b>/);
+  },
   'settings: only the changed value is sent': async () => {
     await Store.saveSettings({ apps: { care: false } });
     assert.deepEqual(Object.keys(op(calls[0], 'update')[1]), ['apps']);
