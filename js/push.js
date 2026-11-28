@@ -10,6 +10,8 @@
   const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   const able = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
   let reg = null, listening = false;
+  const BRAVE = 'brave-push-off';
+  const BRAVE_HTML = '<b>เบราว์เซอร์ Brave ปิดบริการแจ้งเตือนไว้</b> · พิมพ์ <code>brave://settings/privacy</code> ในช่องที่อยู่เว็บ → เปิด <b>"Use Google services for push messaging"</b> → ปิดแล้วเปิด Brave ใหม่ แล้วกดเปิดการแจ้งเตือนอีกครั้ง (หรือใช้ Chrome / Edge)';
 
   async function register() {
     if (!('serviceWorker' in navigator) || framed()) return null;
@@ -40,7 +42,14 @@
     const key = await Store.pushKey();
     if (!key) throw new Error('ระบบแจ้งเตือนยังไม่พร้อม ลองใหม่ภายหลัง');
     await navigator.serviceWorker.ready;
-    const s = (await r.pushManager.getSubscription()) || (await r.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: bytes(key) }));
+    let s = await r.pushManager.getSubscription();
+    if (!s) {
+      try { s = await r.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: bytes(key) }); } catch (e) {
+        // Brave turns Google's push service off by default ("Registration failed - push service error")
+        if (navigator.brave || /push service error/i.test(e.message || '')) throw new Error(BRAVE);
+        throw e;
+      }
+    }
     const j = s.toJSON();
     await Store.pushSubscribe(j.endpoint, j.keys.p256dh, j.keys.auth, navigator.userAgent);
   }
@@ -73,7 +82,10 @@
         if (k === 'on') { await enable(); UI.toast('เปิดการแจ้งเตือนแล้ว'); }
         else if (k === 'off') { await disable(); UI.toast('ปิดการแจ้งเตือนบนเครื่องนี้แล้ว'); }
         else { await Store.pushTest(); UI.toast('ส่งแล้ว การแจ้งเตือนจะขึ้นภายในไม่กี่วินาที'); }
-      } catch (e) { UI.toast(e.message || String(e)); }
+      } catch (e) {
+        if (e.message === BRAVE) { box.innerHTML = line('bell-off', 'warn', BRAVE_HTML, btn('on', 'ลองอีกครั้ง', 'primary')); UI.refreshIcons(); box.querySelector('[data-push]').addEventListener('click', () => fill(box)); return; }
+        UI.toast(e.message || String(e));
+      }
       fill(box);
     }));
   }
