@@ -48,10 +48,10 @@
     ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => c.addEventListener(t, () => { last = null; }));
     root.querySelector('[data-sign-clear]').addEventListener('click', fit);
     new ResizeObserver(() => { if (!drawn) fit(); }).observe(c);
-    // small white JPEG (≤ 600 px wide) as a data URL, stored in the row
-    const url = () => { const w = Math.min(600, c.width), h = Math.round(c.height * w / c.width), o = document.createElement('canvas'); o.width = w; o.height = h;
-      const og = o.getContext('2d'); og.fillStyle = '#fff'; og.fillRect(0, 0, w, h); og.drawImage(c, 0, 0, w, h); return o.toDataURL('image/jpeg', 0.8); };
-    return { empty: () => !drawn, url };
+    // small white JPEG (≤ 600 px wide) as a file: uploaded to the private bucket inquiry-signs, copied to Drive (rule, 28 Nov 2026)
+    const blob = () => new Promise((ok, no) => { const w = Math.min(600, c.width), h = Math.round(c.height * w / c.width), o = document.createElement('canvas'); o.width = w; o.height = h;
+      const og = o.getContext('2d'); og.fillStyle = '#fff'; og.fillRect(0, 0, w, h); og.drawImage(c, 0, 0, w, h); o.toBlob((b) => (b ? ok(b) : no(new Error('สร้างรูปลายเซ็นไม่ได้'))), 'image/jpeg', 0.8); });
+    return { empty: () => !drawn, blob };
   }
   const signField = (who) => `<div class="field full sign-box"><label>ลายมือชื่อ${esc(who)} <span class="req">*</span></label><canvas class="sign-pad" aria-label="ช่องลงลายมือชื่อ"></canvas>
     <div class="actions" style="justify-content:space-between"><span class="help">เซ็นด้วยนิ้ว ปากกา หรือเมาส์ในกรอบด้านบน</span><button type="button" class="btn ghost sm" data-sign-clear>ล้าง เซ็นใหม่</button></div></div>`;
@@ -118,6 +118,8 @@
     } catch (err) { toast(err.message, 'error'); }
   }
   const act = async (id, action, p = {}, sign = null) => check(await sb().rpc('inquiry_action', { p_id: id, p_action: action, p, p_sign: sign }));
+  // sign = upload the drawn signature for this inquiry, act with its path, then copy it to Google Drive
+  const signAct = async (x, action, p, pad) => { const path = await Store.uploadInquirySign(x.id, await pad.blob()); const r = await act(x.id, action, p, path); Store.driveSync('inquiry-signs', path); return r; };
 
   /* ---------- dialogs ---------- */
   function openNew(sid) {
@@ -181,7 +183,10 @@
         const p = v.verdict === 'guilty' ? { verdict: 'guilty', rule_id: v.rule, actions: Object.keys(ACTS).filter((k) => v['a_' + k]), note: v.note.trim() }
           : { verdict: 'not_guilty', reason: v.reason, note: v.note.trim() };
         if (p.verdict === 'guilty' && !p.actions.length) { toast('เลือกการดำเนินการอย่างน้อย 1 ข้อ'); return false; }
-        await act(x.id, 'opinion', p, pad.url()); toast('บันทึกความเห็นแล้ว · ส่งต่อหัวหน้าระดับ'); await after();
+        await signAct(x, 'opinion', p, pad); toast('บันทึกความเห็นแล้ว · ส่งต่อหัวหน้าระดับ');
+        // the student signed while signed out, so the Drive copy of that signature is made now, by the investigator (a file copied before is not copied twice)
+        if (x.statement_sign && !/^data:/.test(x.statement_sign)) Store.driveSync('inquiry-signs', x.statement_sign);
+        await after();
       } });
     pad = signPad(d.form);
     d.form.querySelectorAll('input[name=verdict]').forEach((r) => r.addEventListener('change', () => {
@@ -199,7 +204,7 @@
         ${signField(who)}`,
       onSubmit: async (v) => {
         if (pad.empty()) { toast('ลงลายมือชื่อก่อนบันทึก'); return false; }
-        const res = await act(x.id, step, { note: v.note.trim() }, pad.url());
+        const res = await signAct(x, step, { note: v.note.trim() }, pad);
         toast(step === 'head' ? (res.done ? 'ลงนามแล้ว · เสร็จสิ้น' : 'ลงนามแล้ว · ส่งต่อหัวหน้ากลุ่มบริหารกิจการนักเรียน') + (res.record ? ' · ตัดคะแนนแล้ว' : '') : 'ลงนามแล้ว');
         if (res.record) await Store.refresh('records');
         await after();
@@ -218,7 +223,7 @@
     s = s || Store.student(x.student_id) || {};
     const r = x.rule_name ? { name: x.rule_name, code: x.rule_code } : rule(x.rule_id);
     const [dd, mm, yy] = thDate(x.at), [ed, em, ey] = thDate(x.event_date);
-    const sig = (img, name) => (img && !opts.noSign ? `<img class="pk-sign" src="${esc(img)}" alt="ลายมือชื่อ ${esc(name || '')}">` : u(name, 'w'));
+    const sig = (img, name) => (img && !opts.noSign ? UI.picImg('inquiry-signs', img, `class="pk-sign" alt="ลายมือชื่อ ${esc(name || '')}"`) : u(name, 'w'));
     const acts = x.actions || [];
     const step = (title, name, note, img, at) => `<div class="pk-step"><b>${title}</b><div class="pk-note">${note ? esc(note) : '&nbsp;'}</div>
       <div>ลงชื่อ ${sig(img, name)}</div><div>( ${u(name, 'w')} )</div><div>${short(at)}</div></div>`;

@@ -396,6 +396,14 @@ const tests = {
     assert.ok(!/<img>|<script>/.test(bad)); assert.match(bad, /href="tel:0812345678"/);
     assert.ok(!g({ name: '', phone: '12<b>' }).includes('<b>1')); assert.ok(!g({ name: '', phone: '12<i x>' }).includes('<i x>'));
   },
+  'pictures: a stored path becomes a lazy <img data-pic>, an old data URL still shows, nothing unescaped gets in': () => {
+    const p = ctx.UI.picImg;
+    assert.equal(p('visit-photos', ''), '');
+    assert.match(p('visit-photos', '40166/1700000000001.jpg', 'alt="x"'), /^<img data-pic="visit-photos:40166\/1700000000001\.jpg" alt="x">$/);
+    assert.match(p('inquiry-signs', 'data:image/jpeg;base64,QUJD'), /^<img src="data:image\/jpeg;base64,QUJD"/);
+    assert.ok(!p('visit-photos', '"><script>').includes('<script>'));
+    assert.ok(!p('visit-photos', 'javascript:alert(1)').includes('src="javascript'));
+  },
   'gate TV: approved pass shows the form and the pickup photo, a pass that left is small, every value escaped': () => {
     const t = ctx.Gate._test;
     const row = { id: 'a', student_id: '40166', status: 'approved', doc_no: 3, doc_year: 2569, leave_date: '2026-11-28', out_plan: '10:30:00', returns: false, reason: 'doctor',

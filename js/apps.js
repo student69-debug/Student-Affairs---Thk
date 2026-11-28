@@ -482,7 +482,7 @@
       if (kind === 'screen') { const x = c.screenings.find((y) => y.id === id); return x && { title: 'รายงานผลการคัดกรองนักเรียน', secret: true, studentId: x.studentId, by: x.by,
         rows: [['วันที่', fmtDate(x.at)], ['เครื่องมือ', esc(x.tool)], ['ผลการคัดกรอง', esc(RES[x.result] || x.result)], ['หมายเหตุ', esc(x.note)], ['ผู้ประเมิน', esc(x.by)]] }; }
       if (kind === 'visit') { const x = c.visits.find((y) => y.id === id); return x && { title: 'รายงานการเยี่ยมบ้านนักเรียน', secret: true, studentId: x.studentId, by: x.by,
-        rows: [['วันที่', fmtDate(x.at)], ['ผู้เยี่ยม', esc(x.by)], ['สภาพครอบครัว', esc(FAMILY[x.family] || '')], ['สภาพ / ความเสี่ยงที่พบ', (x.flags || []).map((k) => esc(VFLAG[k] || k) + (k === 'risk_other' && x.otherRisk ? ': ' + esc(x.otherRisk) : k === 'problem_other' && x.otherProblem ? ': ' + esc(x.otherProblem) : '')).join('<br>')], ['บันทึก', esc(x.note)], ['รูปถ่าย', /^(data:image\/|https:)/.test(x.photo || '') ? `<img src="${esc(x.photo)}" alt="รูปเยี่ยมบ้าน" style="max-width:260px;max-height:200px">` : '']] }; }
+        rows: [['วันที่', fmtDate(x.at)], ['ผู้เยี่ยม', esc(x.by)], ['สภาพครอบครัว', esc(FAMILY[x.family] || '')], ['สภาพ / ความเสี่ยงที่พบ', (x.flags || []).map((k) => esc(VFLAG[k] || k) + (k === 'risk_other' && x.otherRisk ? ': ' + esc(x.otherRisk) : k === 'problem_other' && x.otherProblem ? ': ' + esc(x.otherProblem) : '')).join('<br>')], ['บันทึก', esc(x.note)], ['รูปถ่าย', UI.picImg('visit-photos', x.photo, 'alt="รูปเยี่ยมบ้าน" style="max-width:260px;max-height:200px"')]] }; }
       if (kind === 'referral') { const x = c.referrals.find((y) => y.id === id); return x && { title: 'แบบส่งต่อนักเรียน', secret: true, studentId: x.studentId,
         rows: [['วันที่', fmtDate(x.at)], ['ประเภท', x.type === 'internal' ? 'ส่งต่อภายใน' : 'ส่งต่อภายนอก'], ['ส่งต่อไปยัง', esc(x.to)], ['เหตุผล / ข้อมูลที่ส่งต่อ', esc(x.note)]],
         signs: [['', 'ผู้ส่งต่อ'], [(Store.student(x.studentId) || {}).advisor, 'ครูที่ปรึกษา'], ['', 'ผู้รับการส่งต่อ']] }; }
@@ -501,7 +501,7 @@
       return {
         health: hl.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>อาการ</th><th>รายละเอียด</th><th>การดูแล</th><th>ส่งต่อ</th><th>ผู้บันทึก</th><th></th></tr></thead><tbody>${hl.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.date)}</td><td>${esc(x.symptom)}</td><td class="muted">${esc(x.detail) || '—'}</td><td>${esc(x.action) || '—'}</td><td>${x.referred ? '<span class="badge b-warning">ส่งต่อ</span>' : '—'}</td><td>${esc(x.by)}</td><td style="white-space:nowrap">${reportBtn('care', 'health', x.id)}${canDel(x) ? `<button class="icon-btn" title="ลบ" data-action="care-health-del" data-id="${esc(x.id)}">${icon('trash-2', 'i16')}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>${more(hl.length, 'รายการ')}` : empty('ยังไม่มีบันทึกสุขภาพ', 'thermometer'),
         screen: sc.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>เครื่องมือ</th><th>ผล</th><th>ผู้ประเมิน</th><th>หมายเหตุ</th><th class="no-print"></th></tr></thead><tbody>${sc.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${esc(x.tool)}</td><td>${screenBadge(x.result)}</td><td>${esc(x.by)}</td><td class="muted">${esc(x.note) || '—'}</td><td class="no-print">${reportBtn('care', 'screen', x.id)}</td></tr>`).join('')}</tbody></table></div>${more(sc.length, 'รายการ')}` : empty('ยังไม่มีผลคัดกรอง', 'clipboard-check'),
-        visit: vi.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>ผู้เยี่ยม</th><th>สภาพครอบครัว / ความเสี่ยง</th><th>บันทึก</th><th>รูป</th><th class="no-print"></th></tr></thead><tbody>${vi.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${esc(x.by)}</td><td><div class="chips">${visitTags(x) || '<span class="muted">—</span>'}</div></td><td>${esc(x.note)}</td><td>${x.photo ? `<img src="${x.photo}" alt="รูปเยี่ยมบ้าน" style="width:56px;height:42px;object-fit:cover;border-radius:4px">` : '<span class="muted">—</span>'}</td><td class="no-print">${reportBtn('care', 'visit', x.id)}</td></tr>`).join('')}</tbody></table></div>${more(vi.length, 'รายการ')}` : empty('ยังไม่มีบันทึกเยี่ยมบ้าน', 'house'),
+        visit: vi.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>ผู้เยี่ยม</th><th>สภาพครอบครัว / ความเสี่ยง</th><th>บันทึก</th><th>รูป</th><th class="no-print"></th></tr></thead><tbody>${vi.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${esc(x.by)}</td><td><div class="chips">${visitTags(x) || '<span class="muted">—</span>'}</div></td><td>${esc(x.note)}</td><td>${x.photo ? UI.picImg('visit-photos', x.photo, 'alt="รูปเยี่ยมบ้าน" style="width:56px;height:42px;object-fit:cover;border-radius:4px"') : '<span class="muted">—</span>'}</td><td class="no-print">${reportBtn('care', 'visit', x.id)}</td></tr>`).join('')}</tbody></table></div>${more(vi.length, 'รายการ')}` : empty('ยังไม่มีบันทึกเยี่ยมบ้าน', 'house'),
         needs: ne.length ? `<div class="list">${ne.map((x) => `<div class="list-row"><span class="badge ${x.kind === 'สุขภาพ' ? 'b-info' : 'b-warning'}">${esc(x.kind)}</span><div class="grow">${st ? `<div class="t">${sLink(x.studentId)}</div>` : ''}<div>${esc(x.text)}</div></div></div>`).join('')}</div>` : empty('ไม่มีข้อมูลความต้องการพิเศษ / สุขภาพ', 'heart-pulse'),
         referral: rf.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${st ? '<th>นักเรียน</th>' : ''}<th>วันที่</th><th>ประเภท</th><th>ส่งต่อไปยัง</th><th>เหตุผล</th><th class="no-print"></th></tr></thead><tbody>${rf.slice(0, LIMIT).map((x) => `<tr>${st ? `<td>${sLink(x.studentId)}</td>` : ''}<td>${fmtDate(x.at)}</td><td>${x.type === 'internal' ? '<span class="badge b-info">ภายใน</span>' : '<span class="badge b-warning">ภายนอก</span>'}</td><td>${esc(x.to)}</td><td>${esc(x.note)}</td><td class="no-print">${reportBtn('care', 'referral', x.id)}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีการส่งต่อ', 'share-2'),
       };
@@ -562,12 +562,11 @@
           const finish = (photo) => this.save('visits', v.student, { at: new Date(v.at + 'T15:00').toISOString(), by: Store.user().name, note: v.note.trim(), photo,
             family: v.family, flags, otherRisk: v.otherRisk.trim(), otherProblem: v.otherProblem.trim() }, 'บันทึกเยี่ยมบ้านแล้ว');
           if (!file) return finish('');
-          if (!parseMyStudent(v.student)) { toast('ไม่พบรหัสนักเรียน หรือไม่ได้อยู่ในห้อง/ระดับชั้นที่คุณดูแล'); return false; }
-          // ย่อรูปก่อนเก็บ
-          const img = new Image();
-          img.onload = () => { const c = document.createElement('canvas'); const r = Math.min(1, 640 / img.width); c.width = img.width * r; c.height = img.height * r; c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); finish(c.toDataURL('image/jpeg', 0.7)).then((r) => { if (r !== false) d.close(); }).catch((e) => toast('บันทึกไม่สำเร็จ: ' + e.message)); };
-          img.src = URL.createObjectURL(file);
-          return false;
+          const sid = parseMyStudent(v.student);
+          if (!sid) { toast('ไม่พบรหัสนักเรียน หรือไม่ได้อยู่ในห้อง/ระดับชั้นที่คุณดูแล'); return false; }
+          // shrink → private bucket visit-photos (the row keeps only the path) → copy to Google Drive (rule: every picture goes to Drive)
+          return UI.shrinkImage(file, 640, 0.7).then((blob) => Store.uploadVisitPhoto(sid, blob))
+            .then((path) => Promise.resolve(finish(path)).then((r) => { if (r !== false) Store.driveSync('visit-photos', path); return r; }));
         } });
     },
     openHealth(sid) {
@@ -788,6 +787,7 @@
         return false;
       } });
     fitSheet(d.form);
+    UI.hydratePhotos(d.form); // pictures kept in private buckets (visit photos, ปค.03 signatures)
     if (r.after) r.after(d.form);
   }
   // a wide sheet (A4 landscape) is shrunk to the dialog's width so a phone shows the whole page without sideways scrolling

@@ -428,6 +428,20 @@
       check(await sb.rpc('leave_action', { p_id: id, p_action: 'photos', p_photos: paths.slice(0, 5) }));
       await this.pull('leave', id);
     },
+    // any private bucket: signed links (1 hour) for the paths the storage policies let this person read
+    async signedUrls(bucket, paths) { const m = new Map(); const need = [...new Set(paths)].filter(Boolean); if (!need.length) return m;
+      const { data } = await sb.storage.from(bucket).createSignedUrls(need, 3600); (data || []).forEach((d) => { if (d.signedUrl) m.set(d.path, d.signedUrl); }); return m; },
+    // pictures go to Drive (rule, 28 Nov 2026): upload to the private bucket first, the row keeps only the path, then driveSync
+    async uploadVisitPhoto(studentId, blob) {
+      const path = `${studentId}/${Date.now()}.jpg`;
+      check(await sb.storage.from('visit-photos').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '3600' }));
+      return path;
+    },
+    async uploadInquirySign(inquiryId, blob) {
+      const path = `${inquiryId}/sign-${Date.now()}.jpg`;
+      check(await sb.storage.from('inquiry-signs').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '3600' }));
+      return path;
+    },
     async leaveUrls(paths) { const m = new Map(); const { data } = await sb.storage.from('leave-photos').createSignedUrls(paths, 3600); (data || []).forEach((d) => { if (d.signedUrl) m.set(d.path, d.signedUrl); }); return m; },
     // ตรวจระเบียบวินัย: one call saves the check and makes the deductions (the database takes the points from the rule table)
     async saveDiscipline(p) { const id = check(await sb.rpc('discipline_save', { p })); await this.refresh('discipline', 'records'); return id; },

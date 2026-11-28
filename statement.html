@@ -6,8 +6,8 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title>ให้ข้อเท็จจริง · ระบบกิจการนักเรียน</title>
-<link rel="icon" type="image/png" href="img/favicon.png?v=20261128a">
-<link rel="stylesheet" href="css/styles.css?v=20261128a">
+<link rel="icon" type="image/png" href="img/favicon.png?v=20261128b">
+<link rel="stylesheet" href="css/styles.css?v=20261128b">
 <style>
   body{background:var(--ink-50)}
   .sv{max-width:680px;margin:0 auto;padding:20px 14px 60px;display:flex;flex-direction:column;gap:14px}
@@ -21,7 +21,7 @@
 </head>
 <body>
 <main class="sv" id="sv"><div class="card card-body">กำลังโหลด…</div></main>
-<script src="js/config.js?v=20261128a"></script>
+<script src="js/config.js?v=20261128b"></script>
 <script>
 /* ปค.03 บันทึกการสอบสวนข้อเท็จจริง — นักเรียนให้การเอง (ไม่ต้องเข้าระบบ): รหัสจากครู + รหัสนักเรียน + เลขบัตรประชาชน 4 ตัวท้าย
    ตรวจในฐานข้อมูล (inquiry_check / inquiry_submit): ผิด 5 ครั้งล็อก · รหัสใช้ได้ 2 ชั่วโมง · ส่งได้ครั้งเดียว */
@@ -91,9 +91,14 @@
       // a small signature: at most 600 px wide JPEG
       const w = Math.min(600, c.width), h = Math.round(c.height * w / c.width), o = document.createElement('canvas'); o.width = w; o.height = h;
       const og = o.getContext('2d'); og.fillStyle = '#fff'; og.fillRect(0, 0, w, h); og.drawImage(c, 0, 0, w, h);
-      const sign = o.toDataURL('image/jpeg', 0.8);
       const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'กำลังส่ง…';
-      rpc('inquiry_submit', { p_code: code, p_student: sid, p_cid4: cid4, p_statement: text, p_sign: sign }).then((x) => {
+      // the signature is a file in the private bucket inquiry-signs (the database lets this page add one only while the code is valid);
+      // the row keeps its path and the investigator's browser copies it to Google Drive (rule, 28 Nov 2026)
+      const path = r.id + '/statement-' + Date.now() + '.jpg';
+      new Promise((ok, no) => o.toBlob((b) => (b ? ok(b) : no(new Error('สร้างรูปลายเซ็นไม่ได้'))), 'image/jpeg', 0.8))
+        .then((b) => fetch(C.supabaseUrl + '/storage/v1/object/inquiry-signs/' + path, { method: 'POST', headers: { apikey: C.supabaseKey, 'Content-Type': 'image/jpeg', 'x-upsert': 'false' }, body: b }))
+        .then((u) => (u.ok ? null : Promise.reject(new Error('ส่งลายเซ็นไม่ได้ (' + u.status + ')'))))
+        .then(() => rpc('inquiry_submit', { p_code: code, p_student: sid, p_cid4: cid4, p_statement: text, p_sign: path })).then((x) => {
         if (x === 'ok') { msg('<b>ส่งคำให้การแล้ว</b><br>ครูผู้สอบสวนจะพิจารณาต่อ ปิดหน้านี้ได้เลย'); return; }
         if (x === 'locked' || x === 'closed') { msg(STATE[x]); return; }
         err.textContent = STATE[x] || 'ส่งไม่สำเร็จ ลองใหม่'; btn.disabled = false; btn.textContent = 'ส่งคำให้การ';

@@ -2,11 +2,12 @@
 // as <app>/<school year>/<room e.g. ม.1/1>/<file>. The caller must be signed in and allowed to
 // read that photo (checked by downloading it with the caller's own token, so storage RLS decides).
 // The Apps Script URL and its shared secret are kept in private.drive_config (never in this file).
+// 28 Nov 2026: + visit-photos (ดูแลช่วยเหลือนักเรียน) and inquiry-signs (ปค.03 signatures): every picture goes to Drive.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2.45.4";
 import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 
-const BUCKETS = ["student-photos", "drug-evidence"];
+const BUCKETS = ["student-photos", "drug-evidence", "leave-photos", "visit-photos", "inquiry-signs"];
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",

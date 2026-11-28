@@ -235,7 +235,16 @@
     if (signs.length && Store.leaveUrls) {
       try { const m = await Store.leaveUrls(signs.map((i) => i.dataset.lvSign)); signs.forEach((i) => { const u = m.get(i.dataset.lvSign); if (u) i.src = u; }); } catch (e) { /* the name stays */ }
     }
+    // other private buckets: <img data-pic="bucket:path"> (home-visit photos, ปค.03 signatures; storage policies decide who gets a link)
+    const pics = [...root.querySelectorAll('img[data-pic]:not([src])')];
+    const byBucket = {};
+    pics.forEach((i) => { const [b, ...p] = i.dataset.pic.split(':'); (byBucket[b] = byBucket[b] || []).push([i, p.join(':')]); });
+    for (const [b, list] of Object.entries(byBucket)) {
+      try { const m = await Store.signedUrls(b, list.map(([, p]) => p)); list.forEach(([i, p]) => { const u = m.get(p); if (u) i.src = u; }); } catch (e) { /* stays empty */ }
+    }
   }
+  // a stored picture value: a file path in a private bucket (since 28 Nov 2026) or an old data URL kept in the row
+  const picImg = (bucket, v, attrs = '') => (!v ? '' : /^data:image\/(jpeg|png);base64,/.test(v) ? `<img src="${esc(v)}" ${attrs}>` : `<img data-pic="${esc(bucket + ':' + v)}" ${attrs}>`);
   // tap a large student photo (profile, picker card) → full-size view with ✕ (user, 26 Nov 2026, for phones)
   function openPhoto(img) {
     if (!img.src) return;
@@ -318,5 +327,5 @@
   new MutationObserver(queueA11y).observe(document.body, { childList: true, subtree: true });
   window.addEventListener('resize', queueA11y);
 
-  window.UI = { a11y, esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, studentCard, studentCards, telLinks, numAttrs, numValue, NUM, parseStudent, parseMyStudent, dialog, confirmDialog, deleteDialog, toast, refreshIcons, hydratePhotos, shrinkImage, readSheet, download, parseCSV };
+  window.UI = { a11y, esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, studentCard, studentCards, telLinks, numAttrs, numValue, NUM, parseStudent, parseMyStudent, dialog, confirmDialog, deleteDialog, toast, refreshIcons, hydratePhotos, picImg, shrinkImage, readSheet, download, parseCSV };
 })();
