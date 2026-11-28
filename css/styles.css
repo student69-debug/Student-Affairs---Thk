@@ -849,3 +849,36 @@ img.avatar.lg[data-photo]{cursor:zoom-in}
 @media (max-width:900px){.rp-preview .pk03{width:auto;min-height:0;padding:12px}.rp-preview .pk03 .pk-steps{grid-template-columns:1fr}.rp-preview .pk03 .pk-u.w{min-width:6em}}
 .inq-statement{white-space:pre-wrap;background:var(--ink-50,#f6f7f9);border:1px solid var(--ink-200);border-radius:var(--radius-md,8px);padding:10px;max-height:240px;overflow:auto}
 body.printing-sheet #print-sheet:has(.pk03){padding:0}
+
+/* ---------- ผู้บริหาร (read-only, 28 Nov 2026): hide the main record buttons; the database refuses every write anyway ---------- */
+body.ro .page-head .actions .btn.accent, body.ro .page-head .actions .btn.primary { display: none; }
+
+/* ---------- Gate TV (ป้อมรักษาความปลอดภัย, 28 Nov 2026): full screen, big type, readable from a distance ---------- */
+.gt { min-height: 100dvh; width: 100%; background: var(--ink-50); display: flex; flex-direction: column; font-size: 18px; }
+.gt-head { display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: var(--navy-800); color: #fff; flex-wrap: wrap; }
+.gt-head img { width: 52px; height: 52px; }
+.gt-head b { font-size: 26px; }
+.gt-head .muted { color: rgba(255, 255, 255, .75); }
+.gt-clock { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+.gt-clock b { font-size: 34px; font-variant-numeric: tabular-nums; }
+.gt-btns { display: flex; gap: 8px; }
+.gt-btns .btn { color: #fff; border-color: rgba(255, 255, 255, .4); }
+.gt main { padding: 18px 24px 32px; display: flex; flex-direction: column; gap: 16px; }
+.gt-card { background: #fff; border: 3px solid var(--green-600); border-radius: 16px; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.gt-card.gone { border-color: var(--ink-200); grid-template-columns: 1fr; opacity: .8; }
+.gt-who { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 16px; align-items: start; }
+.gt-pic { width: 190px; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--ink-500); font-size: 15px; }
+.gt-pic img, .gt-pic svg { width: 190px; height: 240px; object-fit: cover; border-radius: 12px; background: var(--ink-100); }
+.gt-card.gone .gt-pic, .gt-card.gone .gt-pic img, .gt-card.gone .gt-pic svg { width: 110px; height: 140px; }
+.gt-info h2 { font-size: 34px; margin: 6px 0 2px; line-height: 1.2; }
+.gt-class { font-size: 22px; font-weight: 600; color: var(--navy-800); margin-bottom: 8px; }
+.gt-line { display: flex; gap: 6px; align-items: center; margin: 4px 0; overflow-wrap: anywhere; }
+.gt-state .badge { font-size: 17px; padding: 6px 12px; }
+.gt-doc { overflow: hidden; border: 1px solid var(--ink-200); border-radius: 10px; padding: 8px; background: #fff; }
+.gt-doc .pk22 { display: block; font-size: 14px; }
+.gt-doc .pk22 > div { width: auto; }
+.gt-sub { margin: 8px 0 0; color: var(--ink-600); }
+.gt-gone { display: grid; grid-template-columns: repeat(auto-fill, minmax(560px, 1fr)); gap: 12px; }
+.gt-empty { display: flex; gap: 16px; align-items: center; justify-content: center; padding: 60px 20px; font-size: 26px; color: var(--ink-500); text-align: center; }
+@media (max-width: 1100px) { .gt-card { grid-template-columns: 1fr; } .gt-pic, .gt-pic img, .gt-pic svg { width: 130px; height: 165px; } .gt-gone { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .gt-who { grid-template-columns: auto auto; } .gt-info { grid-column: 1 / -1; } .gt-info h2 { font-size: 26px; } .gt-clock { margin-left: 0; align-items: flex-start; } }

@@ -7,7 +7,7 @@
     const link = (href, ic, label, active, extra = '') => `<a href="#/${href}" class="${active ? 'active' : ''} ${extra}">${icon(ic)}<span>${esc(label)}</span>${extra.includes('locked') ? `<span class="lock">${icon('lock', 'i16')}</span>` : ''}</a>`;
     const admin = Store.isAdmin();
     // ทะเบียนนักเรียน: admins and grade heads (own grades) · ทะเบียนครู: admins only
-    const reg = admin || Store.user().role === 'grade_head';
+    const reg = admin || ['grade_head', 'executive'].includes(Store.user().role);
     return `
       ${link('', 'layout-dashboard', 'หน้าแรก', is(''))}
       ${link('search', 'search', 'ค้นหานักเรียน', is('search') || is('student'))}
@@ -900,11 +900,15 @@
       const p = await Store.loadProfile();
       if (p && p.role === 'parent') return Parent.render(gate);
       if (!p || p.role === 'pending' || p.role === 'none') return pendingScreen(p);
+      // gate TV: the security account sees only this screen; staff who may watch the gate open it at #/gate (new tab from the leave app)
+      if (p.role === 'security') return Gate.render((h) => gate(h, true));
+      if (/^#\/?gate/.test(location.hash) && ['admin', 'inspector', 'executive'].includes(p.role)) return Gate.render((h) => gate(h, true), true);
       gate(`<div class="login" style="align-items:center">${icon('loader', 'i28')}<div class="muted">กำลังโหลดข้อมูล…</div></div>`);
       await Store.load();
       gateEl.hidden = true;
       gateEl.innerHTML = '';
       document.querySelector('.shell').hidden = false;
+      document.body.classList.toggle('ro', Store.readOnly()); // ผู้บริหาร: hides the main record buttons (the database refuses writes anyway)
       render();
       if (window.Feedback) Feedback.mount();
       startReminders();

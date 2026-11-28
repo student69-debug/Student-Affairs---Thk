@@ -220,6 +220,7 @@
     async parentView() { return check(await sb.rpc('parent_view')); },
     // leave requests filed by the student / parent (own linked child only, checked in the database)
     async parentLeaves() { return check(await sb.rpc('parent_leave_list')) || []; },
+    async gateBoard() { return check(await sb.rpc('gate_board')) || []; },
     async parentLeaveSave(p) { return check(await sb.rpc('parent_leave_save', { p })); },
     async parentLeaveCancel(id) { return check(await sb.rpc('parent_leave_cancel', { p_id: id })); },
 
@@ -308,7 +309,7 @@
       this.data.gradeStaff = [];
       this.data.subjects = [];
       const kinds = ['students', 'users', 'teacherRooms', 'teacherGrades', 'rules', 'records', 'incidents', 'incidentPeople', 'cases', 'apptLog', 'progress', 'counsellors', 'screenings', 'visits', 'visitRooms', 'needs', 'referrals', 'health', 'drugs', 'discipline', 'leave', 'surveyRounds', 'surveyResponses', 'nurse', 'nurseNow', 'nurseHealth', 'nurseFollow'];
-      if (!this.isAdmin() && this.profile.role === 'grade_head') kinds.push('history'); // own grades only (row level security)
+      if (!this.isAdmin() && ['grade_head', 'executive'].includes(this.profile.role)) kinds.push('history'); // own grades only (row level security)
       if (this.isAdmin()) {
         kinds.push('history', 'gradeStaff', 'subjects');
         const { count } = await sb.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'parent');
@@ -609,7 +610,8 @@
     binOk(app) { const r = this.profile && this.profile.role; return this.isAdmin() || (((this.s.restoreRoles || {})[app] || []).includes(r) && (app === 'registry' || this.appOk(app))); },
     seesAll() { const r = this.profile && this.profile.role; return r === 'admin' || r === 'counselor'; },
     // reads every student in full (since 26 Nov 2026 grade heads too); writing is still limited, see canWrite
-    readsAll() { const r = this.profile && this.profile.role; return r === 'admin' || r === 'counselor' || r === 'grade_head'; },
+    readsAll() { const r = this.profile && this.profile.role; return r === 'admin' || r === 'counselor' || r === 'grade_head' || r === 'executive'; },
+    readOnly() { return !!(this.profile && this.profile.role === 'executive'); }, // ผู้บริหาร: reads all, the database refuses every write
     // may add records with personal data for this student (care, health…): grade heads only in their own grades or homeroom (the database checks again)
     canWrite(s) {
       if (!s || !this.profile) return false;

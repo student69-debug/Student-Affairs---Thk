@@ -248,7 +248,9 @@
       const search = Apps.searchCard({ id: 'leave', title: 'ค้นหาคำขอออกนอกโรงเรียน', typeLabel: 'เหตุผล', typeHtml: '<option value="">ทุกเหตุผล</option>' + Apps.optList(Object.entries(REASONS), q.type), q });
       const bindS = () => Apps.bindSearch('leave', (v) => Apps.hashOf(base, { tab: 'list', grade: v.grade, type: v.type, from: v.from, to: v.to }));
       const tabs = Apps.tabsBar([['list', 'รายการคำขอ'], ['done', 'เสร็จสิ้นแล้ว'], ['overview', 'ภาพรวม'], ['guide', 'ขั้นตอน']], tab, base);
-      const out = (html) => ({ title: this.name, html: search + cards + tabs + html, after: bindS });
+      // the gate TV (opens in its own tab; the TV itself signs in with a security account)
+      const tv = ['admin', 'inspector', 'executive'].includes(Store.user().role) ? `<a class="btn secondary" href="#/gate" target="_blank" rel="noopener">${icon('tv', 'i16')}จอทีวีป้อมยาม</a>` : '';
+      const out = (html) => ({ title: this.name, actions: tv, html: search + cards + tabs + html, after: bindS });
       if (tab === 'trash') return out(Apps.trashView('leave', 'คำขอออกนอกโรงเรียน'));
       if (tab === 'guide') return out(`<div class="card"><div class="card-body"><ol style="margin:0;padding-left:20px;line-height:2">
         <li><b>ยื่นคำขอ</b> — นักเรียน / ผู้ปกครองยื่นจากหน้าผู้ปกครองเท่านั้น · ครูไม่ต้องยื่น รอแจ้งเตือนเพื่ออนุมัติ</li>

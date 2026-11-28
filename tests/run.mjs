@@ -20,7 +20,7 @@ const storage = { getItem: () => null, setItem() {}, removeItem() {} };
 const ctx = vm.createContext({ console, setTimeout, clearTimeout, setInterval: () => 0, localStorage: storage, sessionStorage: storage, location: { hash: '', pathname: '/', origin: '' }, URLSearchParams, Date, Math, JSON, Map, Set, crypto,
   document: { addEventListener() {}, getElementById: () => null, querySelector: () => null }, addEventListener() {}, MutationObserver: class { observe() {} } });
 ctx.window = ctx; ctx.supabase = { createClient: () => sb };
-for (const f of ['config.js', 'store.js', 'ui.js', 'charts.js', 'counsel.js', 'apps.js', 'drugs.js', 'nurse.js', 'discipline.js', 'leave.js', 'inquiry.js', 'pages.js', 'parent.js', 'help.js']) vm.runInContext(read(f), ctx, { filename: f });
+for (const f of ['config.js', 'store.js', 'ui.js', 'charts.js', 'counsel.js', 'apps.js', 'drugs.js', 'nurse.js', 'discipline.js', 'leave.js', 'gate.js', 'inquiry.js', 'pages.js', 'parent.js', 'help.js']) vm.runInContext(read(f), ctx, { filename: f });
 const { Store, Pages } = ctx;
 
 const fresh = () => {
@@ -395,6 +395,26 @@ const tests = {
     const bad = g({ name: '<img>', phone: '0812345678"><script>' });
     assert.ok(!/<img>|<script>/.test(bad)); assert.match(bad, /href="tel:0812345678"/);
     assert.ok(!g({ name: '', phone: '12<b>' }).includes('<b>1')); assert.ok(!g({ name: '', phone: '12<i x>' }).includes('<i x>'));
+  },
+  'gate TV: approved pass shows the form and the pickup photo, a pass that left is small, every value escaped': () => {
+    const t = ctx.Gate._test;
+    const row = { id: 'a', student_id: '40166', status: 'approved', doc_no: 3, doc_year: 2569, leave_date: '2026-11-28', out_plan: '10:30:00', returns: false, reason: 'doctor',
+      pickup_name: '<img src=x onerror=1>', pickup_relation: 'มารดา', pickup_photo: 'a/pickup.jpg', approve_name: 'ครู ข', approve_at: '2026-11-28T03:00:00Z',
+      student: { id: '40166', prefix: 'ด.ช.', first: '<b>ก', last: 'ข', grade: 1, room: 1, no: 2, photo_path: '40166.jpg' } };
+    const p = t.toPass(row);
+    assert.equal(p.pickupName, row.pickup_name); assert.equal(p.docNo, 3); assert.equal(p.leaveDate, '2026-11-28');
+    const h = t.card(row, false);
+    assert.ok(!h.includes('<img src=x') && !h.includes('<b>ก')); assert.match(h, /อนุญาตแล้ว · รอออก/); assert.match(h, /data-gt-lv="a\/pickup.jpg"/); assert.match(h, /ม\.1\/1/);
+    assert.match(t.card({ ...row, status: 'out', out_at: new Date().toISOString() }, false), /ออกแล้ว/);
+  },
+  'roles: executive reads everything but is read-only in the site; registry menu shown': () => {
+    const keep = Store.profile;
+    Store.profile = { id: 'e', role: 'executive', apps: {} };
+    assert.ok(Store.readsAll()); assert.ok(Store.readOnly()); assert.ok(!Store.isAdmin());
+    Store.profile = { id: 'g', role: 'grade_head', apps: {} };
+    assert.ok(!Store.readOnly());
+    Store.profile = keep;
+    assert.ok(ctx.Pages.ROLES.executive && ctx.Pages.ROLES.security);
   },
   'nurse insurance: header found below the title rows, staff skipped, IDs cleaned, short IDs kept aside, notice escaped': () => {
     const t = ctx.NurseApp._test;
