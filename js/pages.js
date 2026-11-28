@@ -220,7 +220,7 @@
       <div class="card rule profile">${avatar(s, true)}
         <div class="who"><h2>${esc(fullName(s))} ${statusBadge(s.status)}</h2>
           <div class="kv"><span><b>รหัส</b><span class="mono">${esc(s.id)}</span></span><span><b>ชื่อเล่น</b>${esc(s.nick)}</span><span><b>ชั้น</b>${klass(s)} เลขที่ ${s.no}</span><span><b>ครูที่ปรึกษา</b>${esc(s.advisor)}</span></div>
-          <div class="kv"><span><b>ผู้ปกครอง</b>${esc(s.guardian)} · <span class="mono">${esc(s.guardianPhone)}</span></span></div></div>
+          <div class="kv"><span><b>ผู้ปกครอง</b>${esc(s.guardian)} · ${UI.telLinks(s.guardianPhone)}</span></div></div>
         <div class="actions no-print">
           ${on('behavior') ? `<button class="btn accent" data-action="behavior-record" data-student="${esc(s.id)}">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}
           ${on('counsel') && Store.seesAll() ? `<button class="btn secondary" data-action="counsel-record" data-student="${esc(s.id)}">${icon('message-square-plus')}บันทึกให้คำปรึกษา</button>` : ''}
