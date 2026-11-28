@@ -68,9 +68,9 @@
     const st = await state().catch(() => 'unsupported');
     const line = (ic, tone, html, btns = '') => `<div class="notice ${tone} push-line">${icon(ic, 'i16')}<span>${html}</span>${btns ? `<span class="push-btns">${btns}</span>` : ''}</div>`;
     const btn = (k, label, cls = 'secondary') => `<button type="button" class="btn ${cls} sm" data-push="${k}">${label}</button>`;
-    if (st === 'unsupported') { box.innerHTML = ''; return; }
-    box.innerHTML = st === 'on' ? line('bell-ring', 'success', `<b>การแจ้งเตือนเปิดอยู่บนเครื่องนี้</b> · ${esc(what)}`, btn('test', 'ส่งทดสอบ') + btn('off', 'ปิด', 'ghost'))
-      : st === 'off' ? line('bell', 'info', `<b>รับการแจ้งเตือนบนเครื่องนี้</b> · ${esc(what)} แม้ไม่ได้เปิดเว็บ`, btn('on', 'เปิดการแจ้งเตือน', 'primary'))
+    // turned on = nothing shown (user, 28 Nov 2026); the line stays until the person allows notifications
+    if (st === 'unsupported' || st === 'on') { box.innerHTML = ''; return; }
+    box.innerHTML = st === 'off' ? line('bell', 'info', `<b>รับการแจ้งเตือนบนเครื่องนี้</b> · ${esc(what)} แม้ไม่ได้เปิดเว็บ`, btn('on', 'เปิดการแจ้งเตือน', 'primary'))
       : st === 'framed' ? line('bell', 'info', `<b>การแจ้งเตือน</b> เปิดได้เมื่อเข้าระบบจากลิงก์หลัก`, `<a class="btn primary sm" href="${MAIN}" target="_blank" rel="noopener">เปิดลิงก์หลัก</a>`)
       : st === 'ios' ? line('smartphone', 'info', `<b>iPhone / iPad:</b> กดปุ่มแชร์ ${icon('share', 'i16')} → <b>เพิ่มไปยังหน้าจอโฮม</b> แล้วเปิดระบบจากไอคอนนั้น จึงเปิดการแจ้งเตือนได้ (iOS 16.4 ขึ้นไป)`)
       : line('bell-off', 'warn', '<b>เบราว์เซอร์บล็อกการแจ้งเตือนไว้</b> · เปิดได้ที่การตั้งค่าเว็บไซต์ (รูปแม่กุญแจข้างที่อยู่เว็บ) → การแจ้งเตือน → อนุญาต แล้วโหลดหน้าใหม่');
@@ -78,10 +78,9 @@
     box.querySelectorAll('[data-push]').forEach((b) => b.addEventListener('click', async () => {
       b.disabled = true;
       try {
-        const k = b.dataset.push;
-        if (k === 'on') { await enable(); UI.toast('เปิดการแจ้งเตือนแล้ว'); }
-        else if (k === 'off') { await disable(); UI.toast('ปิดการแจ้งเตือนบนเครื่องนี้แล้ว'); }
-        else { await Store.pushTest(); UI.toast('ส่งแล้ว การแจ้งเตือนจะขึ้นภายในไม่กี่วินาที'); }
+        await enable();
+        UI.toast('เปิดการแจ้งเตือนแล้ว · ระบบส่งการแจ้งเตือนทดสอบให้ 1 ครั้ง');
+        Store.pushTest().catch(() => {}); // proves it works on this device right away
       } catch (e) {
         if (e.message === BRAVE) { box.innerHTML = line('bell-off', 'warn', BRAVE_HTML, btn('on', 'ลองอีกครั้ง', 'primary')); UI.refreshIcons(); box.querySelector('[data-push]').addEventListener('click', () => fill(box)); return; }
         UI.toast(e.message || String(e));
