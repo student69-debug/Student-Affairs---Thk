@@ -376,15 +376,16 @@
       <div class="card" id="rg-list"><div class="toolbar" data-stat-sync>
         <input class="input grow" id="rg-q" placeholder="ค้นหารหัส / ชื่อ">
         <select class="select" id="rg-grade" aria-label="ระดับชั้น"><option value="">${admin ? 'ทุกชั้น' : 'ทุกระดับที่ดูแล'}</option>${grades.map((g) => `<option value="${g}" ${q.grade === String(g) ? 'selected' : ''}>ม.${g}</option>`).join('')}</select>
+        <select class="select" id="rg-room" aria-label="ห้อง"></select>
         <select class="select" id="rg-sex" aria-label="เพศ"><option value="">ทุกเพศ</option>${Object.entries(SEX).map(([k, v]) => `<option value="${k}" ${q.sex === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
         <select class="select" id="rg-status" aria-label="สถานะ"><option value="">ทุกสถานะ</option>${Object.entries(UI.STATUS).map(([k, v]) => `<option value="${k}" ${q.status === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select>
         ${admin ? `<button class="btn ghost sm" data-action="registry-export">${icon('download', 'i16')}ส่งออก CSV</button>` : ''}</div>
         <div class="tbl-wrap" id="rg-table"></div></div>`,
       after() {
         const draw = () => {
-          const t = document.getElementById('rg-q').value.trim().toLowerCase(), g = document.getElementById('rg-grade').value, st = document.getElementById('rg-status').value, sx = document.getElementById('rg-sex').value;
+          const t = document.getElementById('rg-q').value.trim().toLowerCase(), g = document.getElementById('rg-grade').value, st = document.getElementById('rg-status').value, sx = document.getElementById('rg-sex').value, r = document.getElementById('rg-room').value;
           if (drawn++) Apps.markStats(Apps.hashOf('#/registry', { status: st, grade: g, sex: sx }));
-          const list = D().students.filter((s) => grades.includes(Number(s.grade)) && (!g || String(s.grade) === g) && (!st || s.status === st) && (!sx || sexOf(s) === sx) && (!t || [s.id, fullName(s), s.nick].some((x) => x.toLowerCase().includes(t))))
+          const list = D().students.filter((s) => grades.includes(Number(s.grade)) && (!g || String(s.grade) === g) && (!r || String(s.room) === r) && (!st || s.status === st) && (!sx || sexOf(s) === sx) && (!t || [s.id, fullName(s), s.nick].some((x) => x.toLowerCase().includes(t))))
             .sort((a, b) => a.grade - b.grade || a.room - b.room || a.no - b.no);
           document.getElementById('rg-table').innerHTML = `<table class="tbl"><thead><tr><th>รหัส</th><th>ชื่อ – นามสกุล</th><th>ชื่อเล่น</th><th>ชั้น</th><th class="num">เลขที่</th><th>ครูที่ปรึกษา</th><th>สถานะ</th><th></th></tr></thead><tbody>
             ${list.slice(0, 300).map((s) => `<tr><td class="mono">${esc(s.id)}</td><td><a href="#/student/${esc(s.id)}">${esc(fullName(s))}</a></td><td>${esc(s.nick)}</td><td>${klass(s)}</td><td class="num">${s.no}</td><td>${esc(s.advisor)}</td><td>${statusBadge(s.status)}</td>
@@ -392,7 +393,17 @@
           UI.refreshIcons();
         };
         let drawn = 0;
-        ['rg-q', 'rg-grade', 'rg-status', 'rg-sex'].forEach((i) => document.getElementById(i).addEventListener('input', draw));
+        // room list follows the chosen grade (user, 28 Nov 2026: "มีให้เลือกแค่ระดับชั้นแต่ไม่มีเลือกห้อง")
+        const roomSel = document.getElementById('rg-room');
+        const fillRooms = (keep) => {
+          const g = document.getElementById('rg-grade').value;
+          const rooms = g ? [...new Set(D().students.filter((s) => String(s.grade) === g).map((s) => Number(s.room)))].sort((a, b) => a - b) : [];
+          roomSel.innerHTML = `<option value="">${g ? 'ทุกห้อง' : 'เลือกชั้นก่อน'}</option>` + rooms.map((r) => `<option value="${r}" ${String(keep) === String(r) ? 'selected' : ''}>ม.${esc(g)}/${r}</option>`).join('');
+          roomSel.disabled = !g;
+        };
+        fillRooms(q.room);
+        document.getElementById('rg-grade').addEventListener('input', () => fillRooms(''));
+        ['rg-q', 'rg-grade', 'rg-room', 'rg-status', 'rg-sex'].forEach((i) => document.getElementById(i).addEventListener('input', draw));
         draw();
       } };
   }
