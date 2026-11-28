@@ -722,6 +722,33 @@
       onSubmit: () => { d.close(); loginScreen('in', () => t('memberHint'), email); return false; } });
   }
 
+  // gate TV not yet paired (28 Nov 2026): a big code; an admin types it in Settings → จอทีวีป้อมยาม, then the TV signs itself in
+  async function tvScreen() {
+    const secret = Store.tvSecret(), hash = await Store.sha256(secret);
+    let code = null;
+    const show = (inner) => gate(`<div class="tv-pair">${BRAND}${inner}</div>`, true);
+    async function fresh() {
+      code = null;
+      const r = await Store.tvStart(hash).catch(() => null);
+      if (!r || r.state !== 'ok') { show(`<p class="tv-note">${icon('wifi-off', 'i28')}<br>ยังเชื่อมต่อไม่ได้ ระบบจะลองใหม่เองใน 30 วินาที</p>`); setTimeout(fresh, 30000); return; }
+      code = r.code;
+      show(`<h1>จอทีวีป้อมยาม</h1><p class="tv-note">ผู้ดูแลระบบ: เมนู <b>ตั้งค่า → จอทีวีป้อมยาม</b> แล้วใส่รหัสนี้</p>
+        <div class="tv-code" aria-label="รหัสจับคู่">${esc(code.slice(0, 3))}-${esc(code.slice(3))}</div>
+        <p class="muted">รหัสใช้ได้ 15 นาที หมดแล้วระบบสร้างรหัสใหม่ให้เอง · จับคู่ครั้งเดียว ไม่ต้องใส่รหัสผ่านบนทีวี</p>`);
+    }
+    async function poll() {
+      if (!code) return;
+      const st = await Store.tvStatus(code, hash).catch(() => 'error');
+      if (st === 'ready') {
+        clearInterval(timer);
+        show(`<p class="tv-note">${icon('loader', 'i28')}<br>กำลังเชื่อมต่อ…</p>`);
+        try { await Store.tvActivate(code, secret); location.reload(); } catch (e) { show(`<p class="tv-note">เชื่อมต่อไม่สำเร็จ จะเริ่มใหม่ใน 10 วินาที</p>`); setTimeout(() => location.reload(), 10000); }
+      } else if (st === 'expired' || st === 'invalid' || st === 'used') fresh();
+    }
+    const timer = setInterval(poll, 3000);
+    await fresh();
+  }
+
   function loginScreen(mode = 'in', msg = '', email = '') {
     if (mode === 'parent' || mode === 'activate') return parentScreen(mode, msg);
     if (mode === 'forgot') return forgotScreen();
@@ -906,12 +933,17 @@
       }
       const session = await Store.session();
       if (Store.recovery()) return recoveryScreen(session);
+      if (!session && (/^#\/?tv/.test(location.hash) || Store.isTv())) return tvScreen();
       if (!session) return loginScreen(/^#\/?parent/.test(location.hash) ? 'parent' : 'in');
       const p = await Store.loadProfile();
       if (p && p.role === 'parent') { if (window.Push) Push.register(); return Parent.render(gate); }
       if (!p || p.role === 'pending' || p.role === 'none') return pendingScreen(p);
       // gate TV: the security account sees only this screen; staff who may watch the gate open it at #/gate (new tab from the leave app)
-      if (p.role === 'security') return Gate.render((h) => gate(h, true));
+      if (p.role === 'security') {
+        // a revoked TV (account deleted) loses its sign-in: back to the pairing code
+        Store.sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') location.reload(); });
+        return Gate.render((h) => gate(h, true));
+      }
       if (/^#\/?gate/.test(location.hash) && ['admin', 'inspector', 'executive'].includes(p.role)) return Gate.render((h) => gate(h, true), true);
       gate(`<div class="login" style="align-items:center">${icon('loader', 'i28')}<div class="muted">กำลังโหลดข้อมูล…</div></div>`);
       await Store.load();

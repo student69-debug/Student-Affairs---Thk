@@ -139,7 +139,8 @@
 
     async session() {
       const s = check(await sb.auth.getSession()).session;
-      if (s && remembers() && !this.recovery()) {
+      // a paired gate TV keeps its sign-in (no 30-day rule); an admin revokes it by deleting the TV account
+      if (s && remembers() && !this.recovery() && ls.get('sa-tv') !== '1') {
         const at = Number(ls.get('sa-login-at')) || 0;
         if (!at) ls.set('sa-login-at', String(Date.now())); // signed in before this rule: count 30 days from now
         else if (Date.now() - at > REMEMBER_DAYS * 864e5) { await sb.auth.signOut({ scope: 'local' }); return null; }
@@ -202,7 +203,30 @@
       check(await sb.rpc('profile_request', { p_name: name }));
       return this.loadProfile();
     },
-    async signOut() { const wasParent = this.profile && this.profile.role === 'parent'; ss.set('sa-recovery', null); await sb.auth.signOut(); location.hash = wasParent ? '#/parent' : '#/'; location.reload(); },
+    async signOut() { ls.set('sa-tv', '0'); const wasParent = this.profile && this.profile.role === 'parent'; ss.set('sa-recovery', null); await sb.auth.signOut(); location.hash = wasParent ? '#/parent' : '#/'; location.reload(); },
+
+    /* ---- gate-TV pairing (28 Nov 2026): the TV keeps a random secret, shows a code; an admin accepts the code ---- */
+    tvSecret() {
+      let s = ls.get('sa-tv-secret');
+      if (!/^[0-9a-f]{64}$/.test(s || '')) { s = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, '0')).join(''); ls.set('sa-tv-secret', s); }
+      return s;
+    },
+    async sha256(text) { return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))), (b) => b.toString(16).padStart(2, '0')).join(''); },
+    async tvStart(hash) { return check(await sb.rpc('tv_pair_start', { p_hash: hash })); },
+    async tvStatus(code, hash) { return check(await sb.rpc('tv_pair_status', { p_code: code, p_hash: hash })); },
+    async tvActivate(code, secret) {
+      const res = await fetch(SA_CONFIG.supabaseUrl + '/functions/v1/tv-activate', {
+        method: 'POST', headers: { apikey: SA_CONFIG.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ code, secret }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.token) throw new Error(body.error || 'server');
+      this.setRemember(true);
+      ls.set('sa-tv', '1');
+      check(await sb.auth.verifyOtp({ token_hash: body.token, type: 'email' }));
+      ls.set('sa-tv-secret', ''); // used once; a new pairing makes a new one
+    },
+    isTv: () => ls.get('sa-tv') === '1',
+    async tvApprove(code, name) { return check(await sb.rpc('tv_pair_approve', { p_code: code, p_name: name })); },
 
     /* ---- parents ---- */
     parentEmail: (studentId) => 'p' + String(studentId).trim() + '@parents.thk-student-affairs.invalid',

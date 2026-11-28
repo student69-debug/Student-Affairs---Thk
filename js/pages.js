@@ -255,7 +255,7 @@
           <td>${appsCell(u, admin)}</td>${act ? `<td>${usedCell(u)}</td>` : ''}${admin ? `<td style="text-align:right">${u.id !== Store.user().id ? `<button class="icon-btn danger" title="ลบผู้ใช้ออกจากระบบ" aria-label="ลบผู้ใช้ ${esc(u.name)}" data-action="user-delete" data-id="${u.id}">${icon('user-x', 'i16')}</button>` : ''}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
   }
 
-  const STAFF_ACTIONS = ['สมัครใช้งาน', 'อนุมัติผู้ใช้', 'เปลี่ยนบทบาท', 'เปลี่ยนสิทธิ์แอป', 'กำหนดห้องที่ปรึกษา', 'กำหนดระดับชั้น', 'ลบบัญชีผู้ใช้'];
+  const STAFF_ACTIONS = ['สมัครใช้งาน', 'อนุมัติผู้ใช้', 'เปลี่ยนบทบาท', 'เปลี่ยนสิทธิ์แอป', 'กำหนดห้องที่ปรึกษา', 'กำหนดระดับชั้น', 'ลบบัญชีผู้ใช้', 'จับคู่จอทีวี'];
   const isStaffEvent = (x) => STAFF_ACTIONS.includes(x.action) || (x.action === 'ลบไม่สำเร็จ' && /บัญชีผู้ใช้/.test(x.detail || ''));
   const histBadge = (x) => `<span class="badge ${/ไม่สำเร็จ/.test(x.action) ? 'b-warning' : /^ลบ/.test(x.action) ? 'b-danger' : /อนุมัติ|สมัคร/.test(x.action) ? 'b-success' : /เปลี่ยน|กำหนด/.test(x.action) ? 'b-info' : 'b-neutral'}">${esc(x.action)}</span>`;
 
@@ -1007,9 +1007,40 @@
     });
   }
 
+  // gate-TV pairing (28 Nov 2026): the TV shows a code at <site>#/tv, the admin types it here; each TV = one hidden account (role security)
+  const TV_URL = 'https://student69-debug.github.io/Student-Affairs---Thk/#/tv';
+  function tvHtml() {
+    const tvs = D().users.filter((u) => u.role === 'security');
+    return `<div class="card" style="max-width:720px"><div class="card-head"><h3>จับคู่จอทีวีป้อมยาม</h3></div><div class="card-body">
+        <ol class="tv-steps"><li>ที่ทีวี เปิด <code>${esc(TV_URL)}</code> (ตั้งเป็นหน้าแรกของเบราว์เซอร์ / แอป Kiosk ให้เปิดเองตอนเปิดเครื่อง)</li>
+          <li>ทีวีแสดงรหัส 6 ตัว เช่น <b>K7P-4QX</b></li><li>ใส่รหัสและตั้งชื่อจอด้านล่าง → ทีวีขึ้นจอป้อมยามเองภายในไม่กี่วินาที</li></ol>
+        <form class="form-grid" id="tv-form" autocomplete="off">
+          <div class="field"><label for="tv-code">รหัสบนจอทีวี</label><input class="input mono" id="tv-code" name="code" required maxlength="7" pattern="[A-Za-z0-9]{3}-?[A-Za-z0-9]{3}" placeholder="K7P-4QX" style="text-transform:uppercase"></div>
+          <div class="field"><label for="tv-name">ชื่อจอ</label><input class="input" id="tv-name" name="name" required minlength="2" maxlength="60" placeholder="เช่น ป้อมยามประตูหน้า"></div>
+          <div class="full"><button class="btn primary" type="submit">${icon('link', 'i16')}จับคู่จอนี้</button></div></form>
+        <div class="notice" style="margin-top:12px">${icon('shield-check', 'i16')}<span>จอที่จับคู่แล้วเห็นเฉพาะจอป้อมยาม (นักเรียนที่ได้รับอนุญาตออกวันนี้ ไม่มีเลขบัตรหรือที่อยู่) ไม่ต้องใส่รหัสผ่านและไม่หมดอายุ · ยกเลิกได้ด้วยปุ่มลบด้านล่าง</span></div></div></div>
+      <div class="card" style="max-width:720px"><div class="card-head"><h3>จอที่จับคู่แล้ว</h3><span class="muted small">${tvs.length} จอ</span></div>
+        ${tvs.length ? `<div class="list">${tvs.map((u) => `<div class="list-row"><div class="grow"><b>${esc(u.name || '—')}</b><div class="muted small">${u.createdAt ? 'จับคู่ ' + fmtDate(u.createdAt, true) : ''}</div></div>
+          <button class="btn ghost sm danger" data-action="user-delete" data-id="${esc(u.id)}">${icon('unlink', 'i16')}ยกเลิกจอนี้</button></div>`).join('')}</div>` : empty('ยังไม่มีจอที่จับคู่', 'tv')}</div>`;
+  }
+  function bindTv() {
+    const f = document.getElementById('tv-form');
+    if (!f) return;
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const b = f.querySelector('button[type=submit]');
+      b.disabled = true;
+      try {
+        const r = await Store.tvApprove(f.code.value, f.name.value);
+        if (r === 'ok') { UI.toast('จับคู่แล้ว · ทีวีจะขึ้นจอป้อมยามภายในไม่กี่วินาที'); f.reset(); setTimeout(async () => { await Store.refresh('users', 'history'); App.render(); }, 8000); }
+        else UI.toast(r === 'name' ? 'ตั้งชื่อจอ 2–60 ตัวอักษร' : 'ไม่พบรหัสนี้ หรือรหัสหมดอายุแล้ว (ดูรหัสล่าสุดบนทีวี)');
+      } catch (err) { UI.toast('จับคู่ไม่สำเร็จ: ' + err.message); }
+      b.disabled = false;
+    });
+  }
   function settings(q) {
     const tab = q.tab || 'users';
-    const tabs = `<div class="tabs">${[['users', 'ผู้ใช้และสิทธิ์']].concat(Store.isAdmin() ? [['feedback', 'ข้อเสนอแนะ'], ['help', 'ถาม-ตอบ / LINE']] : [], [['term', 'ปีการศึกษา / ภาคเรียน'], ['apps', 'จัดการแอป'], ['parents', 'ผู้ปกครอง']]).concat(Store.isAdmin() ? [['subjects', 'ครูประจำวิชา'], ['api', 'การเชื่อมต่อ API']] : [], [['data', 'ข้อมูลระบบ']]).map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/settings?tab=${k}">${l}</button>`).join('')}</div>`;
+    const tabs = `<div class="tabs">${[['users', 'ผู้ใช้และสิทธิ์']].concat(Store.isAdmin() ? [['feedback', 'ข้อเสนอแนะ'], ['help', 'ถาม-ตอบ / LINE'], ['tv', 'จอทีวีป้อมยาม']] : [], [['term', 'ปีการศึกษา / ภาคเรียน'], ['apps', 'จัดการแอป'], ['parents', 'ผู้ปกครอง']]).concat(Store.isAdmin() ? [['subjects', 'ครูประจำวิชา'], ['api', 'การเชื่อมต่อ API']] : [], [['data', 'ข้อมูลระบบ']]).map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" data-action="go" data-href="#/settings?tab=${k}">${l}</button>`).join('')}</div>`;
     const admin = Store.isAdmin();
     const lock = admin ? '' : `<div class="notice warn">${icon('lock', 'i16')}<span>เฉพาะผู้ดูแลระบบที่แก้ไขการตั้งค่าได้ </span></div>`;
     let body = '';
@@ -1027,6 +1058,8 @@
       return { title: 'ตั้งค่า', html: tabs + subjectsHtml(), after: bindSubjects };
     } else if (tab === 'help' && admin && window.Help) {
       return { title: 'ตั้งค่า', html: tabs + Help.html(), after: Help.after };
+    } else if (tab === 'tv' && admin) {
+      return { title: 'ตั้งค่า', html: tabs + tvHtml(), after: bindTv };
     } else if (tab === 'feedback' && admin) {
       return { title: 'ตั้งค่า', html: tabs + Feedback.html(q), after: Feedback.after };
     } else if (tab === 'api' && admin) {
