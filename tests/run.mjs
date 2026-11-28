@@ -404,6 +404,13 @@ const tests = {
     assert.ok(!p('visit-photos', '"><script>').includes('<script>'));
     assert.ok(!p('visit-photos', 'javascript:alert(1)').includes('src="javascript'));
   },
+  'gate TV voice: the spoken sentence spells out the title, class and who picks up': () => {
+    const say = ctx.Gate._test.sayText;
+    assert.equal(say({ student: { prefix: 'ด.ช.', first: 'ก', last: 'ข', grade: 4, room: 2 }, pickup_relation: 'แม่', pickup_name: 'x' }),
+      'ประกาศ เด็กชายก ข ชั้นมัธยมศึกษาปีที่ 4 ห้อง 2 ได้รับอนุญาตออกนอกโรงเรียน แม่มารับ');
+    assert.match(say({ student: { prefix: 'น.ส.', first: 'ค', last: 'ง', grade: 6, room: 1 }, pickup_name: 'y' }), /^ประกาศ นางสาวค ง .* ผู้ปกครองมารับ$/);
+    assert.match(say({ student: { prefix: 'นาย', first: 'จ', last: 'ฉ', grade: 5, room: 3 } }), /^ประกาศ นายจ ฉ .*ออกนอกโรงเรียน$/);
+  },
   'gate TV: approved pass shows the form and the pickup photo, a pass that left is small, every value escaped': () => {
     const t = ctx.Gate._test;
     const row = { id: 'a', student_id: '40166', status: 'approved', doc_no: 3, doc_year: 2569, leave_date: '2026-11-28', out_plan: '10:30:00', returns: false, reason: 'doctor',

@@ -904,3 +904,6 @@ body.ro .page-head .actions .btn.accent, body.ro .page-head .actions .btn.primar
 .stu-tile .nm{font-size:14px;font-weight:500;line-height:1.3;overflow-wrap:anywhere}
 .stu-tile .nick{font-size:12px;color:var(--ink-500)}
 @media (max-width:520px){.stu-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:12px}.stu-tile .avatar{width:64px;height:64px}.stu-tile .nm{font-size:12.5px}}
+/* gate TV voice hint (28 Nov 2026) */
+.gt-hint{margin:0 24px 12px;padding:10px 16px;border-radius:12px;background:#fff7d6;color:#7a5400;font-size:18px;display:flex;gap:8px;align-items:center}
+.gt-hint[hidden]{display:none}
