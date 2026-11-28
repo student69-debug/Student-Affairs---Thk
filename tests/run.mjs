@@ -455,6 +455,19 @@ const tests = {
     assert.equal(t.followVals({ followDate: '2026-12-01', followFor: '' }, x).follow_date, '2026-12-01');
     assert.ok(t.isDue({ status: 'missed', at: '2999-01-01' })); assert.ok(!t.isDue({ status: 'scheduled', at: '2999-01-01' }));
   },
+  'home: my homeroom shows only studying students of my room, in number order, names escaped': () => {
+    Store.profile = { id: 't', role: 'teacher', name: 'x' }; Store.data.teacherRooms = [{ userId: 't', grade: 4, room: 1 }];
+    Store.data.students = [
+      { id: '40002', prefix: 'นาย', first: 'ข<b>', last: 'ค', nick: 'บี', grade: 4, room: 1, no: 2, advisor: 'ครู ก, ครู ข', status: 'studying' },
+      { id: '40001', prefix: 'นางสาว', first: 'ก', last: 'ค', grade: 4, room: 1, no: 1, advisor: 'ครู ก, ครู ข', status: 'studying' },
+      { id: '40003', prefix: 'นาย', first: 'ย้าย', last: 'ค', grade: 4, room: 1, no: 3, status: 'moved' },
+      { id: '40100', prefix: 'นาย', first: 'อื่น', last: 'ค', grade: 4, room: 2, no: 1, status: 'studying' }];
+    const h = Pages.myRoomsHtml();
+    assert.match(h, /ม\.4\/1/); assert.match(h, /ครู ก · ครู ข/); assert.match(h, /ทั้งหมด 2 คน/); assert.match(h, /ชาย 1/); assert.match(h, /หญิง 1/);
+    assert.ok(h.indexOf('40001') < h.indexOf('40002')); assert.doesNotMatch(h, /40003|40100/); assert.doesNotMatch(h, /ข<b>/);
+    Store.data.teacherRooms = [];
+    assert.equal(Pages.myRoomsHtml(), '');
+  },
   'earlier terms: only for admin, grade head and inspector, never a later term': () => {
     for (const [role, n] of [['admin', 1], ['grade_head', 1], ['inspector', 1], ['teacher', 0], ['counselor', 0]]) {
       Store.profile.role = role;

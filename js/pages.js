@@ -70,6 +70,20 @@
       <div class="grid g-dash">${cards.join('')}</div>`;
   }
 
+  // homeroom teachers' request (28 Nov 2026): the home page starts with my own room(s): advisors, counts, every student with photo
+  function myRoomsHtml() {
+    return Store.myRooms().map((t) => {
+      const list = D().students.filter((s) => s.status === 'studying' && Number(s.grade) === Number(t.grade) && Number(s.room) === Number(t.room))
+        .sort((a, b) => (Number(a.no) || 999) - (Number(b.no) || 999));
+      const advisors = [...new Set(list.flatMap((s) => String(s.advisor || '').split(/\s*[,/]\s*/)).map((x) => x.trim()).filter(Boolean))];
+      const n = (x) => list.filter((s) => sexOf(s) === x).length;
+      return `<div class="card my-room"><div class="card-head"><h3>${icon('school', 'i16')} ห้องที่ปรึกษาของฉัน · ม.${esc(t.grade)}/${esc(t.room)}</h3>
+          <a class="small" href="${Apps.hashOf('#/search', { grade: t.grade, room: t.room })}">ดูแบบรายการ ${icon('chevron-right', 'i16')}</a></div>
+        <div class="card-body my-room-info"><div><span class="muted small">ครูที่ปรึกษา</span><div>${advisors.length ? advisors.map(esc).join(' · ') : '<span class="muted">ยังไม่มีในทะเบียน</span>'}</div></div>
+          <div class="chips"><span class="badge b-navy">ทั้งหมด ${list.length} คน</span><span class="badge b-info">ชาย ${n('m')}</span><span class="badge b-danger">หญิง ${n('f')}</span>${n('x') ? `<span class="badge b-neutral">ไม่ระบุ ${n('x')}</span>` : ''}</div></div>
+        ${list.length ? `<div class="stu-grid">${list.map((s) => `<a class="stu-tile" href="#/student/${esc(s.id)}">${avatar(s)}<span class="no">เลขที่ ${esc(s.no || '—')}</span><span class="nm">${esc(fullName(s))}</span>${s.nick ? `<span class="nick">(${esc(s.nick)})</span>` : ''}</a>`).join('')}</div>` : empty('ยังไม่มีนักเรียนในห้องนี้', 'users')}</div>`;
+    }).join('');
+  }
   function home(q = {}) {
     const showToday = q.show === 'today', showWatch = q.show === 'watch';
     const ev = Apps.events();
@@ -97,6 +111,7 @@
       <div class="page-head"><div><h2>ภาพรวมวันนี้</h2><p>${fmtDate(new Date().toISOString())} · ภาคเรียนที่ ${Store.s.term}/${Store.s.year}${Store.seesAll() ? ' · นักเรียนทั้งโรงเรียน' : Store.myScopeText() ? ' · ' + Store.myScopeText() + ' (' + act.length.toLocaleString() + ' คน)' : ''}</p></div>
         <div class="actions">${on('behavior') ? `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}
         ${on('counsel') && Store.seesAll() ? `<button class="btn secondary" data-action="counsel-record">${icon('message-square-plus')}บันทึกให้คำปรึกษา</button>` : ''}</div></div>
+      ${myRoomsHtml()}
       ${!Store.seesAll() && !Store.myScopeText() && Store.user().role !== 'inspector' ? `<div class="notice warn">${icon('info', 'i16')}<span>บัญชีของคุณยังไม่ได้กำหนด${Store.user().role === 'grade_head' ? 'ระดับชั้นที่ดูแล' : 'ห้องที่ปรึกษา'} — ค้นหาและบันทึกพฤติกรรมได้ แต่จะยังไม่เห็นรายละเอียดนักเรียน กรุณาแจ้งผู้ดูแลระบบ</span></div>` : ''}
       <div class="grid ${Store.isAdmin() ? 'g6' : 'g5'}">
         ${stat('file-plus', 'บันทึกใหม่วันนี้', today.length, 'รายการ', '', 'จากทุกแอป', '#/?show=today&go=recent-list')}
@@ -1110,5 +1125,5 @@
     });
   }
 
-  window.Pages = { home, search, student, registry, teachers, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES, approveRequest, planFor, importRows, contactRows, sexOf, contactTemplate, photoRows, backupDialog };
+  window.Pages = { home, myRoomsHtml, search, student, registry, teachers, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES, approveRequest, planFor, importRows, contactRows, sexOf, contactTemplate, photoRows, backupDialog };
 })();
