@@ -227,12 +227,13 @@
     else if (!v.enabled) body = `<div class="card">${empty('ระบบสำหรับผู้ปกครองปิดใช้งานชั่วคราว', 'lock')}</div>`;
     else if (!v.students.length) body = `<div class="card">${empty('บัญชีนี้ยังไม่ได้เชื่อมกับนักเรียน กรุณาติดต่อครูที่ปรึกษา', 'user-x')}</div>`;
     else body = v.students.map(childCard).join('');
-    gate(`<div class="pv">${head}<main class="pv-main">${body}
+    gate(`<div class="pv">${head}<main class="pv-main">${window.Push && v && v.enabled ? Push.slot() : ''}${body}
       <p class="pv-foot">${icon('info', 'i16')}ข้อมูลจากกลุ่มบริหารกิจการนักเรียน · หากข้อมูลไม่ถูกต้องหรือมีข้อสงสัย กรุณาติดต่อครูที่ปรึกษา</p></main></div>`, true);
     document.getElementById('pv-out').addEventListener('click', () => Store.signOut());
     UI.hydratePhotos(document.getElementById('gate'));
     bindFilters(document.getElementById('gate'));
     bindLeave(document.getElementById('gate'), gate);
+    if (window.Push) Push.fillAll(document.getElementById('gate'));
   }
 
   window.Parent = { render };

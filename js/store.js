@@ -219,6 +219,11 @@
     },
     async parentView() { return check(await sb.rpc('parent_view')); },
     // leave requests filed by the student / parent (own linked child only, checked in the database)
+    // Web Push (28 Nov 2026): this device's registration; the database decides who gets which notification
+    async pushKey() { return check(await sb.rpc('push_public_key')); },
+    async pushSubscribe(endpoint, p256dh, auth, ua) { return check(await sb.rpc('push_subscribe', { p_endpoint: endpoint, p_p256dh: p256dh, p_auth: auth, p_ua: ua })); },
+    async pushUnsubscribe(endpoint) { return check(await sb.rpc('push_unsubscribe', { p_endpoint: endpoint })); },
+    async pushTest() { return check(await sb.rpc('push_test')); },
     async parentLeaves() { return check(await sb.rpc('parent_leave_list')) || []; },
     async gateBoard() { return check(await sb.rpc('gate_board')) || []; },
     async parentLeaveSave(p) { return check(await sb.rpc('parent_leave_save', { p })); },

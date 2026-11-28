@@ -166,6 +166,7 @@
     contentEl.querySelectorAll('.tabs').forEach((t) => { const b = t.querySelector('button.on'); if (!b || t.scrollWidth <= t.clientWidth) return; const tr = t.getBoundingClientRect(), br = b.getBoundingClientRect(); if (br.right > tr.right || br.left < tr.left) t.scrollLeft += br.left - tr.left - (tr.width - br.width) / 2; });
     if (window.Apps && Apps.attachRooms) Apps.attachRooms(contentEl);
     if (page.after) page.after();
+    if (window.Push) Push.fillAll(document.getElementById('content'));
     if (!samePage && window.Charts) Charts.animate(contentEl);
     UI.studentCards(document.getElementById('content'));
     UI.hydratePhotos(document.getElementById('content'));
@@ -907,7 +908,7 @@
       if (Store.recovery()) return recoveryScreen(session);
       if (!session) return loginScreen(/^#\/?parent/.test(location.hash) ? 'parent' : 'in');
       const p = await Store.loadProfile();
-      if (p && p.role === 'parent') return Parent.render(gate);
+      if (p && p.role === 'parent') { if (window.Push) Push.register(); return Parent.render(gate); }
       if (!p || p.role === 'pending' || p.role === 'none') return pendingScreen(p);
       // gate TV: the security account sees only this screen; staff who may watch the gate open it at #/gate (new tab from the leave app)
       if (p.role === 'security') return Gate.render((h) => gate(h, true));
@@ -921,6 +922,7 @@
       render();
       if (window.Feedback) Feedback.mount();
       startReminders();
+      if (window.Push) Push.register();
     } catch (err) {
       gate(`<div class="card rule login">${BRAND}${icon('wifi-off', 'i28')}<h2>เชื่อมต่อฐานข้อมูลไม่ได้</h2><p class="muted" style="margin:0">${esc(err.message)}</p><button class="btn primary" id="gate-reload">ลองอีกครั้ง</button></div>`);
       document.getElementById('gate-reload').addEventListener('click', () => location.reload());

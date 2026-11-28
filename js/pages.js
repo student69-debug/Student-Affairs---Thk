@@ -93,6 +93,7 @@
     return { title: 'หน้าแรก', html: `
       ${on('leave') && window.LeaveApp ? LeaveApp.homeNotice() : ''}
       ${on('behavior') && window.Inquiry && Inquiry.forMe().length ? `<a class="notice warn lv-remind" href="#/apps/behavior?tab=inquiry">${icon('file-search', 'i16')}<span><b>บันทึกการสอบสวน (ปค.03) รอคุณ ${Inquiry.forMe().length} รายการ</b> — กดเพื่อดู</span></a>` : ''}
+      ${window.Push ? Push.slot() : ''}
       <div class="page-head"><div><h2>ภาพรวมวันนี้</h2><p>${fmtDate(new Date().toISOString())} · ภาคเรียนที่ ${Store.s.term}/${Store.s.year}${Store.seesAll() ? ' · นักเรียนทั้งโรงเรียน' : Store.myScopeText() ? ' · ' + Store.myScopeText() + ' (' + act.length.toLocaleString() + ' คน)' : ''}</p></div>
         <div class="actions">${on('behavior') ? `<button class="btn accent" data-action="behavior-record">${icon('clipboard-pen')}บันทึกพฤติกรรม</button>` : ''}
         ${on('counsel') && Store.seesAll() ? `<button class="btn secondary" data-action="counsel-record">${icon('message-square-plus')}บันทึกให้คำปรึกษา</button>` : ''}</div></div>

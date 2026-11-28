@@ -235,6 +235,11 @@ a.app-card:hover{box-shadow:var(--shadow-2);border-color:var(--navy-300);color:i
 .notice.ok{background:var(--green-100);color:var(--green-700)}
 .notice.mute{background:var(--ink-100);color:var(--ink-700)}
 .notice.allergy{background:var(--red-700);color:var(--white);font-weight:500}
+.push-slot:empty{display:none}
+.push-slot{margin-bottom:14px}
+.push-line{align-items:center;flex-wrap:wrap}
+.push-line>span:first-of-type{flex:1;min-width:200px}
+.push-btns{display:flex;gap:6px;flex-wrap:wrap}
 .nh-box{display:grid;gap:8px}
 .nh-call{align-items:center;flex-wrap:wrap}
 .nh-call>span{flex:1;min-width:140px}
