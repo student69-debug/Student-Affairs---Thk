@@ -220,6 +220,17 @@
     return raw ? rows.map((r) => r.map((c) => (c == null ? '' : String(c)))) : rows;
   }
 
+  // every sheet of a workbook as [{ name, rows }] (a CSV is one sheet)
+  async function readSheets(file, raw = false) {
+    if (/\.csv$/i.test(file.name)) return [{ name: file.name, rows: parseCSV(await file.text()) }];
+    const X = await loadXlsx();
+    const wb = X.read(await file.arrayBuffer(), { type: 'array' });
+    return wb.SheetNames.map((n) => {
+      const rows = X.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '', raw });
+      return { name: n, rows: raw ? rows.map((r) => r.map((c) => (c == null ? '' : String(c)))) : rows };
+    });
+  }
+
   // fill <img data-photo="path"> with signed links from the private photo bucket
   async function hydratePhotos(root = document) {
     const imgs = [...root.querySelectorAll('img[data-photo]:not([src])')];
@@ -327,5 +338,5 @@
   new MutationObserver(queueA11y).observe(document.body, { childList: true, subtree: true });
   window.addEventListener('resize', queueA11y);
 
-  window.UI = { a11y, esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, studentCard, studentCards, telLinks, numAttrs, numValue, NUM, parseStudent, parseMyStudent, dialog, confirmDialog, deleteDialog, toast, refreshIcons, hydratePhotos, picImg, shrinkImage, readSheet, download, parseCSV };
+  window.UI = { a11y, esc, fmtDate, isToday, localInput, icon, signed, fullName, klass, initials, STATUS, statusBadge, scoreLevel, meter, SCREEN, screenBadge, empty, studentField, studentCard, studentCards, telLinks, numAttrs, numValue, NUM, parseStudent, parseMyStudent, dialog, confirmDialog, deleteDialog, toast, refreshIcons, hydratePhotos, picImg, shrinkImage, readSheet, readSheets, download, parseCSV };
 })();

@@ -601,6 +601,71 @@
     if (b) b.addEventListener('click', () => skipCSV('แถวที่ข้าม.csv', skipped));
     return false;
   }
+  /* เลขที่ by national ID (user, 28 Nov 2026: "เพิ่มเลขที่ที่ถูกต้อง … อ้างอิงเลขบัตรประชาชน"). The sheet needs a "เลขที่" header;
+     the national-ID column is found by its values (13 characters), whatever its header says. National IDs are matched here in the
+     admin's browser against the registry and never shown: skipped rows are listed by row number and student id only. */
+  const cidKey = (v) => String(v ?? '').replace(/[\s-]/g, '').replace(/\.0+$/, '').toUpperCase();
+  function numberRows(sheets) {
+    const tidy = (x) => String(x ?? '').replace(/[\u200b\ufeff]/g, '').replace(/\s+/g, ' ').trim();
+    const byCid = new Map(D().students.filter((s) => s.cid).map((s) => [cidKey(s.cid), s]));
+    for (const { name, rows } of sheets) {
+      const at = rows.slice(0, 10).findIndex((r) => r.some((h) => tidy(h) === 'เลขที่'));
+      if (at < 0) continue;
+      const head = rows[at].map(tidy), noIdx = head.indexOf('เลขที่');
+      const body = rows.slice(at + 1);
+      const width = Math.max(0, ...body.map((r) => r.length));
+      let cidIdx = -1, best = 0;
+      for (let j = 0; j < width; j++) {
+        const vals = body.map((r) => cidKey(r[j])).filter(Boolean);
+        const n = vals.filter((v) => /^[0-9A-Z]{13}$/.test(v)).length;
+        if (vals.length && n / vals.length >= 0.8 && n > best) { best = n; cidIdx = j; }
+      }
+      if (cidIdx < 0) continue;
+      const gIdx = head.indexOf('ชั้น'), rIdx = head.indexOf('ห้อง');
+      const seen = new Map();
+      body.forEach((r) => { const k = cidKey(r[cidIdx]); if (k) seen.set(k, (seen.get(k) || 0) + 1); });
+      const out = [], skipped = [];
+      let same = 0;
+      body.forEach((r, i) => {
+        const k = cidKey(r[cidIdx]), noTxt = tidy(r[noIdx]);
+        if (!k && !noTxt) return;
+        const s = byCid.get(k), no = Number(noTxt);
+        const g = gIdx < 0 ? '' : tidy(r[gIdx]).replace(/^ม\.?\s*/, ''), room = rIdx < 0 ? '' : tidy(r[rIdx]);
+        const why = !/^[0-9A-Z]{13}$/.test(k) ? 'เลขบัตรประชาชนไม่ครบ 13 หลัก' : !s ? 'ไม่พบเลขบัตรนี้ในทะเบียน' : seen.get(k) > 1 ? 'เลขบัตรซ้ำในไฟล์'
+          : !/^\d{1,3}$/.test(noTxt) || no < 1 || no > 99 ? 'เลขที่ว่างหรือไม่ถูกต้อง (' + (noTxt || 'ว่าง') + ')'
+          : (g && String(s.grade) !== g) || (room && String(s.room) !== room) ? `ห้องในไฟล์ ม.${g}/${room} ไม่ตรงกับทะเบียน ม.${s.grade}/${s.room}` : '';
+        if (why) { skipped.push([at + i + 2, s ? s.id : '', why]); return; }
+        if (Number(s.no) === no) same++; else out.push({ ...s, no });
+      });
+      // two studying students with the same number in one room after the import: reported, not blocked
+      const after = new Map(D().students.map((s) => [s.id, s]));
+      out.forEach((s) => after.set(s.id, s));
+      const count = new Map();
+      [...after.values()].filter((s) => s.status === 'studying').forEach((s) => { const key = `ม.${s.grade}/${s.room} เลขที่ ${s.no}`; count.set(key, (count.get(key) || 0) + 1); });
+      const dups = [...count.entries()].filter(([, n]) => n > 1).map(([key, n]) => `${key} (${n} คน)`);
+      return { sheet: name, out, skipped, same, dups, error: out.length || skipped.length || same ? '' : 'ไม่มีเลขที่ในไฟล์' };
+    }
+    return { out: [], skipped: [], same: 0, dups: [], error: 'ไม่พบชีตที่มีหัวคอลัมน์ "เลขที่" และคอลัมน์เลขบัตรประชาชน 13 หลัก' };
+  }
+  async function importNumbers(f) {
+    const sheets = await UI.readSheets(f, true);
+    await Store.refresh('students'); // rows are saved whole, so start from what is in the database now
+    const { sheet, out, skipped, same, dups, error } = numberRows(sheets);
+    if (error) { UI.toast('นำเข้าไม่ได้: ' + error, 'error'); return false; }
+    UI.dialog({ title: 'ตรวจก่อนนำเข้าเลขที่', submitLabel: 'บันทึกเลขที่ ' + out.length + ' คน', cancelLabel: out.length ? 'ยกเลิก' : 'ปิด',
+      body: `<div class="notice">${icon('info', 'i16')}<span>ชีต <b>${esc(sheet)}</b> · เปลี่ยนเลขที่ <b>${out.length}</b> คน · เลขที่เดิมถูกแล้ว ${same} คน · ข้าม <b>${skipped.length}</b> แถว<br>จับคู่ด้วยเลขบัตรประชาชน แก้เฉพาะเลขที่ ข้อมูลอื่นไม่เปลี่ยน แถวที่ข้ามคงเลขที่เดิม</span></div>
+        ${dups.length ? `<div class="notice warn">${icon('circle-alert', 'i16')}<span><b>เลขที่ซ้ำในห้องเดียวกัน (หลังนำเข้า) ${dups.length} จุด</b> — บันทึกได้ แต่ควรแก้ในไฟล์ต้นทาง<br>${dups.slice(0, 10).map(esc).join('<br>')}${dups.length > 10 ? '<br>…' : ''}</span></div>` : ''}
+        ${skipped.length ? `<div class="notice warn">${icon('circle-alert', 'i16')}<span><b>แถวที่ข้าม</b><br>${skipped.slice(0, 15).map(([n, id, why]) => esc(`แถว ${n}${id ? ' รหัส ' + id : ''}: ${why}`)).join('<br>')}${skipped.length > 15 ? '<br>… ดูทั้งหมดในไฟล์' : ''}</span></div>
+        <button type="button" class="btn secondary sm" id="no-skip" style="align-self:flex-start">${icon('download', 'i16')}ดาวน์โหลดรายการที่ข้าม</button>` : ''}`,
+      onSubmit: out.length ? async () => {
+        await Store.upsert('students', out);
+        await Store.log('', 'นำเข้าข้อมูล', `นำเข้าเลขที่จากไฟล์ ${f.name} (อ้างอิงเลขบัตรประชาชน) · เปลี่ยน ${out.length} คน · ข้าม ${skipped.length} แถว`);
+        UI.toast(`บันทึกเลขที่แล้ว ${out.length} คน`); App.render();
+      } : undefined });
+    const b = document.getElementById('no-skip');
+    if (b) b.addEventListener('click', () => skipCSV('เลขที่-แถวที่ข้าม.csv', skipped));
+    return false;
+  }
   // every studying student with the numbers known so far, to fill in and bring back
   function contactTemplate() {
     const list = Store.activeStudents().slice().sort((a, b) => a.grade - b.grade || a.room - b.room || a.no - b.no);
@@ -686,8 +751,8 @@
   }
   function importDialog() {
     UI.dialog({ title: 'นำเข้าข้อมูลนักเรียนจาก Excel', submitLabel: 'นำเข้า',
-      body: `<div class="field"><label>นำเข้าอะไร</label><select class="select" name="what"><option value="all">ข้อมูลทะเบียนทั้งหมด (ไฟล์ CSV)</option><option value="contact">ข้อมูลติดต่อ: เบอร์นักเรียน ผู้ปกครอง บิดา มารดา (ไฟล์ Excel หรือ CSV)</option><option value="photo">รูปถ่ายจากลิงก์ (ไฟล์ Excel หรือ CSV)</option></select></div>
-        <p style="margin:0"><b>ข้อมูลทะเบียนทั้งหมด:</b> ใน Excel เลือก <b>บันทึกเป็น → CSV UTF-8</b> แถวแรกต้องเป็นหัวคอลัมน์ตามแม่แบบ<br><b>ข้อมูลติดต่อ:</b> ใช้คอลัมน์ รหัสนักเรียน กับคอลัมน์ที่มี เช่น เบอร์โทรนักเรียน, ผู้ปกครอง, เบอร์โทร, ชื่อบิดา, เบอร์โทรบิดา, ชื่อมารดา, เบอร์โทรมารดา คอลัมน์อื่นไม่ถูกนำเข้า และตรวจรายการก่อนบันทึกได้<br><b>รูปถ่ายจากลิงก์:</b> ใช้คอลัมน์ รหัสนักเรียน (หรือรหัสประจำตัว) และ ลิงก์รูปภาพ คนที่มีรูปแล้วไม่ถูกเปลี่ยน</p>
+      body: `<div class="field"><label>นำเข้าอะไร</label><select class="select" name="what"><option value="all">ข้อมูลทะเบียนทั้งหมด (ไฟล์ CSV)</option><option value="contact">ข้อมูลติดต่อ: เบอร์นักเรียน ผู้ปกครอง บิดา มารดา (ไฟล์ Excel หรือ CSV)</option><option value="photo">รูปถ่ายจากลิงก์ (ไฟล์ Excel หรือ CSV)</option><option value="number">เลขที่ อ้างอิงเลขบัตรประชาชน (ไฟล์ Excel หรือ CSV)</option></select></div>
+        <p style="margin:0"><b>ข้อมูลทะเบียนทั้งหมด:</b> ใน Excel เลือก <b>บันทึกเป็น → CSV UTF-8</b> แถวแรกต้องเป็นหัวคอลัมน์ตามแม่แบบ<br><b>ข้อมูลติดต่อ:</b> ใช้คอลัมน์ รหัสนักเรียน กับคอลัมน์ที่มี เช่น เบอร์โทรนักเรียน, ผู้ปกครอง, เบอร์โทร, ชื่อบิดา, เบอร์โทรบิดา, ชื่อมารดา, เบอร์โทรมารดา คอลัมน์อื่นไม่ถูกนำเข้า และตรวจรายการก่อนบันทึกได้<br><b>เลขที่:</b> ใช้คอลัมน์หัว "เลขที่" กับคอลัมน์เลขบัตรประชาชน 13 หลัก (ระบบหาเองทุกชีต) แก้เฉพาะเลขที่<br><b>รูปถ่ายจากลิงก์:</b> ใช้คอลัมน์ รหัสนักเรียน (หรือรหัสประจำตัว) และ ลิงก์รูปภาพ คนที่มีรูปแล้วไม่ถูกเปลี่ยน</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn secondary sm" data-action="registry-template">${icon('download', 'i16')}แม่แบบทะเบียน</button><button type="button" class="btn secondary sm" data-action="contact-template">${icon('download', 'i16')}แม่แบบข้อมูลติดต่อ (มีรายชื่อ)</button></div>
         <div class="field"><label>ไฟล์ <span class="req">*</span></label><input class="input" type="file" name="file" accept=".csv,text/csv,.xlsx,.xls" required style="padding-top:6px"></div>
         <div class="notice">${icon('info', 'i16')}<span>ข้อมูลทะเบียนทั้งหมด: รหัสที่มีอยู่แล้วจะถูกอัปเดต (ช่องว่าง = คงข้อมูลเดิม) รหัสใหม่จะถูกเพิ่ม · ถ้ามีแถวใดผิด ระบบจะไม่นำเข้าเลย</span></div>`,
@@ -696,6 +761,7 @@
         if (!f) return false;
         if (v.what === 'contact') return importContacts(f);
         if (v.what === 'photo') return importPhotos(f);
+        if (v.what === 'number') return importNumbers(f);
         if (!/\.csv$/i.test(f.name)) { UI.toast('ข้อมูลทะเบียนทั้งหมดต้องเป็นไฟล์ CSV', 'error'); return false; }
         return f.text().then(async (txt) => {
           const rows = UI.parseCSV(txt);
@@ -1136,5 +1202,5 @@
     });
   }
 
-  window.Pages = { home, myRoomsHtml, search, student, registry, teachers, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES, approveRequest, planFor, importRows, contactRows, sexOf, contactTemplate, photoRows, backupDialog };
+  window.Pages = { home, myRoomsHtml, numberRows, search, student, registry, teachers, reports, settings, roomDialog, gradeDialog, autoRooms, appsDialog, studentDialog, statusDialog, deleteDialog, promoteDialog, exportCSV, importDialog, template, reportExport, ROLES, approveRequest, planFor, importRows, contactRows, sexOf, contactTemplate, photoRows, backupDialog };
 })();

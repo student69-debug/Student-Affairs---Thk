@@ -455,6 +455,29 @@ const tests = {
     assert.equal(t.followVals({ followDate: '2026-12-01', followFor: '' }, x).follow_date, '2026-12-01');
     assert.ok(t.isDue({ status: 'missed', at: '2999-01-01' })); assert.ok(!t.isDue({ status: 'scheduled', at: '2999-01-01' }));
   },
+  'import เลขที่: matched by national ID found by its values, only the number changes, bad rows skipped without showing IDs': () => {
+    Store.data.students = [
+      { id: '40001', cid: '1100000000011', first: 'ก', last: 'ข', grade: 4, room: 1, no: 5, status: 'studying', guardian: 'x' },
+      { id: '40002', cid: '1100000000022', first: 'ค', last: 'ง', grade: 4, room: 1, no: 2, status: 'studying' },
+      { id: '40003', cid: '1100000000033', first: 'จ', last: 'ฉ', grade: 4, room: 2, no: 1, status: 'studying' },
+      { id: '40004', cid: '1100000000044', first: 'ช', last: 'ซ', grade: 4, room: 1, no: 3, status: 'studying' }];
+    const sheets = [
+      { name: 'Sheet4', rows: [['เลขที่', 'รหัสประจำตัว'], ['1', '40001']] },
+      { name: 'Sheet1', rows: [[''], ['เลขประจำตัวนักเรียน', 'ชั้น', 'ห้อง', 'เลขที่', 'อื่น'],
+        ['1100000000011', 'ม.4', '1', '1', 'a'],
+        ['1100000000022', 'ม.4', '1', '2', 'b'],
+        ['1100000000033', 'ม.4', '1', '7', 'c'],
+        ['1100000000044', 'ม.4', '1', '0', 'd'],
+        ['1100000000099', 'ม.4', '1', '9', 'e'],
+        ['123', 'ม.4', '1', '4', 'f']] }];
+    const r = Pages.numberRows(sheets);
+    assert.equal(r.sheet, 'Sheet1');
+    assert.equal(JSON.stringify(r.out.map((s) => [s.id, s.no])), JSON.stringify([['40001', 1]]));
+    assert.equal(r.out[0].guardian, 'x'); assert.equal(r.same, 1);
+    assert.equal(JSON.stringify(r.skipped.map(([, id, why]) => [id, why.split(' ')[0]])), JSON.stringify([['40003', 'ห้องในไฟล์'], ['40004', 'เลขที่ว่างหรือไม่ถูกต้อง'], ['', 'ไม่พบเลขบัตรนี้ในทะเบียน'], ['', 'เลขบัตรประชาชนไม่ครบ']]));
+    assert.ok(!JSON.stringify(r.skipped).includes('1100000000'));
+    assert.match(Pages.numberRows([{ name: 'x', rows: [['เลขที่', 'ชื่อ'], ['1', 'a']] }]).error, /ไม่พบชีต/);
+  },
   'home: my homeroom shows only studying students of my room, in number order, names escaped': () => {
     Store.profile = { id: 't', role: 'teacher', name: 'x' }; Store.data.teacherRooms = [{ userId: 't', grade: 4, room: 1 }];
     Store.data.students = [
