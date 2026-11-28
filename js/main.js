@@ -62,6 +62,7 @@
     if ((first || fresh.length) && !typing && !document.getElementById('dialog-root').innerHTML && /^#\/?(\?|$)/.test(location.hash || '#/')) render();
   }
   async function checkReminders() {
+    Store.activityPing(); // once a Bangkok day: a tab left open overnight counts the next day too
     checkInquiries(false);
     if (!window.LeaveApp || Store.s.apps.leave === false || !Store.appOk('leave')) return;
     if (document.hidden) return;
@@ -84,6 +85,7 @@
     checkInquiries(true);
     clearInterval(remindTimer);
     remindTimer = setInterval(checkReminders, 60000);
+    Store.activityPing();
     if (!startReminders.on) { startReminders.on = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) checkReminders(); }); }
   }
 
@@ -112,7 +114,7 @@
     return { title: 'ไม่พบหน้า', html: `<div class="card">${UI.empty('ไม่พบหน้าที่ต้องการ', 'map-pin-off')}</div>` };
   }
 
-  let lastPath = null, lastBin = null, insIn = false;
+  let lastPath = null, lastBin = null, insIn = false, actIn = false;
   function render() {
     if (!Store.data) return;
     const { path, q } = parse();
@@ -133,6 +135,13 @@
     else {
       const wait = Store.ensureInsurance(!insIn);
       insIn = true;
+      if (wait) { document.getElementById('content').innerHTML = `<div class="card card-body muted">${UI.icon('loader', 'i16')} กำลังโหลด…</div>`; UI.refreshIcons(); wait.then(render); return; }
+    }
+    // days each teacher used the system: fetched each time ทะเบียนครู is entered (admin)
+    if (path !== 'teachers') actIn = false;
+    else {
+      const wait = Store.ensureActivity(!actIn);
+      actIn = true;
       if (wait) { document.getElementById('content').innerHTML = `<div class="card card-body muted">${UI.icon('loader', 'i16')} กำลังโหลด…</div>`; UI.refreshIcons(); wait.then(render); return; }
     }
     const samePage = path === lastPath;

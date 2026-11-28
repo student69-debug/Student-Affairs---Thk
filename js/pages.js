@@ -232,15 +232,26 @@
   const FIELDS = [['id', 'รหัสนักเรียน'], ['cid', 'เลขประจำตัวประชาชน'], ['prefix', 'คำนำหน้า'], ['first', 'ชื่อ'], ['last', 'นามสกุล'], ['nick', 'ชื่อเล่น'], ['grade', 'ชั้น'], ['room', 'ห้อง'], ['no', 'เลขที่'], ['advisor', 'ครูที่ปรึกษา'], ['guardian', 'ผู้ปกครอง'], ['guardianPhone', 'เบอร์โทร'], ['address', 'ที่อยู่'], ['studentPhone', 'เบอร์โทรนักเรียน'], ['father', 'ชื่อบิดา'], ['fatherPhone', 'เบอร์โทรบิดา'], ['mother', 'ชื่อมารดา'], ['motherPhone', 'เบอร์โทรมารดา']];
 
   // ตารางผู้ใช้ (ใช้ทั้งในทะเบียนครูและตั้งค่า → ผู้ใช้และสิทธิ์)
+  // days used (only the date is kept, since 28 Nov 2026): last day + how many of the last 7 / 30 days
+  const daysAgo = (d) => Math.round((Date.parse(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })) - Date.parse(d)) / 864e5);
+  const usedOf = (u) => (Store.activity && Store.activity.get(u.id)) || null;
+  function usedCell(u) {
+    if (u.role === 'pending') return '<span class="muted small">—</span>';
+    const a = usedOf(u);
+    if (!a) return '<span class="badge b-warning">ยังไม่เข้าใช้</span>';
+    const n = daysAgo(a.last);
+    return `<span class="badge ${n === 0 ? 'b-success' : n < 7 ? 'b-info' : 'b-warning'}">${n === 0 ? 'วันนี้' : n === 1 ? 'เมื่อวาน' : n + ' วันก่อน'}</span><div class="muted small">${a.d7} วันใน 7 วัน · ${a.d30} วันใน 30 วัน</div>`;
+  }
   function usersTable(list, admin) {
     if (!list.length) return empty('ไม่พบครูตามเงื่อนไข', 'search-x');
-    return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ชื่อ</th><th>บทบาท</th><th>สิทธิ์</th><th>ห้องที่ปรึกษา</th><th>แอปที่ใช้ได้</th>${admin ? '<th></th>' : ''}</tr></thead><tbody>
+    const act = admin && Store.activity;
+    return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ชื่อ</th><th>บทบาท</th><th>สิทธิ์</th><th>ห้องที่ปรึกษา</th><th>แอปที่ใช้ได้</th>${act ? '<th>เข้าใช้งาน</th>' : ''}${admin ? '<th></th>' : ''}</tr></thead><tbody>
         ${list.map((u) => `<tr><td>${esc(u.name)} ${u.id === Store.user().id ? '<span class="badge b-navy">คุณ</span>' : ''}${u.createdAt && Date.now() - new Date(u.createdAt) < 7 * 864e5 ? ' <span class="badge b-success">ใหม่</span>' : ''}<div class="muted small">${esc(u.email || '')}${u.createdAt ? ' · สมัคร ' + fmtDate(u.createdAt, true) : ''}</div>
           ${admin && u.role === 'pending' ? requestCell(u) + (canApprove(u) ? `<div class="req-line"><button class="btn primary sm" data-action="user-approve" data-id="${u.id}">${icon('user-check', 'i16')}อนุมัติ</button> <span class="muted small">หรือเลือกบทบาทเองในช่องถัดไป</span></div>` : '') : ''}</td>
           <td>${admin && u.id !== Store.user().id ? `<select class="select" style="height:32px;width:auto" data-user-role="${u.id}" aria-label="บทบาทของ ${esc(u.name)}">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${k === u.role ? 'selected' : ''}>${v}</option>`).join('')}</select>` : ROLES[u.role]}</td>
           <td class="muted small">${u.role === 'admin' ? 'ทะเบียนกลาง · ตั้งค่า · ทุกแอป · เนื้อหาลับ' : u.role === 'counselor' ? 'ทุกแอป · เนื้อหาลับของการให้คำปรึกษา' : u.role === 'teacher' ? 'ค้นหา ดู และบันทึกได้เฉพาะนักเรียนห้องที่ปรึกษา (และห้องที่สอน)' : u.role === 'grade_head' ? 'ค้นหา/บันทึกพฤติกรรมได้ทุกคน · รายละเอียดทุกห้องในระดับชั้นที่ดูแล (ไม่เห็นเนื้อหาลับ)' : u.role === 'inspector' ? 'ดู/บันทึกพฤติกรรมได้ทั้งโรงเรียน · รายละเอียดอื่นเฉพาะห้องที่ปรึกษา (ถ้ามี)' : 'ยังเข้าถึงข้อมูลไม่ได้'}</td>
           <td>${u.role === 'admin' || u.role === 'counselor' ? '<span class="muted small">ทุกห้อง</span>' : u.role === 'grade_head' ? `<div class="chips">${Store.gradesOf(u.id).map((g) => `<span class="badge b-navy">ระดับ ม.${g}</span>`).join('') || '<span class="badge b-warning">ยังไม่กำหนดระดับ</span>'}${admin ? `<button class="icon-btn" title="กำหนดระดับชั้น" data-action="grade-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : u.role === 'teacher' || u.role === 'inspector' ? `<div class="chips">${Store.roomsOf(u.id).map((t) => `<span class="badge b-info">ม.${t.grade}/${t.room}</span>`).join('') || (u.role === 'inspector' ? '<span class="muted small">ไม่มี (ไม่บังคับ)</span>' : '<span class="badge b-warning">ยังไม่กำหนด</span>')}${admin ? `<button class="icon-btn" title="กำหนดห้องที่ปรึกษา" data-action="room-edit" data-id="${u.id}">${icon('pencil', 'i16')}</button>` : ''}</div>` : '—'}</td>
-          <td>${appsCell(u, admin)}</td>${admin ? `<td style="text-align:right">${u.id !== Store.user().id ? `<button class="icon-btn danger" title="ลบผู้ใช้ออกจากระบบ" aria-label="ลบผู้ใช้ ${esc(u.name)}" data-action="user-delete" data-id="${u.id}">${icon('user-x', 'i16')}</button>` : ''}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
+          <td>${appsCell(u, admin)}</td>${act ? `<td>${usedCell(u)}</td>` : ''}${admin ? `<td style="text-align:right">${u.id !== Store.user().id ? `<button class="icon-btn danger" title="ลบผู้ใช้ออกจากระบบ" aria-label="ลบผู้ใช้ ${esc(u.name)}" data-action="user-delete" data-id="${u.id}">${icon('user-x', 'i16')}</button>` : ''}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
   }
 
   const STAFF_ACTIONS = ['สมัครใช้งาน', 'อนุมัติผู้ใช้', 'เปลี่ยนบทบาท', 'เปลี่ยนสิทธิ์แอป', 'กำหนดห้องที่ปรึกษา', 'กำหนดระดับชั้น', 'ลบบัญชีผู้ใช้'];
@@ -263,16 +274,18 @@
     const roleOpts = Object.entries(ROLES).filter(([k]) => k !== 'parent');
     // groups behind the summary cards: lead = every role above teacher · noroom = teachers without rooms yet
     const LEAD = ['grade_head', 'inspector', 'counselor', 'admin'];
-    const GROUPS = { lead: ['หัวหน้าระดับ / สารวัตร / แนะแนว / ผู้ดูแล', (u) => LEAD.includes(u.role)], noroom: ['ครูที่ปรึกษาที่ยังไม่กำหนดห้อง', (u) => u.role === 'teacher' && !Store.roomsOf(u.id).length] };
+    const GROUPS = { lead: ['หัวหน้าระดับ / สารวัตร / แนะแนว / ผู้ดูแล', (u) => LEAD.includes(u.role)], noroom: ['ครูที่ปรึกษาที่ยังไม่กำหนดห้อง', (u) => u.role === 'teacher' && !Store.roomsOf(u.id).length],
+      idle7: ['ไม่ได้เข้าใช้ใน 7 วัน', (u) => u.role !== 'pending' && !(usedOf(u) && usedOf(u).d7)], idle30: ['ไม่ได้เข้าใช้ใน 30 วัน', (u) => u.role !== 'pending' && !(usedOf(u) && usedOf(u).d30)] };
     const inRole = (u, r) => !r || (GROUPS[r] ? GROUPS[r][1](u) : u.role === r);
     const nOf = (r) => staff.filter((u) => inRole(u, r)).length;
     const href = (r) => '#/teachers' + (r ? '?role=' + r : '');
     return { title: 'ทะเบียนครู', actions, html: tabs + `
-      <div class="grid g4">
+      <div class="grid g5">
         ${Apps.stat('users', 'บุคลากรทั้งหมด', staff.length, 'คน', '', '', href(''))}
         ${Apps.stat('hourglass', 'รออนุมัติ', count('pending'), 'คน', 'amber', count('pending') ? 'เลือกบทบาทในตารางเพื่ออนุมัติ' : '', href('pending'))}
         ${Apps.stat('school', 'ครูที่ปรึกษา', count('teacher'), 'คน', 'green', `ยังไม่กำหนดห้อง ${nOf('noroom')} คน`, href('teacher'))}
         ${Apps.stat('layers', GROUPS.lead[0], nOf('lead'), 'คน', '', '', href('lead'))}
+        ${Apps.stat('user-x', GROUPS.idle7[0], nOf('idle7'), 'คน', 'red', 'นับวันที่เปิดใช้ระบบ เริ่มเก็บ 28 พ.ย. 2569', href('idle7'))}
       </div>
       <div class="card" id="tf-list"><div class="toolbar" data-stat-sync>
         <input class="input grow" id="tf-q" placeholder="ค้นหาชื่อ / อีเมล" value="${esc(q.q || '')}">

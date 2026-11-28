@@ -487,6 +487,21 @@
         .finally(() => { this.insLoaded = true; });
     },
     canInsurance() { return this.isAdmin() || this.nurseStaff(); },
+    /* ---- days each staff account used the system (only the date): ping once a Bangkok day while the page is open; admin reads a summary ---- */
+    activityPing() {
+      const day = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+      if (this.pingDay === day || !this.profile || ['parent', 'pending', 'security', 'none'].includes(this.profile.role)) return;
+      this.pingDay = day;
+      sb.rpc('activity_ping').then(({ error }) => { if (error) this.pingDay = null; });
+    },
+    activity: null, // Map user id → { last, d7, d30 } (admin, loaded when ทะเบียนครู opens)
+    ensureActivity(fresh) {
+      if (!this.isAdmin() || (this.activity && !fresh)) return null;
+      return sb.rpc('admin_activity').then(({ data, error }) => {
+        if (error) throw error;
+        this.activity = new Map((data || []).map((r) => [r.user_id, { last: r.last_day, d7: r.d7, d30: r.d30 }]));
+      }).catch((e) => { this.activity = new Map(); if (window.UI) UI.toast('โหลดข้อมูลการใช้งานไม่สำเร็จ: ' + e.message); });
+    },
     async insuranceImport(cids, insurer, replace) { const r = check(await sb.rpc('insurance_import', { p_year: this.data.settings.year, p_insurer: insurer, p_cids: cids, p_replace: replace })); await this.ensureInsurance(true); return r; },
     async insuranceSet(id, paid) { const r = check(await sb.rpc('insurance_set', { p_student: id, p_year: this.data.settings.year, p_paid: paid })); await this.ensureInsurance(true); return r; },
     async restoreCase(id) {
