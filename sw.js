@@ -9,7 +9,7 @@ self.addEventListener('push', (e) => {
   try { d = e.data ? e.data.json() : {}; } catch (x) { d = {}; }
   const url = typeof d.url === 'string' && /^#\//.test(d.url) ? d.url : '#/';
   e.waitUntil(self.registration.showNotification(d.title || 'Student Life', {
-    body: d.body || '', icon: 'img/icon-192.png', lang: 'th',
+    body: d.body || '', icon: 'img/icon-192.png?v=20261128f', lang: 'th',
     tag: d.tag || undefined, renotify: !!d.tag, data: { url },
   }));
 });
